@@ -7,7 +7,7 @@
 - **IOL 度数计算**：基于 Barrett Universal II 公式，支持单眼或双眼计算，可配置 A 常数、目标屈光度、硅油眼矫正等参数
 - **AI 识图填充**：上传 IOL Master 晶体单图片，自动识别并填充患者姓名、A 常数及双眼 AL、K1、K2、ACD 等参数，采用三次并发识别 + 多数决机制提升准确性
 - **Web UI**：内置可视化操作界面，支持手动输入与图片上传两种方式
-- **OpenAPI 接口**：提供标准 OpenAPI 规范，可通过 `/docs`（Swagger UI）或 `/redoc` 查看完整接口文档
+- **OpenAPI 接口**：提供标准 OpenAPI 规范，可通过 `/docs`（Swagger UI）或 `/openapi.json` 查看完整接口文档
 
 ## 环境变量
 
@@ -27,7 +27,7 @@
 # 安装依赖
 npm install
 
-# 设置 API 密钥（必需）
+# 设置 API 密钥（可选，仅 AI 识图功能需要）
 wrangler secret put OPENAI_API_KEY
 
 # 在 wrangler.jsonc 中配置 OPENAI_API_URL 和 OPENAI_MODEL（可选）

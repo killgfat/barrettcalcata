@@ -565,60 +565,6 @@ def get_swagger_ui_html():
 """
 
 
-def get_redoc_html():
-    """
-    返回ReDoc HTML页面（备用文档界面）
-    """
-    openapi_spec = json.dumps(get_openapi_spec(), ensure_ascii=False)
-
-    return f"""
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-    <meta charset="UTF-8">
-    <title>Barretcalcata API 文档 - ReDoc</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link href="https://fonts.googleapis.com/css?family=Montserrat:300,400,700|Roboto:300,400,700" rel="stylesheet">
-    <style>
-        body {{
-            margin: 0;
-            padding: 0;
-        }}
-        .header {{
-            background-color: #1e3a8a;
-            color: white;
-            padding: 20px;
-            text-align: center;
-        }}
-        .header h1 {{
-            margin: 0;
-            font-size: 2em;
-        }}
-        .header p {{
-            margin: 10px 0 0;
-            opacity: 0.9;
-        }}
-    </style>
-    <!-- ReDoc doesn't work with unpkg CDN -->
-    <!-- <script src="https://cdn.jsdelivr.net/npm/redoc@next/bundles/redoc.standalone.js"></script> -->
-</head>
-<body>
-    <div class="header">
-        <h1>Barretcalcata IOL Calculator API</h1>
-        <p>基于Cloudflare Workers的IOL（人工晶体）计算器API，支持AI图像识别提取医疗数据</p>
-        <p style="font-size: 0.9em; margin-top: 5px;">版本 1.0.0 | 使用 Swagger UI 查看完整文档</p>
-    </div>
-    <div style="padding: 20px; text-align: center;">
-        <h2>API 文档</h2>
-        <p>此页面使用 Swagger UI 显示 API 文档。</p>
-        <p>如需查看 ReDoc 版本，请访问 <a href="/redoc">/redoc</a></p>
-        <p>OpenAPI 规范：<a href="/openapi.json">/openapi.json</a></p>
-    </div>
-</body>
-</html>
-"""
-
-
 def get_openapi_json():
     """
     返回OpenAPI规范的JSON格式

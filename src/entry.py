@@ -6,7 +6,7 @@ from webui import get_webui_page
 from worker_ai import WorkerAI
 
 from api import APIHandler
-from docs import get_swagger_ui_html, get_redoc_html, get_openapi_json
+from docs import get_swagger_ui_html, get_openapi_json
 
 
 class Default(WorkerEntrypoint):
@@ -29,8 +29,6 @@ class Default(WorkerEntrypoint):
             return await self.handle_calculate(request)
         elif path == "/docs":
             return await self.handle_docs()
-        elif path == "/redoc":
-            return await self.handle_docs_redoc()
         elif path == "/openapi.json":
             return await self.handle_openapi_json()
 
@@ -46,7 +44,6 @@ class Default(WorkerEntrypoint):
                         "POST /api/extract - 从图片提取IOL数据",
                         "POST /api/calculate - 执行IOL计算",
                         "GET /docs - API文档页面（Swagger UI）",
-                        "GET /redoc - API文档页面（ReDoc）",
                         "GET /openapi.json - OpenAPI规范JSON",
                     ],
                 },
@@ -85,12 +82,6 @@ class Default(WorkerEntrypoint):
         """处理API文档页面请求（Swagger UI）"""
         return Response(
             get_swagger_ui_html(), headers={"Content-Type": "text/html; charset=utf-8"}
-        )
-
-    async def handle_docs_redoc(self):
-        """处理API文档页面请求（ReDoc）"""
-        return Response(
-            get_redoc_html(), headers={"Content-Type": "text/html; charset=utf-8"}
         )
 
     async def handle_openapi_json(self):
