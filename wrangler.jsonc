@@ -19,8 +19,7 @@
 	// 部署前执行的构建命令
 	"build": {
 		"command": "uv sync",
-		"deploy_command": "npx wrangler deploy",
-		"version_command": "npx wrangler versions upload"
+		"deploy_command": "npm run deploy"
 	},
 	"root": "/",
 
