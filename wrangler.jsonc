@@ -18,7 +18,7 @@
 	// ========== 构建配置（一键部署） ==========
 	// 部署前执行的构建命令
 	"build": {
-		"command": "npm run build",
+		"command": "uv sync",
 		"deploy_command": "npx wrangler deploy",
 		"version_command": "npx wrangler versions upload"
 	},
