@@ -27,7 +27,7 @@
 
 [![Deploy to Cloudflare Workers](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/killgfat/barrettcalcata)
 
-> 请自行在部署界面的高级选项中
+> 请自行在部署界面的高级选项中配置 `OPENAI_API_KEY` 的机密变量
 
 ### 手动部署
 
