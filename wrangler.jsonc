@@ -26,7 +26,6 @@
 	"vars": {
 		// OpenAI 兼容 API 的 Base URL（支持视觉能力的 VLM）
 		// 示例："https://api.openai.com/v1"
-		// 示例："https://gateway.ai.cloudflare.com/v1/your-account-id/your-worker-name"
 		"OPENAI_API_URL": "https://api.openai.com/v1",
 		
 		// 使用的模型名称（需支持视觉输入）
