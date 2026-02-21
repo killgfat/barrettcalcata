@@ -1,7 +1,7 @@
 [project]
-name = "barretcalcata"
-version = "0.1.0"
-description = "Add your description here"
+name = "barrettcalcata"
+version = "1.0.0"
+description = "Cloudflare Workers IOL calculator with Barrett Universal II formula and AI vision recognition for IOL Master reports."
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [

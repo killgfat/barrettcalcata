@@ -20,8 +20,8 @@ wheels = [
 ]
 
 [[package]]
-name = "barretcalcata"
-version = "0.1.0"
+name = "barrettcalcata"
+version = "1.0.0"
 source = { virtual = "." }
 dependencies = [
     { name = "beautifulsoup4" },
