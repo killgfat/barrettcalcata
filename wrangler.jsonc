@@ -19,7 +19,7 @@
 	// 部署前执行的构建命令
 	"build": {
 		"command": "uv sync",
-		"deploy_command": "npm run deploy"
+		"deploy_command": "uv run pywrangler deploy"
 	},
 	"root": "/",
 
