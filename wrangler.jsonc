@@ -18,7 +18,7 @@
 	"root": "/",
 
 	"build": {
-		"command": "npm run build"
+		"command": "uv sync"
 	},
 
 	// ========== 环境变量配置 ==========
