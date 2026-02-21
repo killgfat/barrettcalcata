@@ -106,6 +106,9 @@ INDEX_PAGE = """
                         <input type="file" id="imageUpload" name="imageUpload" accept="image/*" style="margin-bottom: 10px;">
                         <button type="button" id="extractBtn" class="btn" style="background: #28a745; margin-top: 10px;">从图片提取数据</button>
                         <div class="param-hint">支持JPG、PNG等格式，AI将自动识别并填充相关数据</div>
+                        <div style="margin-top: 10px; padding: 10px; background: #fff3cd; border: 1px solid #ffc107; border-radius: 5px; font-size: 0.9em; color: #856404;">
+                            <strong>⚠️ 注意：</strong>大模型识别不能保证100%准确，建议用户自行确认识别结果后再进行计算。
+                        </div>
                     </div>
                     <div id="imagePreview" style="margin-top: 10px; display: none;">
                         <img id="previewImg" style="max-width: 100%; max-height: 200px; border: 1px solid #ddd; border-radius: 5px;">

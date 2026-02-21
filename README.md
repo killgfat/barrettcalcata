@@ -23,6 +23,12 @@
 
 ## 快速部署
 
+### 一键部署（推荐）
+
+[![Deploy to Cloudflare Workers](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/killgfat/barrettcalcata)
+
+### 手动部署
+
 ```bash
 # 安装依赖
 npm install

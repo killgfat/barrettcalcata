@@ -28,6 +28,8 @@ pids
 !.dev.vars.example
 .env*
 !.env.example
+wrangler.jsonc
+!wrangler.jsonc.example
 
 # ==============================
 # Python
@@ -88,3 +90,8 @@ logs/
 # Ruff cache
 # ==============================
 .ruff_cache/
+
+# ==============================
+# Project specific
+# ==============================
+AGENTS.md
