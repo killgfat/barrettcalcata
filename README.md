@@ -11,13 +11,15 @@
 
 ## 环境变量
 
-| 变量 | 必需 | 说明 |
-|------|------|------|
-| `OPENAI_API_KEY` | **是** | API 密钥，通过 `wrangler secret put OPENAI_API_KEY` 设置 |
-| `OPENAI_API_URL` | 否 | OpenAI 兼容 API 的 Base URL（默认 `https://api.openai.com/v1`） |
-| `OPENAI_MODEL` | 否 | 使用的模型名称（默认 `gpt-4-vision-preview`） |
+以下变量均为可选，仅在使用 AI 识图功能时需要配置。
 
-> **注意**：AI 识图功能依赖 OpenAI 兼容 API，必须接入具备**视觉能力的 VLM**（Vision Language Model），普通 LLM 不支持图片输入，无法使用此功能。
+| 变量 | 说明 |
+|------|------|
+| `OPENAI_API_KEY` | API 密钥，通过 `wrangler secret put OPENAI_API_KEY` 设置 |
+| `OPENAI_API_URL` | OpenAI 兼容 API 的 Base URL（默认 `https://api.openai.com/v1`） |
+| `OPENAI_MODEL` | 使用的模型名称（默认 `gpt-4-vision-preview`） |
+
+> **注意**：AI 识图功能使用 OpenAI 兼容 API，需接入具备**视觉能力的 VLM**（Vision Language Model），普通 LLM 不支持图片输入。不配置以上变量时，IOL 计算功能仍可正常使用。
 
 ## 快速部署
 
