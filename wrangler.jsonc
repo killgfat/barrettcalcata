@@ -15,12 +15,6 @@
 		"enabled": true
 	},
 
-	// ========== 构建配置（一键部署） ==========
-	// 部署前执行的构建命令
-	"build": {
-		"command": "uv sync && uv pip install -e . --prefix .venv-workers",
-		"deploy_command": "uv run pywrangler deploy"
-	},
 	"root": "/",
 
 	// ========== 环境变量配置 ==========
