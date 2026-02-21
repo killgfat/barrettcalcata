@@ -1,0 +1,74 @@
+/**
+ * 模板配置文件 wrangler.jsonc
+ * 将此文件复制为 wrangler.jsonc 并根据实际情况修改
+ * 注意：确保 wrangler.jsonc 在 .gitignore 中
+ */
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "barretcalcata",
+	"main": "src/entry.py",
+	"compatibility_date": "2025-11-17",
+	"compatibility_flags": [
+		"python_workers"
+	],
+	"observability": {
+		"enabled": true
+	},
+	/**
+	 * 域名配置（可选）
+	 * 如需使用自定义域名，请修改以下配置
+	 */
+	// "routes": [
+	// 	{
+	// 		"pattern": "yourdomain.example.com",
+	// 		"custom_domain": true
+	// 	}
+	// ],
+	/**
+	 * 智能位置放置（可选）
+	 * 文档：https://developers.cloudflare.com/workers/configuration/smart-placement/#smart-placement
+	 */
+	// "placement": { "mode": "smart" },
+	/**
+	 * 环境变量配置
+	 * AI 识图功能需要配置以下变量，不配置则 IOL 计算功能仍可正常使用
+	 */
+	"vars": {
+		// OpenAI 兼容 API 的 Base URL（支持视觉能力的 VLM）
+		// 示例："https://api.openai.com/v1"
+		// 示例："https://gateway.ai.cloudflare.com/v1/your-account-id/your-worker-name"
+		"OPENAI_API_URL": "YOUR_OPENAI_COMPATIBLE_API_URL",
+		
+		// 使用的模型名称（需支持视觉输入）
+		// 示例："gpt-4-vision-preview"
+		// 示例："gpt-4o"
+		// 示例："gpt-4o-mini"
+		"OPENAI_MODEL": "gpt-4-vision-preview"
+	},
+	/**
+	 * 敏感数据（API 密钥等）应使用 secrets 存储
+	 * 配置方法：
+	 * 1. wrangler secret put OPENAI_API_KEY
+	 * 2. 输入你的 API 密钥
+	 * 
+	 * 需要在环境变量中设置的 secrets：
+	 * - OPENAI_API_KEY：AI 识图功能的 API 密钥（可选）
+	 */
+	/**
+	 * 静态资源绑定（可选）
+	 * 文档：https://developers.cloudflare.com/workers/static-assets/binding/
+	 */
+	// "assets": { "directory": "./public/", "binding": "ASSETS" },
+	/**
+	 * Service Bindings（多个 Workers 之间的通信，可选）
+	 * 文档：https://developers.cloudflare.com/workers/wrangler/configuration/#service-bindings
+	 */
+	// "services": [{ "binding": "MY_SERVICE", "service": "my-service" }],
+	/**
+	 * 数据库绑定（如 D1、KV、R2 等，可选）
+	 * 文档：https://developers.cloudflare.com/workers/runtime-apis/bindings/
+	 */
+	// "kv_namespaces": [{ "binding": "MY_KV", "id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" }],
+	// "d1_databases": [{ "binding": "DB", "database_name": "my-database", "database_id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" }],
+	// "r2_buckets": [{ "binding": "MY_BUCKET", "bucket_name": "my-bucket" }]
+}
