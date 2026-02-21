@@ -13,7 +13,13 @@ INDEX_PAGE = """
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: Arial, sans-serif; background: #f5f5f5; padding: 20px; }
         .container { max-width: 1000px; margin: 0 auto; background: white; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        .header { background: #007bff; color: white; padding: 20px; text-align: center; border-radius: 10px 10px 0 0; }
+        .header { background: #007bff; color: white; padding: 20px; border-radius: 10px 10px 0 0; display: flex; justify-content: space-between; align-items: center; position: relative; }
+        .header-title { text-align: center; flex: 1; }
+        .header-title h1 { margin: 0; font-size: 1.8em; }
+        .header-title p { margin: 5px 0 0; opacity: 0.9; }
+        .github-link { display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; color: white; text-decoration: none; border-radius: 6px; transition: background 0.2s; }
+        .github-link:hover { background: rgba(255,255,255,0.15); }
+        .github-icon { width: 28px; height: 28px; fill: white; }
         .main-content { padding: 30px; }
         .form-section { margin-bottom: 30px; padding: 20px; border: 1px solid #ddd; border-radius: 8px; }
         .section-title { font-size: 1.5em; margin-bottom: 15px; color: #333; border-bottom: 2px solid #007bff; padding-bottom: 10px; }
@@ -80,8 +86,15 @@ INDEX_PAGE = """
 <body>
     <div class="container">
         <div class="header">
-            <h1>IOL晶体计算器</h1>
-            <p>基于Barrett Universal II公式的人工晶体度数计算</p>
+            <div class="header-title">
+                <h1>IOL晶体计算器</h1>
+                <p>基于Barrett Universal II公式的人工晶体度数计算</p>
+            </div>
+            <a href="https://github.com/killgfat/barrettcalcata" target="_blank" class="github-link" title="查看源码">
+                <svg class="github-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
+                </svg>
+            </a>
         </div>
         
         <div class="main-content">

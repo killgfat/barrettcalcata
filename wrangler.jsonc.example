@@ -14,15 +14,20 @@
 	"observability": {
 		"enabled": true
 	},
-	/**
-	 * 环境变量配置
-	 * AI 识图功能需要配置以下变量，不配置则 IOL 计算功能仍可正常使用
-	 */
+
+	// ========== 构建配置（一键部署） ==========
+	// 部署前执行的构建命令
+	"build": {
+		"command": "uv sync"
+	},
+
+	// ========== 环境变量配置 ==========
+	// AI 识图功能需要配置以下变量，不配置则 IOL 计算功能仍可正常使用
 	"vars": {
 		// OpenAI 兼容 API 的 Base URL（支持视觉能力的 VLM）
 		// 示例："https://api.openai.com/v1"
 		// 示例："https://gateway.ai.cloudflare.com/v1/your-account-id/your-worker-name"
-		"OPENAI_API_URL": "YOUR_OPENAI_COMPATIBLE_API_URL",
+		"OPENAI_API_URL": "https://api.openai.com/v1",
 		
 		// 使用的模型名称（需支持视觉输入）
 		// 示例："gpt-4-vision-preview"
