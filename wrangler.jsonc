@@ -1,0 +1,33 @@
+/**
+ * 模板配置文件 wrangler.jsonc
+ * 将此文件复制为 wrangler.jsonc 并根据实际情况修改
+ * 注意：确保 wrangler.jsonc 在 .gitignore 中
+ */
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "barretcalcata",
+	"main": "src/entry.py",
+	"compatibility_date": "2025-11-17",
+	"compatibility_flags": [
+		"python_workers"
+	],
+	"observability": {
+		"enabled": true
+	},
+	/**
+	 * 环境变量配置
+	 * AI 识图功能需要配置以下变量，不配置则 IOL 计算功能仍可正常使用
+	 */
+	"vars": {
+		// OpenAI 兼容 API 的 Base URL（支持视觉能力的 VLM）
+		// 示例："https://api.openai.com/v1"
+		// 示例："https://gateway.ai.cloudflare.com/v1/your-account-id/your-worker-name"
+		"OPENAI_API_URL": "YOUR_OPENAI_COMPATIBLE_API_URL",
+		
+		// 使用的模型名称（需支持视觉输入）
+		// 示例："gpt-4-vision-preview"
+		// 示例："gpt-4o"
+		// 示例："gpt-4o-mini"
+		"OPENAI_MODEL": "gpt-4-vision-preview"
+	}
+}
