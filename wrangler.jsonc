@@ -5,7 +5,7 @@
  */
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
-	"name": "barretcalcata",
+	"name": "barrettcalcata",
 	"main": "src/entry.py",
 	"compatibility_date": "2025-11-17",
 	"compatibility_flags": [
