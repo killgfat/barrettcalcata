@@ -27,26 +27,28 @@
 
 [![Deploy to Cloudflare Workers](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/killgfat/barrettcalcata)
 
+> 请自行在部署界面的高级选项中
+
 ### 手动部署
 
 ```bash
 # 安装依赖
-npm install
+uv sync
 
 # 设置 API 密钥（可选，仅 AI 识图功能需要）
-wrangler secret put OPENAI_API_KEY
+npx wrangler secret put OPENAI_API_KEY
 
 # 在 wrangler.jsonc 中配置 OPENAI_API_URL 和 OPENAI_MODEL（可选）
 
 # 部署
-npm run deploy
+uv run pywrangler deploy
 ```
 
 ## 本地开发
 
 ```bash
 uv sync
-npm run dev
+uv run pywrangler dev
 ```
 
 ## 免责声明
