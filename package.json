@@ -11,7 +11,11 @@
 	"devDependencies": {
 		"wrangler": "^4.67.0"
 	},
-	"config": {
-		"OPENAI_API_KEY": "required for AI image recognition feature"
+	"cloudflare": {
+		"bindings": {
+			"OPENAI_API_KEY": {
+				"description": "OpenAI API key for AI image recognition feature. Get it from https://platform.openai.com/api-keys"
+			}
+		}
 	}
 }
