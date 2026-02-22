@@ -17,7 +17,7 @@ def get_openapi_spec():
             "version": "1.0.0",
             "contact": {
                 "name": "API Support",
-                "url": "https://barretcalcata.killgfat.com",
+                "url": "https://barrettcalcata.killgfat.com",
             },
         },
         "tags": [
@@ -477,7 +477,7 @@ def get_swagger_ui_html():
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>Barretcalcata API 文档</title>
+    <title>Barrettcalcata API 文档</title>
     <link rel="stylesheet" type="text/css" href="https://unpkg.com/swagger-ui-dist@5.9.0/swagger-ui.css">
     <link rel="icon" type="image/png" href="https://unpkg.com/swagger-ui-dist@5.9.0/favicon-32x32.png" sizes="32x32" />
     <link rel="icon" type="image/png" href="https://unpkg.com/swagger-ui-dist@5.9.0/favicon-16x16.png" sizes="16x16" />
@@ -552,7 +552,7 @@ def get_swagger_ui_html():
             const topbar = document.querySelector('.topbar');
             if (topbar) {{
                 topbar.innerHTML = `
-                    <div class="api-title">Barretcalcata IOL Calculator API</div>
+                    <div class="api-title">Barrettcalcata IOL Calculator API</div>
                     <div class="api-description">基于Cloudflare Workers的IOL（人工晶体）计算器API，支持AI图像识别提取医疗数据</div>
                 ` + topbar.innerHTML;
             }}

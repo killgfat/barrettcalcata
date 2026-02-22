@@ -6,7 +6,7 @@
 
 我们提供了一个在线演示版本，可直接体验所有功能：
 
-🔗 **https://barretcalcata.killgfat.com**
+🔗 **https://barrettcalcata.killgfat.com**
 
 > **注意**：Demo 环境资源有限，仅用于功能体验和测试。请勿在生产环境中使用，生产部署请参考下方一键部署指南。
 
