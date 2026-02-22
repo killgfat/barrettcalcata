@@ -29,9 +29,9 @@ jobs:
         uses: astral-sh/setup-uv@v7
 
       - name: Deploy to Cloudflare Workers
-        run: |
-          export CLOUDFLARE_ACCOUNT_ID="${{ secrets.CLOUDFLARE_ACCOUNT_ID }}"
-          export CLOUDFLARE_API_TOKEN="${{ secrets.CLOUDFLARE_API_TOKEN }}"
-          export OPENAI_API_URL="${{ secrets.OPENAI_API_URL }}"
-          export OPENAI_MODEL="${{ secrets.OPENAI_MODEL }}"
-          uv run pywrangler deploy
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          OPENAI_API_URL: ${{ secrets.OPENAI_API_URL }}
+          OPENAI_MODEL: ${{ secrets.OPENAI_MODEL }}
+        run: uv run pywrangler deploy
