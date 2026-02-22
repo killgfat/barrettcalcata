@@ -142,7 +142,7 @@ INDEX_PAGE = """
                                     <input type="checkbox" id="rightSiliconeOil" name="rightSiliconeOil" style="width: 13px; margin-right: 8px; transform: scale(1.2);">
                                     <label for="rightSiliconeOil" style="margin: 0; font-weight: normal;">硅油眼</label>
                                 </div>
-                                <div class="param-hint" style="margin-top: 2px; margin-left: 20px;">*勾选后会使用硅油眼轴校正，如输入结果已经校正则无需勾选</div>
+                                <div class="param-hint" style="margin-top: 2px; margin-left: 20px;">*勾选后会使用硅油眼轴校正，如输入结果已经校正则无需勾选。该功能未完善。</div>
                             </div>
                             <div class="form-group">
                                 <label for="rightAL">眼轴长度 (AL) mm</label>
@@ -178,7 +178,7 @@ INDEX_PAGE = """
                                     <input type="checkbox" id="leftSiliconeOil" name="leftSiliconeOil" style="width: 13px; margin-right: 8px; transform: scale(1.2);">
                                     <label for="leftSiliconeOil" style="margin: 0; font-weight: normal;">硅油眼</label>
                                 </div>
-                                <div class="param-hint" style="margin-top: 2px; margin-left: 20px;">*勾选后会使用硅油眼轴校正，如输入结果已经校正则无需勾选</div>
+                                <div class="param-hint" style="margin-top: 2px; margin-left: 20px;">*勾选后会使用硅油眼轴校正，如输入结果已经校正则无需勾选。该功能未完善。</div>
                             </div>
                             <div class="form-group">
                                 <label for="leftAL">眼轴长度 (AL) mm</label>
@@ -693,17 +693,15 @@ INDEX_PAGE = """
             const AL = eyeData.AL;
             const ACD = eyeData.ACD || 3; // 如果ACD未输入，使用默认值3
             
-            // 计算矫正值：IOL度数校准=[(Ns-Nv) / (AL-ACD)]*1000
-            const Ns = 1.4034; // 硅油反射指数
-            const Nv = 1.336;  // 玻璃体反射指数
-            const correction = ((Ns - Nv) / (AL - ACD)) * 1000;
+            // 实际眼轴长 = (硅油存在时的眼轴测量长度 - 前房深度) × 990 / 1532 + 前房深度
+            const correctedAL = (AL - ACD) * 990 / 1532 + ACD;
             
             // 创建新的眼数据对象，应用矫正
             const correctedEyeData = {
                 ...eyeData,
                 original_AL: AL, // 保存原始眼轴值
-                AL: AL + correction, // 应用矫正后的眼轴
-                silicone_correction: correction // 保存矫正值
+                AL: correctedAL, // 应用矫正后的眼轴
+                silicone_correction: correctedAL - AL // 保存矫正值
             };
             
             return correctedEyeData;
