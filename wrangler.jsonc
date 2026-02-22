@@ -6,6 +6,8 @@
 	"compatibility_flags": [
 		"python_workers"
 	],
+	"keep_vars": true,
+
 	"observability": {
 		"enabled": true
 	},
