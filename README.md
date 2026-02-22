@@ -2,6 +2,14 @@
 
 基于 Cloudflare Workers 的人工晶体（IOL）度数计算服务，支持 Barrett Universal II 公式计算，并集成 AI 视觉识别功能，可从 IOL Master 测量报告图片中自动提取参数。
 
+## 在线 Demo
+
+我们提供了一个在线演示版本，可直接体验所有功能：
+
+🔗 **https://barretcalcata.killgfat.com**
+
+> **注意**：Demo 环境资源有限，仅用于功能体验和测试。请勿在生产环境中使用，生产部署请参考下方一键部署指南。
+
 ## 主要功能
 
 - **IOL 度数计算**：基于 Barrett Universal II 公式，支持单眼或双眼计算，可配置 A 常数、目标屈光度、硅油眼矫正等参数
