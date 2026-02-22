@@ -362,7 +362,7 @@ class WorkerAI:
 
             return {"success": True, "data": cleaned, "raw_response": response_text}
 
-        except httpx.RequestException as e:
+        except httpx.RequestError as e:
             error_msg = f"API请求失败: {e}"
             print(f"WorkerAI处理图片时发生网络异常: {error_msg}")
             return {
@@ -840,7 +840,7 @@ class WorkerAI:
                 "fallback_used": True,
             }
 
-        except httpx.RequestException as e:
+        except httpx.RequestError as e:
             error_msg = f"Fallback API请求失败: {e}"
             print(f"Fallback处理时发生网络异常: {error_msg}")
             return {
