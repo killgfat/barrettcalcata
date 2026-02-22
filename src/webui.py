@@ -902,7 +902,7 @@ INDEX_PAGE = """
                         suggestion.content = "短眼轴（AL＜23mm），前房深度正常偏深（ACD＞3mm）：容易远视漂移，目标屈光度比常规多留-0.5D左右";
                     } else if (ACD < 2.6) {
                         // ③前房深度很浅（＜2.6mm）
-                        suggestion.content = "短眼轴（AL＜23mm），前房深度很浅（ACD＜2.6mm）：容易近视漂移，目标屈光度比常规少留0.5D左右。请注意：新手搬运法不是很完美。";
+                        suggestion.content = "短眼轴（AL＜23mm），前房深度很浅（ACD＜2.6mm）：容易近视漂移，目标屈光度比常规少留0.5D左右。";
                     } else {
                         // ①前房深度正常偏浅（3mm＞ACD＞2.6mm）
                         suggestion.content = "短眼轴（AL＜23mm），前房深度正常偏浅（3mm＞ACD＞2.6mm）：目标屈光度按常规留-0.3左右";
