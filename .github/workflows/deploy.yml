@@ -39,14 +39,7 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          secrets: |
-            OPENAI_API_KEY
-            OPENAI_API_URL
-            OPENAI_MODEL
-        env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          OPENAI_API_URL: ${{ secrets.OPENAI_API_URL }}
-          OPENAI_MODEL: ${{ secrets.OPENAI_MODEL }}
+          command: deploy
 
       - name: Verify deployment
         run: |
