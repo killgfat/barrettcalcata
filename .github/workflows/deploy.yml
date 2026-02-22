@@ -35,18 +35,15 @@ jobs:
         run: uv sync
 
       - name: Deploy to Cloudflare Workers
-        run: |
-          # 注入 OPENAI_API_KEY 到 Workers 机密变量
-          if [ -n "$OPENAI_API_KEY" ]; then
-            echo "Setting OPENAI_API_KEY secret..."
-            npx wrangler secret put OPENAI_API_KEY
-          fi
-          
-          # 部署应用
-          npm run deploy
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          secrets: |
+            OPENAI_API_KEY
+            OPENAI_API_URL
+            OPENAI_MODEL
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           OPENAI_API_URL: ${{ secrets.OPENAI_API_URL }}
           OPENAI_MODEL: ${{ secrets.OPENAI_MODEL }}
