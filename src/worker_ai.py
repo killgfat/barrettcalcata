@@ -185,6 +185,37 @@ class WorkerAI:
                 "attempts": extraction_results,
             }
 
+    def _remove_thinking_tags(self, text: str) -> str:
+        """
+        移除文本中的思考标签及其内容
+
+        参数:
+          - text: 原始文本
+
+        返回:
+          - 清理后的文本
+        """
+        # 定义需要移除的思考标签模式
+        patterns = [
+            # 匹配 ** 标签（思考内容）
+            r"\*\*.*?\*\*",
+            # 匹配 <thinking> 标签
+            r"<thinking>.*?</thinking>",
+            # 匹配 <thought> 标签
+            r"<thought>.*?</thought>",
+            # 匹配 <reasoning> 标签
+            r"<reasoning>.*?</reasoning>",
+        ]
+
+        cleaned_text = text
+        for pattern in patterns:
+            cleaned_text = re.sub(pattern, "", cleaned_text, flags=re.DOTALL)
+
+        # 清理可能产生的多余空白行
+        cleaned_text = re.sub(r"\n\s*\n", "\n", cleaned_text)
+
+        return cleaned_text.strip()
+
     async def _extract_data_from_image_once(
         self, image_base64: str, extract_num: int = 1, total_count: int = 3
     ):
@@ -342,6 +373,9 @@ class WorkerAI:
             if response_text.endswith("```"):
                 response_text = response_text[:-3]
             response_text = response_text.strip()
+
+            # 移除思考标签及其内容
+            response_text = self._remove_thinking_tags(response_text)
 
             try:
                 extracted = json.loads(response_text)
@@ -811,6 +845,9 @@ class WorkerAI:
                 if resp_text2.endswith("```"):
                     resp_text2 = resp_text2[:-3]
                 resp_text2 = resp_text2.strip()
+
+                # 移除思考标签及其内容
+                resp_text2 = self._remove_thinking_tags(resp_text2)
 
             try:
                 extracted2 = json.loads(resp_text2)
