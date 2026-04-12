@@ -187,7 +187,7 @@ class WorkerAI:
 
     def _remove_thinking_tags(self, text: str) -> str:
         """
-        移除文本中的思考标签及其内容
+        移除文本中的思考标签及其内容（不影响普通 Markdown 加粗格式）
 
         参数:
           - text: 原始文本
@@ -196,23 +196,30 @@ class WorkerAI:
           - 清理后的文本
         """
         # 定义需要移除的思考标签模式
+        # 注意：不使用 r"\*\*.*?\*\*" 因为它会误删所有 Markdown 加粗文本
         patterns = [
-            # 匹配 ** 标签（思考内容）
-            r"\*\*.*?\*\*",
+            # 匹配 <think> 标签（常见于 DeepSeek 等推理模型）
+            r"<think>.*?</think>",
             # 匹配 <thinking> 标签
             r"<thinking>.*?</thinking>",
             # 匹配 <thought> 标签
             r"<thought>.*?</thought>",
             # 匹配 <reasoning> 标签
             r"<reasoning>.*?</reasoning>",
+            # 匹配 |thinking| 格式（部分模型使用）
+            r"\|thinking\|.*?\|/thinking\|",
+            # 匹配特定标识符的 ** 思考块（如 **思考:** 或 **Thought:** 开头的块）
+            # 只匹配明确标识为思考内容的块，避免误删普通加粗文本
+            r"\*\*(?:思考|Thought|Thinking|Reasoning|分析|推理):?\*\*.*?(?=\*\*[^思T分]|$|```|\n\n)",
         ]
 
         cleaned_text = text
         for pattern in patterns:
             cleaned_text = re.sub(pattern, "", cleaned_text, flags=re.DOTALL)
 
-        # 清理可能产生的多余空白行
-        cleaned_text = re.sub(r"\n\s*\n", "\n", cleaned_text)
+        # 清理可能产生的多余空白行（但保留 JSON 结构中的合理换行）
+        # 只清理连续的空行，不影响单个换行
+        cleaned_text = re.sub(r"\n{3,}", "\n\n", cleaned_text)
 
         return cleaned_text.strip()
 
