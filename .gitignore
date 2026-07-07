@@ -71,6 +71,8 @@ share/python-wheels/
 # ==============================
 .vscode/
 .idea/
+.opencode/
+.brv/
 *.swp
 *.swo
 *~
@@ -92,6 +94,19 @@ logs/
 # Ruff cache
 # ==============================
 .ruff_cache/
+
+# ==============================
+# Testing / Coverage
+# ==============================
+.pytest_cache/
+.mypy_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+.hypothesis/
+.tox/
+.nox/
 
 # ==============================
 # Project specific
