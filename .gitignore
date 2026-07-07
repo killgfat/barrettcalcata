@@ -31,7 +31,6 @@ pids
 wrangler.jsonc
 !wrangler.jsonc.example
 wrangler.cloudflare.jsonc
-!wrangler.cloudflare.jsonc.example
 
 # ==============================
 # Python
