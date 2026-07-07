@@ -107,8 +107,8 @@ INDEX_PAGE = """
                     </div>
                     <div class="form-group">
                         <label for="aConstant">A常数</label>
-                        <input type="number" id="aConstant" name="aConstant" value="119.3" step="0.1" required>
-                        <div class="param-hint">默认值：119.3（可根据晶体类型调整）</div>
+                        <input type="number" id="aConstant" name="aConstant" value="119.30" step="0.01" required>
+                        <div class="param-hint">默认值：119.30（可根据晶体类型调整）</div>
                     </div>
                 </div>
                 
@@ -158,7 +158,7 @@ INDEX_PAGE = """
                             </div>
                             <div class="form-group">
                                 <label for="rightACD">ACD mm（可选）</label>
-                                <input type="number" id="rightACD" name="rightACD" step="0.01" min="0" max="6" placeholder="默认3.0">
+                                <input type="number" id="rightACD" name="rightACD" step="0.01" min="0" max="6" placeholder="默认3.00">
                             </div>
                             <div class="form-group">
                                 <label for="rightRefraction">目标屈光度 D（可选）</label>
@@ -194,7 +194,7 @@ INDEX_PAGE = """
                             </div>
                             <div class="form-group">
                                 <label for="leftACD">ACD mm（可选）</label>
-                                <input type="number" id="leftACD" name="leftACD" step="0.01" min="0" max="6" placeholder="默认3.0">
+                                <input type="number" id="leftACD" name="leftACD" step="0.01" min="0" max="6" placeholder="默认3.00">
                             </div>
                             <div class="form-group">
                                 <label for="leftRefraction">目标屈光度 D（可选）</label>
@@ -506,8 +506,8 @@ INDEX_PAGE = """
                     // /api/extract 接口返回的数据结构中，眼部参数直接在 data 里
                     const fillData = (result.data && result.data.extracted_data)
                         ? Object.assign({}, result.data.extracted_data, {
-                            patient_name: result.data.patient_name || result.data.extracted_data.patient_name,
-                            a_constant: result.data.a_constant || result.data.extracted_data.a_constant
+                            patient_name: result.data.patient_name ?? result.data.extracted_data.patient_name,
+                            a_constant: result.data.a_constant ?? result.data.extracted_data.a_constant
                           })
                         : result.data;
                     fillFormData(fillData);
@@ -590,7 +590,7 @@ INDEX_PAGE = """
             
             // 清除患者姓名和A常数
             document.getElementById('patientName').value = '';
-            document.getElementById('aConstant').value = '119.3'; // 恢复默认值
+            document.getElementById('aConstant').value = '119.30'; // 恢复默认值
             
             // 取消选中左右眼
             document.getElementById('rightEyeEnabled').checked = false;
@@ -618,6 +618,28 @@ INDEX_PAGE = """
             return imageProcessor.fileToBase64(file);
         }
 
+        function roundToTwoDecimals(value) {
+            if (value === null || value === undefined || value === '') {
+                return null;
+            }
+
+            const parsedValue = Number(value);
+            if (!Number.isFinite(parsedValue)) {
+                return null;
+            }
+
+            return Number(parsedValue.toFixed(2));
+        }
+
+        function formatToTwoDecimals(value) {
+            const roundedValue = roundToTwoDecimals(value);
+            if (roundedValue === null) {
+                return '';
+            }
+
+            return roundedValue.toFixed(2);
+        }
+
         // 填充表单数据
         function fillFormData(data) {
             // 填充患者姓名
@@ -626,8 +648,8 @@ INDEX_PAGE = """
             }
 
             // 填充A常数
-            if (data.a_constant) {
-                document.getElementById('aConstant').value = data.a_constant;
+            if (data.a_constant !== null && data.a_constant !== undefined) {
+                document.getElementById('aConstant').value = formatToTwoDecimals(data.a_constant);
             }
 
             // 填充右眼数据
@@ -638,7 +660,9 @@ INDEX_PAGE = """
                 if (data.right_eye.AL) document.getElementById('rightAL').value = data.right_eye.AL;
                 if (data.right_eye.K1) document.getElementById('rightK1').value = data.right_eye.K1;
                 if (data.right_eye.K2) document.getElementById('rightK2').value = data.right_eye.K2;
-                if (data.right_eye.ACD) document.getElementById('rightACD').value = data.right_eye.ACD;
+                if (data.right_eye.ACD !== null && data.right_eye.ACD !== undefined) {
+                    document.getElementById('rightACD').value = formatToTwoDecimals(data.right_eye.ACD);
+                }
             }
 
             // 填充左眼数据
@@ -649,7 +673,9 @@ INDEX_PAGE = """
                 if (data.left_eye.AL) document.getElementById('leftAL').value = data.left_eye.AL;
                 if (data.left_eye.K1) document.getElementById('leftK1').value = data.left_eye.K1;
                 if (data.left_eye.K2) document.getElementById('leftK2').value = data.left_eye.K2;
-                if (data.left_eye.ACD) document.getElementById('leftACD').value = data.left_eye.ACD;
+                if (data.left_eye.ACD !== null && data.left_eye.ACD !== undefined) {
+                    document.getElementById('leftACD').value = formatToTwoDecimals(data.left_eye.ACD);
+                }
             }
 
             // 验证表单
@@ -721,15 +747,21 @@ INDEX_PAGE = """
             try {
                 const formData = {
                     patient_name: document.getElementById('patientName').value || null,
-                    a_constant: parseFloat(document.getElementById('aConstant').value)
+                    a_constant: roundToTwoDecimals(
+                        document.getElementById('aConstant').value
+                    )
                 };
 
                 if (rightEyeEnabled.checked) {
+                    const rightACDValue = roundToTwoDecimals(
+                        document.getElementById('rightACD').value
+                    );
+
                     let rightEyeData = {
                         AL: parseFloat(document.getElementById('rightAL').value),
                         K1: parseFloat(document.getElementById('rightK1').value),
                         K2: parseFloat(document.getElementById('rightK2').value),
-                        ACD: document.getElementById('rightACD').value ? parseFloat(document.getElementById('rightACD').value) : undefined,
+                        ACD: rightACDValue === null ? undefined : rightACDValue,
                         Refraction: document.getElementById('rightRefraction').value ? parseFloat(document.getElementById('rightRefraction').value) : undefined,
                         SiliconeOil: document.getElementById('rightSiliconeOil').checked
                     };
@@ -740,11 +772,15 @@ INDEX_PAGE = """
                 }
 
                 if (leftEyeEnabled.checked) {
+                    const leftACDValue = roundToTwoDecimals(
+                        document.getElementById('leftACD').value
+                    );
+
                     let leftEyeData = {
                         AL: parseFloat(document.getElementById('leftAL').value),
                         K1: parseFloat(document.getElementById('leftK1').value),
                         K2: parseFloat(document.getElementById('leftK2').value),
-                        ACD: document.getElementById('leftACD').value ? parseFloat(document.getElementById('leftACD').value) : undefined,
+                        ACD: leftACDValue === null ? undefined : leftACDValue,
                         Refraction: document.getElementById('leftRefraction').value ? parseFloat(document.getElementById('leftRefraction').value) : undefined,
                         SiliconeOil: document.getElementById('leftSiliconeOil').checked
                     };
@@ -872,7 +908,7 @@ INDEX_PAGE = """
                 tableHTML += '<div style="margin-top: 10px; padding: 10px; background: #fff3cd; border-radius: 5px;">';
                 tableHTML += '<strong>硅油眼矫正信息：</strong><br>';
                 tableHTML += '原始眼轴：' + originalAL + 'mm<br>';
-                tableHTML += 'ACD：' + ACD + 'mm<br>';
+                tableHTML += 'ACD：' + formatToTwoDecimals(ACD) + 'mm<br>';
                 tableHTML += '矫正值：' + correction.toFixed(4) + 'mm<br>';
                 tableHTML += '矫正后眼轴：' + correctedAL.toFixed(4) + 'mm<br>';
                 tableHTML += '<small>公式：[(1.4034-1.336) / (AL-ACD)] × 1000</small>';

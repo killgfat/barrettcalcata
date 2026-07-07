@@ -3,14 +3,120 @@ API模块 - 处理IOL计算器的API接口
 """
 
 import json
-from urllib.parse import urlparse
 from calculate import calculate_iol
 from worker_ai import WorkerAI
 
 
 class APIHandler:
+    DEFAULT_A_CONSTANT = 119.30
+    DEFAULT_ACD = 3.00
+    DEFAULT_REFRACTION = 0.0
+
     def __init__(self, env):
         self.env = env
+
+    def _normalize_optional_float(self, value, default=None, decimal_places=None):
+        """将可选数值字段标准化为浮点数。"""
+        if value is None:
+            return default
+
+        if isinstance(value, str):
+            value = value.strip()
+            if not value:
+                return default
+
+        try:
+            normalized = float(value)
+        except (TypeError, ValueError):
+            return default
+
+        if decimal_places is not None:
+            normalized = round(normalized, decimal_places)
+
+        return normalized
+
+    def _require_float(self, value, field_name, decimal_places=None):
+        """校验必填字段必须是有效数值。"""
+        normalized = self._normalize_optional_float(
+            value, decimal_places=decimal_places
+        )
+        if normalized is None:
+            raise ValueError(f"{field_name} 必须是有效数值")
+        return normalized
+
+    def _normalize_a_constant(self, value):
+        """标准化A常数，未提供时使用默认值。"""
+        if value is None:
+            return self.DEFAULT_A_CONSTANT
+
+        if isinstance(value, str):
+            value = value.strip()
+            if not value:
+                return self.DEFAULT_A_CONSTANT
+
+        try:
+            return round(float(value), 2)
+        except (TypeError, ValueError):
+            raise ValueError("a_constant 必须是有效数值")
+
+    def _normalize_request_eye_params(self, eye_params, eye_name):
+        """标准化用户提交的眼部参数。"""
+        if not eye_params:
+            return None
+
+        if not isinstance(eye_params, dict):
+            raise ValueError(f"{eye_name}参数必须是JSON对象")
+
+        return {
+            "AL": self._require_float(eye_params.get("AL"), f"{eye_name}AL"),
+            "K1": self._require_float(eye_params.get("K1"), f"{eye_name}K1"),
+            "K2": self._require_float(eye_params.get("K2"), f"{eye_name}K2"),
+            "ACD": self._normalize_optional_float(
+                eye_params.get("ACD"), self.DEFAULT_ACD, decimal_places=2
+            ),
+            "Refraction": self._normalize_optional_float(
+                eye_params.get("Refraction"), self.DEFAULT_REFRACTION
+            ),
+            "LenThickness": (
+                ""
+                if eye_params.get("LenThickness") is None
+                else str(eye_params.get("LenThickness")).strip()
+            ),
+            "WTW": (
+                ""
+                if eye_params.get("WTW") is None
+                else str(eye_params.get("WTW")).strip()
+            ),
+        }
+
+    def _normalize_extracted_eye_params(self, eye_params, eye_name):
+        """标准化AI提取出的眼部参数。"""
+        if not eye_params:
+            return None
+
+        if not isinstance(eye_params, dict):
+            raise ValueError(f"{eye_name}提取结果格式不正确")
+
+        normalized = {
+            "AL": self._normalize_optional_float(eye_params.get("AL")),
+            "K1": self._normalize_optional_float(eye_params.get("K1")),
+            "K2": self._normalize_optional_float(eye_params.get("K2")),
+        }
+
+        if not any(value is not None for value in normalized.values()):
+            return None
+
+        missing_fields = [field for field, value in normalized.items() if value is None]
+        if missing_fields:
+            raise ValueError(
+                f"{eye_name}提取结果缺少必需参数: {', '.join(missing_fields)}"
+            )
+
+        normalized["ACD"] = self._normalize_optional_float(
+            eye_params.get("ACD"), self.DEFAULT_ACD, decimal_places=2
+        )
+
+        return normalized
 
     async def handle_api(self, request):
         """统一API入口，自动检测请求类型并执行相应功能"""
@@ -207,35 +313,21 @@ class APIHandler:
 
             # 准备IOL计算参数
             patient_name = extracted_data.get("patient_name")
-            a_constant = extracted_data.get(
-                "a_constant", 119.3
-            )  # 使用默认值119.3而不是119
+            a_constant = self._normalize_optional_float(
+                extracted_data.get("a_constant"),
+                self.DEFAULT_A_CONSTANT,
+                decimal_places=2,
+            )
 
             # 处理右眼参数
-            right_eye_data = extracted_data.get("right_eye")
-            right_eye_params = None
-            if right_eye_data and any(
-                right_eye_data.get(key) is not None for key in ["AL", "K1", "K2"]
-            ):
-                right_eye_params = {
-                    "AL": right_eye_data.get("AL"),
-                    "K1": right_eye_data.get("K1"),
-                    "K2": right_eye_data.get("K2"),
-                    "ACD": right_eye_data.get("ACD", 3.0),  # 默认值
-                }
+            right_eye_params = self._normalize_extracted_eye_params(
+                extracted_data.get("right_eye"), "右眼"
+            )
 
             # 处理左眼参数
-            left_eye_data = extracted_data.get("left_eye")
-            left_eye_params = None
-            if left_eye_data and any(
-                left_eye_data.get(key) is not None for key in ["AL", "K1", "K2"]
-            ):
-                left_eye_params = {
-                    "AL": left_eye_data.get("AL"),
-                    "K1": left_eye_data.get("K1"),
-                    "K2": left_eye_data.get("K2"),
-                    "ACD": left_eye_data.get("ACD", 3.0),  # 默认值
-                }
+            left_eye_params = self._normalize_extracted_eye_params(
+                extracted_data.get("left_eye"), "左眼"
+            )
 
             # 验证至少提供了一只眼睛的参数
             if not right_eye_params and not left_eye_params:
@@ -358,9 +450,13 @@ class APIHandler:
         """处理IOL计算请求"""
         try:
             # 验证必需的参数
-            right_eye_params = body.get("right_eye")
-            left_eye_params = body.get("left_eye")
-            a_constant = body.get("a_constant", 119.3)  # 使用默认值119.3而不是119
+            right_eye_params = self._normalize_request_eye_params(
+                body.get("right_eye"), "右眼"
+            )
+            left_eye_params = self._normalize_request_eye_params(
+                body.get("left_eye"), "左眼"
+            )
+            a_constant = self._normalize_a_constant(body.get("a_constant"))
             patient_name = body.get("patient_name")
 
             # 验证至少提供了一只眼睛的参数
@@ -369,30 +465,6 @@ class APIHandler:
                     "error": "Bad Request",
                     "message": "至少需要提供右眼或左眼参数",
                 }, 400
-
-            # 验证右眼参数
-            if right_eye_params:
-                required_params = ["AL", "K1", "K2"]
-                missing_params = [
-                    param for param in required_params if param not in right_eye_params
-                ]
-                if missing_params:
-                    return {
-                        "error": "Bad Request",
-                        "message": f"右眼缺少必需参数: {', '.join(missing_params)}",
-                    }, 400
-
-            # 验证左眼参数
-            if left_eye_params:
-                required_params = ["AL", "K1", "K2"]
-                missing_params = [
-                    param for param in required_params if param not in left_eye_params
-                ]
-                if missing_params:
-                    return {
-                        "error": "Bad Request",
-                        "message": f"左眼缺少必需参数: {', '.join(missing_params)}",
-                    }, 400
 
             # 调用计算函数
             result = await calculate_iol(
