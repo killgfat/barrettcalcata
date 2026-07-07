@@ -24,9 +24,10 @@
 		"OPENAI_API_URL": "https://api.openai.com/v1",
 		
 		// 使用的模型名称（需支持视觉输入）
-		// 示例："gpt-4-vision-preview"
+		// Git 跟踪的官方 OpenAI 配置使用 gpt-5
+		// 示例："gpt-5"
 		// 示例："gpt-4o"
 		// 示例："gpt-4o-mini"
-		"OPENAI_MODEL": "gpt-4-vision-preview"
+		"OPENAI_MODEL": "gpt-5"
 	}
 }

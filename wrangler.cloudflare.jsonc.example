@@ -1,0 +1,24 @@
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "barrettcalcata",
+	"main": "src/entry.py",
+	"compatibility_date": "2025-11-17",
+	"compatibility_flags": [
+		"python_workers"
+	],
+	"keep_vars": true,
+
+	"observability": {
+		"enabled": true
+	},
+
+	"build": {
+		"command": "uv sync"
+	},
+
+	"vars": {
+		"OPENAI_API_URL": "https://gateway.ai.cloudflare.com/v1/df5d075e6dda68bc0e75d85e64f333ef/worker/compat",
+		// 本地私人 Cloudflare Gateway 配置使用 dynamic 模型路由
+		"OPENAI_MODEL": "dynamic/gpt-4o-mini"
+	}
+}
