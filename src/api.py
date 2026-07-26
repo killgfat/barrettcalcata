@@ -4,6 +4,7 @@ API模块 - 处理IOL计算器的API接口
 
 import json
 from calculate import calculate_iol
+from iol_models import fetch_iol_model_list, fetch_model_a_constant
 from worker_ai import WorkerAI
 
 
@@ -215,6 +216,40 @@ class APIHandler:
             return {
                 "error": "Internal Server Error",
                 "message": f"处理过程中发生错误: {str(e)}",
+            }, 500
+
+    async def handle_iol_models(self, request, model_name=None):
+        """处理IOL晶体型号查询请求"""
+        if request.method != "GET":
+            return {
+                "error": "Method Not Allowed",
+                "message": "此端点只支持GET请求",
+            }, 405
+
+        try:
+            if model_name:
+                result = fetch_model_a_constant(model_name)
+                return {
+                    "success": True,
+                    "data": {
+                        "name": model_name,
+                        "a_constant": result["a_constant"],
+                        "lens_factor": result["lens_factor"],
+                    },
+                    "message": "查询成功",
+                }, 200
+
+            models = fetch_iol_model_list()
+            return {
+                "success": True,
+                "data": {"models": models},
+                "message": "获取晶体型号列表成功",
+            }, 200
+
+        except Exception as e:
+            return {
+                "error": "Internal Server Error",
+                "message": f"获取晶体型号数据失败: {str(e)}",
             }, 500
 
     async def handle_calculate(self, request):
@@ -458,6 +493,7 @@ class APIHandler:
             )
             a_constant = self._normalize_a_constant(body.get("a_constant"))
             patient_name = body.get("patient_name")
+            iol_model = body.get("iol_model")
 
             # 验证至少提供了一只眼睛的参数
             if not right_eye_params and not left_eye_params:
@@ -472,6 +508,7 @@ class APIHandler:
                 left_eye_params=left_eye_params,
                 a_constant=a_constant,
                 patient_name=patient_name,
+                iol_model=iol_model,
             )
 
             # 返回成功结果

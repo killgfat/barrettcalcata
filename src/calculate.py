@@ -108,7 +108,11 @@ def parse_iol_results(html_content):
 
 
 async def calculate_iol(
-    right_eye_params=None, left_eye_params=None, a_constant=119.30, patient_name=None
+    right_eye_params=None,
+    left_eye_params=None,
+    a_constant=119.30,
+    patient_name=None,
+    iol_model=None,
 ):
     """
     计算IOL度数
@@ -187,6 +191,13 @@ async def calculate_iol(
     right_eye_params = normalize_eye_params(right_eye_params, "右眼")
     left_eye_params = normalize_eye_params(left_eye_params, "左眼")
     a_constant = normalize_optional_number(a_constant, 119.30, decimal_places=2)
+
+    # 确定发送给Barrett站点的晶体型号
+    iol_model_name = (
+        iol_model
+        if iol_model and iol_model != "Personal Constant"
+        else "Personal Constant"
+    )
 
     # 设置患者姓名，如果没有提供则使用默认值"1"
     patient_name = patient_name if patient_name else "1"
@@ -287,7 +298,7 @@ async def calculate_iol(
             "ctl00$MainContent$PatientNo": "",
             "ctl00$MainContent$LensFactor": "",
             "ctl00$MainContent$Aconstant": format_decimal_for_request(a_constant),
-            "ctl00$MainContent$IOLModel": "Personal Constant",
+            "ctl00$MainContent$IOLModel": iol_model_name,
             # 右眼参数（无后缀）
             "ctl00$MainContent$Axlength": str(right_eye_params["AL"])
             if right_eye_params
@@ -425,7 +436,7 @@ async def calculate_iol(
             "ctl00$MainContent$PatientNo": "",
             "ctl00$MainContent$LensFactor": lens_factor,
             "ctl00$MainContent$Aconstant": format_decimal_for_request(a_constant),
-            "ctl00$MainContent$IOLModel": "Personal Constant",
+            "ctl00$MainContent$IOLModel": iol_model_name,
             # 右眼参数（无后缀）
             "ctl00$MainContent$Axlength": str(right_eye_params["AL"])
             if right_eye_params

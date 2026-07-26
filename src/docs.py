@@ -438,6 +438,59 @@ def get_openapi_spec():
                     },
                 }
             },
+            "/api/iol-models": {
+                "get": {
+                    "tags": ["IOL计算"],
+                    "summary": "获取IOL晶体型号列表及A常数",
+                    "description": "从Barrett官方站点同步晶体型号列表。不带参数返回型号列表，带model参数返回指定型号的A常数。",
+                    "parameters": [
+                        {
+                            "name": "model",
+                            "in": "query",
+                            "required": False,
+                            "schema": {"type": "string"},
+                            "description": "晶体型号名称，如 Alcon SN60WF",
+                        }
+                    ],
+                    "responses": {
+                        "200": {
+                            "description": "成功获取",
+                            "content": {
+                                "application/json": {
+                                    "examples": {
+                                        "model_list": {
+                                            "summary": "获取型号列表",
+                                            "value": {
+                                                "success": True,
+                                                "data": {
+                                                    "models": [
+                                                        "Alcon SN60WF",
+                                                        "J&J ZCB00",
+                                                    ]
+                                                },
+                                                "message": "获取晶体型号列表成功",
+                                            },
+                                        },
+                                        "single_model": {
+                                            "summary": "查询单个型号A常数",
+                                            "value": {
+                                                "success": True,
+                                                "data": {
+                                                    "name": "Alcon SN60WF",
+                                                    "a_constant": 118.99,
+                                                    "lens_factor": 1.88,
+                                                },
+                                                "message": "查询成功",
+                                            },
+                                        },
+                                    }
+                                }
+                            },
+                        },
+                        "500": {"description": "获取数据失败"},
+                    },
+                }
+            },
         },
         "components": {
             "schemas": {

@@ -27,6 +27,8 @@ class Default(WorkerEntrypoint):
             return await self.handle_extract(request)
         elif path == "/api/calculate":
             return await self.handle_calculate(request)
+        elif path == "/api/iol-models":
+            return await self.handle_iol_models(request)
         elif path == "/docs":
             return await self.handle_docs()
         elif path == "/openapi.json":
@@ -76,6 +78,19 @@ class Default(WorkerEntrypoint):
         """处理IOL计算请求"""
         api_handler = APIHandler(self.env)
         result, status_code = await api_handler.handle_calculate(request)
+        return Response.json(result, status=status_code)
+
+    async def handle_iol_models(self, request):
+        """处理IOL晶体型号查询请求"""
+        from urllib.parse import parse_qs
+
+        query = parse_qs(urlparse(request.url).query)
+        model_name = query.get("model", [None])[0]
+
+        api_handler = APIHandler(self.env)
+        result, status_code = await api_handler.handle_iol_models(
+            request, model_name=model_name
+        )
         return Response.json(result, status=status_code)
 
     async def handle_docs(self):

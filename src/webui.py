@@ -27,6 +27,8 @@ INDEX_PAGE = """
         .form-group label { display: block; margin-bottom: 5px; font-weight: bold; color: #555; }
         .form-group input { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 16px; }
         .form-group input:focus { outline: none; border-color: #007bff; box-shadow: 0 0 5px rgba(0,123,255,0.3); }
+        .form-group select { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 16px; background: #fff; }
+        .form-group select:focus { outline: none; border-color: #007bff; box-shadow: 0 0 5px rgba(0,123,255,0.3); }
         .eye-section { margin: 15px 0; padding: 20px; border: 1px solid #ccc; border-radius: 8px; transition: border-color 0.3s; }
         .eye-section.active { border-color: #007bff; background: #f8f9ff; }
         .eye-header { margin-bottom: 15px; }
@@ -106,9 +108,16 @@ INDEX_PAGE = """
                         <input type="text" id="patientName" name="patientName" placeholder="请输入患者姓名">
                     </div>
                     <div class="form-group">
+                        <label for="iolModel">晶体型号</label>
+                        <select id="iolModel" name="iolModel">
+                            <option value="Personal Constant">Personal Constant（自定义A常数）</option>
+                        </select>
+                        <div class="param-hint" id="iolModelHint">选择晶体型号可自动填充A常数</div>
+                    </div>
+                    <div class="form-group">
                         <label for="aConstant">A常数</label>
                         <input type="number" id="aConstant" name="aConstant" value="119.30" step="0.01" required>
-                        <div class="param-hint">默认值：119.30（可根据晶体类型调整）</div>
+                        <div class="param-hint" id="aConstantHint">默认值：119.30（可根据晶体类型调整）</div>
                     </div>
                 </div>
                 
@@ -328,6 +337,68 @@ INDEX_PAGE = """
         const rightEyeSection = document.getElementById('rightEyeSection');
         const leftEyeSection = document.getElementById('leftEyeSection');
         const calculateBtn = document.getElementById('calculateBtn');
+
+        // IOL晶体型号同步
+        const iolModelSelect = document.getElementById('iolModel');
+        const aConstantInput = document.getElementById('aConstant');
+
+        async function loadIolModels() {
+            try {
+                const response = await fetch('/api/iol-models');
+                const result = await response.json();
+                if (result.success && result.data.models) {
+                    result.data.models.forEach(model => {
+                        const option = document.createElement('option');
+                        option.value = model;
+                        option.textContent = model;
+                        iolModelSelect.appendChild(option);
+                    });
+                }
+            } catch (e) {
+                console.warn('加载晶体型号列表失败:', e);
+            }
+        }
+
+        iolModelSelect.addEventListener('change', async function() {
+            const selected = this.value;
+            if (selected === 'Personal Constant') {
+                aConstantInput.readOnly = false;
+                aConstantInput.value = '119.30';
+                document.getElementById('aConstantHint').textContent =
+                    '默认值：119.30（可根据晶体类型调整）';
+                document.getElementById('iolModelHint').textContent =
+                    '选择晶体型号可自动填充A常数';
+                return;
+            }
+
+            aConstantInput.readOnly = true;
+            aConstantInput.value = '';
+            document.getElementById('iolModelHint').textContent = '正在获取A常数...';
+
+            try {
+                const response = await fetch(
+                    '/api/iol-models?model=' + encodeURIComponent(selected)
+                );
+                const result = await response.json();
+                if (result.success) {
+                    aConstantInput.value = result.data.a_constant.toFixed(2);
+                    const lf = result.data.lens_factor;
+                    document.getElementById('aConstantHint').textContent =
+                        'Lens Factor: ' + (lf !== null ? lf : 'N/A');
+                    document.getElementById('iolModelHint').textContent =
+                        '已从Barrett官方同步';
+                } else {
+                    throw new Error(result.message);
+                }
+            } catch (e) {
+                aConstantInput.readOnly = false;
+                aConstantInput.value = '119.30';
+                document.getElementById('iolModelHint').textContent =
+                    '获取失败，请手动输入A常数';
+            }
+        });
+
+        loadIolModels();
 
         rightEyeEnabled.addEventListener('change', function() {
             if (this.checked) {
@@ -590,7 +661,13 @@ INDEX_PAGE = """
             
             // 清除患者姓名和A常数
             document.getElementById('patientName').value = '';
+            document.getElementById('iolModel').value = 'Personal Constant';
             document.getElementById('aConstant').value = '119.30'; // 恢复默认值
+            document.getElementById('aConstant').readOnly = false;
+            document.getElementById('aConstantHint').textContent =
+                '默认值：119.30（可根据晶体类型调整）';
+            document.getElementById('iolModelHint').textContent =
+                '选择晶体型号可自动填充A常数';
             
             // 取消选中左右眼
             document.getElementById('rightEyeEnabled').checked = false;
@@ -749,7 +826,8 @@ INDEX_PAGE = """
                     patient_name: document.getElementById('patientName').value || null,
                     a_constant: roundToTwoDecimals(
                         document.getElementById('aConstant').value
-                    )
+                    ),
+                    iol_model: document.getElementById('iolModel').value
                 };
 
                 if (rightEyeEnabled.checked) {
