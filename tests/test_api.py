@@ -16,47 +16,6 @@ api = importlib.import_module("api")
 
 
 @pytest.mark.asyncio
-async def test_auto_process_uses_default_a_constant_and_acd(monkeypatch):
-    handler = api.APIHandler(SimpleNamespace())
-    captured = {}
-
-    async def fake_extract(image_data, env, status_callback=None):
-        return {
-            "success": True,
-            "data": {
-                "patient_name": "李莉",
-                "a_constant": None,
-                "right_eye": {
-                    "AL": 22.54,
-                    "K1": 44.94,
-                    "K2": 45.79,
-                    "ACD": None,
-                },
-                "left_eye": None,
-            },
-        }
-
-    async def fake_calculate(**kwargs):
-        captured.update(kwargs)
-        return {"result": "ok"}
-
-    monkeypatch.setattr(
-        api.WorkerAI,
-        "extract_iol_data_from_image_complete",
-        fake_extract,
-    )
-    monkeypatch.setattr(api, "calculate_iol", fake_calculate)
-
-    result, status_code = await handler._handle_auto_process({"image": "base64"})
-
-    assert status_code == 200
-    assert result["success"] is True
-    assert result["data"]["a_constant"] == 119.3
-    assert captured["a_constant"] == 119.3
-    assert captured["right_eye_params"]["ACD"] == 3.0
-
-
-@pytest.mark.asyncio
 async def test_calculate_defaults_null_a_constant(monkeypatch):
     handler = api.APIHandler(SimpleNamespace())
     captured = {}

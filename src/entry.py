@@ -1,9 +1,7 @@
-import json
 from workers import WorkerEntrypoint, Response
 from urllib.parse import urlparse
-from calculate import calculate_iol, get_hello_message
+from calculate import get_hello_message
 from webui import get_webui_page
-from worker_ai import WorkerAI
 
 from api import APIHandler
 from docs import get_swagger_ui_html, get_openapi_json
@@ -21,8 +19,6 @@ class Default(WorkerEntrypoint):
             )
         elif path == "/hello":
             return await self.handle_hello()
-        elif path == "/api":
-            return await self.handle_api(request)
         elif path == "/api/extract":
             return await self.handle_extract(request)
         elif path == "/api/calculate":
@@ -42,7 +38,6 @@ class Default(WorkerEntrypoint):
                     "available_endpoints": [
                         "GET / - Web UI界面",
                         "GET /hello - 返回问候消息",
-                        "POST /api - 统一API入口，自动检测请求类型",
                         "POST /api/extract - 从图片提取IOL数据",
                         "POST /api/calculate - 执行IOL计算",
                         "GET /docs - API文档页面（Swagger UI）",
@@ -61,12 +56,6 @@ class Default(WorkerEntrypoint):
                 "version": "1.0.0",
             }
         )
-
-    async def handle_api(self, request):
-        """统一API入口，自动检测请求类型并执行相应功能"""
-        api_handler = APIHandler(self.env)
-        result, status_code = await api_handler.handle_api(request)
-        return Response.json(result, status=status_code)
 
     async def handle_extract(self, request):
         """处理图片提取请求"""
