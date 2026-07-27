@@ -13,107 +13,18 @@ def get_openapi_spec():
         "openapi": "3.0.0",
         "info": {
             "title": "Barretcalcata IOL Calculator API",
-            "description": "基于Cloudflare Workers的IOL（人工晶体）计算器API，支持AI图像识别提取医疗数据",
+            "description": "基于Cloudflare Workers的IOL（人工晶体）度数计算API，提交JSON参数即可获取Barrett Universal II公式计算结果",
             "version": "1.0.0",
             "contact": {
                 "name": "API Support",
                 "url": "https://barrettcalcata.killgfat.com",
             },
         },
-        "tags": [
-            {"name": "基础功能", "description": "基础API功能"},
-            {"name": "图片处理", "description": "AI图像识别和数据处理"},
-            {"name": "IOL计算", "description": "人工晶体度数计算"},
-        ],
         "paths": {
-            "/hello": {
-                "get": {
-                    "tags": ["基础功能"],
-                    "summary": "获取问候消息",
-                    "description": "返回简单的问候消息，用于测试API是否正常工作",
-                    "responses": {
-                        "200": {
-                            "description": "成功响应",
-                            "content": {
-                                "application/json": {
-                                    "example": {
-                                        "message": "Hello World!",
-                                        "service": "IOL Calculator API",
-                                        "version": "1.0.0",
-                                    }
-                                }
-                            },
-                        }
-                    },
-                }
-            },
-            "/api/extract": {
-                "post": {
-                    "tags": ["图片处理"],
-                    "summary": "从图片提取IOL数据",
-                    "description": "使用AI图像识别技术从医疗图片中提取IOL计算所需的数据",
-                    "requestBody": {
-                        "required": True,
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {
-                                        "image": {
-                                            "type": "string",
-                                            "format": "base64",
-                                            "description": "Base64编码的图片数据",
-                                        }
-                                    },
-                                    "required": ["image"],
-                                }
-                            }
-                        },
-                    },
-                    "responses": {
-                        "200": {
-                            "description": "成功提取数据",
-                            "content": {
-                                "application/json": {
-                                    "example": {
-                                        "success": True,
-                                        "data": {
-                                            "patient_name": "张三",
-                                            "a_constant": 119.3,
-                                            "right_eye": {
-                                                "AL": 23.5,
-                                                "K1": 43.5,
-                                                "K2": 44.0,
-                                                "ACD": 3.0,
-                                            },
-                                            "left_eye": {
-                                                "AL": 23.3,
-                                                "K1": 43.8,
-                                                "K2": 44.2,
-                                                "ACD": 3.0,
-                                            },
-                                        },
-                                        "message": "图片数据提取成功",
-                                        "status_history": [
-                                            {
-                                                "timestamp": "2025-02-19T10:30:00Z",
-                                                "message": "开始处理图片",
-                                            }
-                                        ],
-                                    }
-                                }
-                            },
-                        },
-                        "400": {"description": "缺少图片数据"},
-                        "500": {"description": "图片处理失败"},
-                    },
-                }
-            },
             "/api/calculate": {
                 "post": {
-                    "tags": ["IOL计算"],
                     "summary": "执行IOL计算",
-                    "description": "根据提供的眼睛参数计算人工晶体度数",
+                    "description": "提交眼睛参数JSON，基于Barrett Universal II公式计算人工晶体度数。至少提供右眼或左眼其中一组参数。",
                     "requestBody": {
                         "required": True,
                         "content": {
@@ -152,8 +63,16 @@ def get_openapi_spec():
                                                 "Refraction": {
                                                     "type": "number",
                                                     "format": "float",
-                                                    "description": "屈光度（D），默认0",
+                                                    "description": "目标屈光度（D），默认0",
                                                     "example": 0,
+                                                },
+                                                "LenThickness": {
+                                                    "type": "string",
+                                                    "description": "晶体厚度（可选）",
+                                                },
+                                                "WTW": {
+                                                    "type": "string",
+                                                    "description": "白到白距离（可选）",
                                                 },
                                             },
                                             "required": ["AL", "K1", "K2"],
@@ -166,19 +85,19 @@ def get_openapi_spec():
                                                     "type": "number",
                                                     "format": "float",
                                                     "description": "眼轴长度（mm）",
-                                                    "example": 23.5,
+                                                    "example": 23.3,
                                                 },
                                                 "K1": {
                                                     "type": "number",
                                                     "format": "float",
                                                     "description": "角膜曲率K1（D）",
-                                                    "example": 43.5,
+                                                    "example": 43.8,
                                                 },
                                                 "K2": {
                                                     "type": "number",
                                                     "format": "float",
                                                     "description": "角膜曲率K2（D）",
-                                                    "example": 44.0,
+                                                    "example": 44.2,
                                                 },
                                                 "ACD": {
                                                     "type": "number",
@@ -189,8 +108,16 @@ def get_openapi_spec():
                                                 "Refraction": {
                                                     "type": "number",
                                                     "format": "float",
-                                                    "description": "屈光度（D），默认0",
+                                                    "description": "目标屈光度（D），默认0",
                                                     "example": 0,
+                                                },
+                                                "LenThickness": {
+                                                    "type": "string",
+                                                    "description": "晶体厚度（可选）",
+                                                },
+                                                "WTW": {
+                                                    "type": "string",
+                                                    "description": "白到白距离（可选）",
                                                 },
                                             },
                                             "required": ["AL", "K1", "K2"],
@@ -203,16 +130,38 @@ def get_openapi_spec():
                                         },
                                         "patient_name": {
                                             "type": "string",
-                                            "description": "患者姓名",
+                                            "description": "患者姓名（可选）",
+                                        },
+                                        "iol_model": {
+                                            "type": "string",
+                                            "description": "IOL晶体型号名称（可选），如 Alcon SN60WF",
                                         },
                                     },
-                                }
+                                },
+                                "example": {
+                                    "right_eye": {
+                                        "AL": 23.5,
+                                        "K1": 43.5,
+                                        "K2": 44.0,
+                                        "ACD": 3.0,
+                                        "Refraction": 0,
+                                    },
+                                    "left_eye": {
+                                        "AL": 23.3,
+                                        "K1": 43.8,
+                                        "K2": 44.2,
+                                        "ACD": 3.0,
+                                        "Refraction": 0,
+                                    },
+                                    "a_constant": 119.3,
+                                    "patient_name": "张三",
+                                },
                             }
                         },
                     },
                     "responses": {
                         "200": {
-                            "description": "成功计算",
+                            "description": "计算成功",
                             "content": {
                                 "application/json": {
                                     "example": {
@@ -244,61 +193,10 @@ def get_openapi_spec():
                                 }
                             },
                         },
-                        "400": {"description": "缺少必需参数"},
+                        "400": {"description": "缺少必需参数或参数无效"},
+                        "405": {"description": "请求方法不允许（仅支持POST）"},
+                        "415": {"description": "请求体必须是JSON格式"},
                         "500": {"description": "计算失败"},
-                    },
-                }
-            },
-            "/api/iol-models": {
-                "get": {
-                    "tags": ["IOL计算"],
-                    "summary": "获取IOL晶体型号列表及A常数",
-                    "description": "从Barrett官方站点同步晶体型号列表。不带参数返回型号列表，带model参数返回指定型号的A常数。",
-                    "parameters": [
-                        {
-                            "name": "model",
-                            "in": "query",
-                            "required": False,
-                            "schema": {"type": "string"},
-                            "description": "晶体型号名称，如 Alcon SN60WF",
-                        }
-                    ],
-                    "responses": {
-                        "200": {
-                            "description": "成功获取",
-                            "content": {
-                                "application/json": {
-                                    "examples": {
-                                        "model_list": {
-                                            "summary": "获取型号列表",
-                                            "value": {
-                                                "success": True,
-                                                "data": {
-                                                    "models": [
-                                                        "Alcon SN60WF",
-                                                        "J&J ZCB00",
-                                                    ]
-                                                },
-                                                "message": "获取晶体型号列表成功",
-                                            },
-                                        },
-                                        "single_model": {
-                                            "summary": "查询单个型号A常数",
-                                            "value": {
-                                                "success": True,
-                                                "data": {
-                                                    "name": "Alcon SN60WF",
-                                                    "a_constant": 118.99,
-                                                    "lens_factor": 1.88,
-                                                },
-                                                "message": "查询成功",
-                                            },
-                                        },
-                                    }
-                                }
-                            },
-                        },
-                        "500": {"description": "获取数据失败"},
                     },
                 }
             },
@@ -310,18 +208,13 @@ def get_openapi_spec():
                     "properties": {
                         "error": {"type": "string", "description": "错误类型"},
                         "message": {"type": "string", "description": "错误消息"},
-                        "available_endpoints": {
-                            "type": "array",
-                            "items": {"type": "string"},
-                            "description": "可用的API端点",
-                        },
                     },
                 },
                 "SuccessResponse": {
                     "type": "object",
                     "properties": {
                         "success": {"type": "boolean", "description": "操作是否成功"},
-                        "data": {"type": "object", "description": "返回的数据"},
+                        "data": {"type": "object", "description": "计算结果"},
                         "message": {"type": "string", "description": "操作消息"},
                     },
                 },
@@ -417,7 +310,7 @@ def get_swagger_ui_html():
             if (topbar) {{
                 topbar.innerHTML = `
                     <div class="api-title">Barrettcalcata IOL Calculator API</div>
-                    <div class="api-description">基于Cloudflare Workers的IOL（人工晶体）计算器API，支持AI图像识别提取医疗数据</div>
+                    <div class="api-description">基于Cloudflare Workers的IOL（人工晶体）度数计算API，提交JSON参数即可获取计算结果</div>
                 ` + topbar.innerHTML;
             }}
             
