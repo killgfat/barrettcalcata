@@ -13,6 +13,8 @@ if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
 api = importlib.import_module("api")
+webui = importlib.import_module("webui")
+docs = importlib.import_module("docs")
 
 
 @pytest.mark.asyncio
@@ -75,3 +77,18 @@ async def test_calculate_rejects_null_required_eye_value():
     assert status_code == 400
     assert result["error"] == "Bad Request"
     assert "右眼AL" in result["message"]
+
+
+def test_web_ui_uses_supported_worker_endpoints():
+    page = webui.get_webui_page()
+
+    assert "fetch('/api/extract'" in page
+    assert "fetch('/api/calculate'" in page
+    assert "fetch('/api'," not in page
+
+
+def test_openapi_documents_image_extraction_endpoint():
+    specification = docs.get_openapi_spec()
+
+    assert "/api/extract" in specification["paths"]
+    assert "post" in specification["paths"]["/api/extract"]

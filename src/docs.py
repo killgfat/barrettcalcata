@@ -21,6 +21,40 @@ def get_openapi_spec():
             },
         },
         "paths": {
+            "/api/extract": {
+                "post": {
+                    "summary": "从报告图片提取 IOL 数据",
+                    "description": (
+                        "使用视觉模型从 IOL Master 报告图片中提取眼部参数。"
+                        "提取完成后，请由调用方确认数据并调用 /api/calculate。"
+                    ),
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "image": {
+                                            "type": "string",
+                                            "format": "byte",
+                                            "description": "报告图片的 Base64 数据",
+                                        }
+                                    },
+                                    "required": ["image"],
+                                }
+                            }
+                        },
+                    },
+                    "responses": {
+                        "200": {"description": "图片数据提取完成"},
+                        "400": {"description": "请求参数无效"},
+                        "405": {"description": "仅支持 POST 请求"},
+                        "415": {"description": "请求体必须是 JSON 格式"},
+                        "500": {"description": "图片识别失败"},
+                    },
+                }
+            },
             "/api/calculate": {
                 "post": {
                     "summary": "执行IOL计算",

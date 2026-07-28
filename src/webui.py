@@ -547,7 +547,7 @@ INDEX_PAGE = """
                 addStatusMessage('发送到服务器进行识别...', 'info');
                 
                 // 发送到服务器进行识别
-                const response = await fetch('/api', {
+                const response = await fetch('/api/extract', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ image: base64, mode: 'extract-from-image' })
@@ -868,7 +868,7 @@ INDEX_PAGE = """
                     formData.left_eye = leftEyeData;
                 }
 
-                const response = await fetch('/api', {
+                const response = await fetch('/api/calculate', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({...formData, mode: 'calculate'})
