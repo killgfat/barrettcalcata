@@ -569,10 +569,10 @@ INDEX_PAGE = """
                         addStatusMessage(`总共进行了 ${result.total_extractions} 次识别`, 'info');
                     }
                     if (result.consensus_reached !== undefined) {
-                        addStatusMessage(`多数决结果: ${result.consensus_reached ? '达成共识' : '未达成共识'}`, result.consensus_reached ? 'success' : 'error');
+                        addStatusMessage(`多数决结果: ${result.consensus_reached ? '全部达成共识' : '部分字段未达成共识'}`, result.consensus_reached ? 'success' : 'warning');
                     }
                     
-                    // 填充表单数据
+                    // 填充表单数据（仅填充达成共识的字段，未达成共识的为null不会填入）
                     // /api 接口（auto process）返回的数据结构中，眼部参数在 extracted_data 里
                     // /api/extract 接口返回的数据结构中，眼部参数直接在 data 里
                     const fillData = (result.data && result.data.extracted_data)
@@ -583,47 +583,35 @@ INDEX_PAGE = """
                         : result.data;
                     fillFormData(fillData);
                     
-                    // 显示成功消息
-                    addStatusMessage('数据提取成功，已填充到表单', 'success');
-                    errorMessage.textContent = '✓ 数据提取成功，请检查并确认数据准确性';
-                    errorMessage.style.background = '#d4edda';
-                    errorMessage.style.color = '#155724';
-                    errorMessage.style.borderColor = '#c3e6cb';
-                    errorMessage.classList.add('show');
-                    
-                    // 3秒后恢复正常样式
-                    setTimeout(() => {
-                        errorMessage.classList.remove('show');
-                        errorMessage.style.background = '';
-                        errorMessage.style.color = '';
-                        errorMessage.style.borderColor = '';
-                    }, 3000);
-                    
-                } else if (result.requires_manual_verification) {
-                    // 需要手动校验的情况
-                    addStatusMessage('识别数据存在差异，需要手动校验', 'warning');
-                    
-                    // 显示共识详情
-                    if (result.consensus_details) {
-                        addStatusMessage('=== 共识分析详情 ===', 'info');
-                        for (const [field, details] of Object.entries(result.consensus_details)) {
-                            if (details.has_consensus) {
-                                addStatusMessage(`${field}: 达成共识 (${details.consensus_value})`, 'success');
-                            } else {
-                                addStatusMessage(`${field}: 未达成共识`, 'warning');
-                            }
-                        }
+                    if (result.requires_manual_verification && result.failed_fields && result.failed_fields.length > 0) {
+                        // 部分字段未达成共识，提示用户手动校验
+                        addStatusMessage('=== 未达成共识的字段 ===', 'warning');
+                        result.failed_fields.forEach(field => {
+                            addStatusMessage(`${field}: 三次识别结果不一致，请手动校验`, 'warning');
+                        });
+                        addStatusMessage('已填充的字段为达成共识的数据，未填充的字段需要手动输入', 'info');
+                        
+                        errorMessage.textContent = '⚠️ 部分字段未达成共识（' + result.failed_fields.join(', ') + '），请手动校验';
+                        errorMessage.style.background = '#fff3cd';
+                        errorMessage.style.color = '#856404';
+                        errorMessage.style.borderColor = '#ffeaa7';
+                        errorMessage.classList.add('show');
+                    } else {
+                        // 全部达成共识
+                        addStatusMessage('数据提取成功，已填充到表单', 'success');
+                        errorMessage.textContent = '✓ 数据提取成功，请检查并确认数据准确性';
+                        errorMessage.style.background = '#d4edda';
+                        errorMessage.style.color = '#155724';
+                        errorMessage.style.borderColor = '#c3e6cb';
+                        errorMessage.classList.add('show');
+                        
+                        setTimeout(() => {
+                            errorMessage.classList.remove('show');
+                            errorMessage.style.background = '';
+                            errorMessage.style.color = '';
+                            errorMessage.style.borderColor = '';
+                        }, 3000);
                     }
-                    
-                    // 显示手动校验提示
-                    errorMessage.textContent = '⚠️ 识别数据存在错误，请手动校验';
-                    errorMessage.style.background = '#fff3cd';
-                    errorMessage.style.color = '#856404';
-                    errorMessage.style.borderColor = '#ffeaa7';
-                    errorMessage.classList.add('show');
-                    
-                    // 不自动隐藏错误消息，让用户手动校验
-                    addStatusMessage('请根据上方识别结果手动填写表单数据', 'warning');
                     
                 } else {
                     addStatusMessage(`提取失败: ${result.error || '图片识别失败'}`, 'error');
@@ -730,7 +718,7 @@ INDEX_PAGE = """
             }
 
             // 填充右眼数据
-            if (data.right_eye && (data.right_eye.AL || data.right_eye.K1 || data.right_eye.K2)) {
+            if (data.right_eye && (data.right_eye.AL || data.right_eye.K1 || data.right_eye.K2 || (data.right_eye.ACD !== null && data.right_eye.ACD !== undefined))) {
                 rightEyeEnabled.checked = true;
                 rightEyeEnabled.dispatchEvent(new Event('change'));
                 
@@ -743,7 +731,7 @@ INDEX_PAGE = """
             }
 
             // 填充左眼数据
-            if (data.left_eye && (data.left_eye.AL || data.left_eye.K1 || data.left_eye.K2)) {
+            if (data.left_eye && (data.left_eye.AL || data.left_eye.K1 || data.left_eye.K2 || (data.left_eye.ACD !== null && data.left_eye.ACD !== undefined))) {
                 leftEyeEnabled.checked = true;
                 leftEyeEnabled.dispatchEvent(new Event('change'));
                 

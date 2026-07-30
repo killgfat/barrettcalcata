@@ -148,30 +148,32 @@ class WorkerAI:
                     "attempts": extraction_results,
                 }
 
-            update_status("开始进行多数决比对")
+            update_status("开始进行多数决比对（逐字段分析）")
             consensus_result = self._perform_consensus_analysis(successful_extractions)
 
-            if consensus_result["consensus_reached"]:
-                update_status("多数决比对成功，生成最终结果")
-                return {
-                    "success": True,
-                    "data": consensus_result["consensus_data"],
-                    "consensus_reached": True,
-                    "consensus_details": consensus_result["details"],
-                    "attempts": extraction_results,
-                    "total_extractions": extraction_count,
-                }
+            failed_fields = [
+                field
+                for field, info in consensus_result["details"].items()
+                if not info.get("has_consensus")
+            ]
+
+            if failed_fields:
+                update_status(
+                    f"部分字段未达成共识: {', '.join(failed_fields)}"
+                )
             else:
-                update_status("多数决比对失败，三次结果均不相同")
-                return {
-                    "success": False,
-                    "error": "识别数据存在错误，请手动校验",
-                    "consensus_reached": False,
-                    "consensus_details": consensus_result["details"],
-                    "attempts": extraction_results,
-                    "total_extractions": extraction_count,
-                    "requires_manual_verification": True,
-                }
+                update_status("所有字段均达成共识")
+
+            return {
+                "success": True,
+                "data": consensus_result["consensus_data"],
+                "consensus_reached": len(failed_fields) == 0,
+                "consensus_details": consensus_result["details"],
+                "failed_fields": failed_fields,
+                "requires_manual_verification": len(failed_fields) > 0,
+                "attempts": extraction_results,
+                "total_extractions": extraction_count,
+            }
 
         except Exception as e:
             update_status(f"处理过程中发生异常: {str(e)}")

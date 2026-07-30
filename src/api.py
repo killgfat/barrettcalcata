@@ -237,8 +237,8 @@ class APIHandler:
             extraction_result["status_history"] = status_messages
 
             if extraction_result["success"]:
-                # 提取成功，返回数据
-                return {
+                # 提取成功，返回数据（部分字段可能未达成共识）
+                response_data = {
                     "success": True,
                     "data": extraction_result["data"],
                     "message": "图片数据提取成功",
@@ -249,7 +249,11 @@ class APIHandler:
                         "consensus_reached", True
                     ),
                     "consensus_details": extraction_result.get("consensus_details", {}),
-                }, 200
+                    "failed_fields": extraction_result.get("failed_fields", []),
+                }
+                if extraction_result.get("requires_manual_verification"):
+                    response_data["requires_manual_verification"] = True
+                return response_data, 200
             else:
                 # 提取失败，返回错误信息
                 response_data = {
