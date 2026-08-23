@@ -13,9 +13,42 @@
 ## 主要功能
 
 - **IOL 度数计算**：基于 Barrett Universal II 公式，支持单眼或双眼计算，可配置 A 常数、目标屈光度、硅油眼矫正等参数
+- **散光晶体计算**：独立的 Barrett Universal II Toric 模块，支持平坦/陡峭 K 值及轴位、切口 SIA、晶体厚度和 WTW，并返回晶体型号与建议植入轴位
 - **AI 识图填充**：上传 IOL Master 晶体单图片，自动识别并填充患者姓名、A 常数及双眼 AL、K1、K2、ACD 等参数，采用三次并发识别 + 多数决机制提升准确性
 - **Web UI**：内置可视化操作界面，支持手动输入与图片上传两种方式
 - **OpenAPI 接口**：提供标准 OpenAPI 规范，可通过 `/docs`（Swagger UI）或 `/openapi.json` 查看完整接口文档
+
+### Barrett Universal II Toric API
+
+散光计算使用独立端点 `POST /api/calculate-toric`，至少提交 `right_eye` 或 `left_eye` 一组参数。每只眼睛需要 `flat_k`、`flat_axis`、`steep_k`、`steep_axis`、`AL`、`lens_thickness` 和 `WTW`；`ACD`、目标屈光度、切口 SIA 与切口位置缺省为 `3.00`、`0`、`0` 和 `0`。成功响应中的 `axis_image.source_url` 指向 Barrett 官方轴位背景图，`fallback_url` 是官方资源不可用时使用的自包含轴位图。
+
+```json
+{
+  "right_eye": {
+    "flat_k": 41.50,
+    "flat_axis": 84,
+    "steep_k": 43.85,
+    "steep_axis": 174,
+    "AL": 24.43,
+    "ACD": 3.25,
+    "target_refraction": 0,
+    "incision_sia": 0,
+    "incision_location": 10,
+    "lens_thickness": 4.21,
+    "WTW": 11.80
+  },
+  "a_constant": 119.30,
+  "k_index": 1.3375,
+  "cylinder_mode": "-ve"
+}
+```
+
+### 模块命名
+
+- `src/barrett_calculate.py`：Barrett Universal II 普通晶体计算
+- `src/barrett_toric_calculate.py`：Barrett Universal II Toric 散光晶体计算与轴位图数据
+- `src/barrett_iol_models.py`：Barrett 晶体型号与常数同步
+- `src/barrett_config.py`：普通和散光计算共用的 K-index 配置
 
 ## 环境变量
 

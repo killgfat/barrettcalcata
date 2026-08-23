@@ -1,8 +1,7 @@
 import asyncio
 import importlib
-from pathlib import Path
 import sys
-
+from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SRC_DIR = PROJECT_ROOT / "src"
@@ -10,7 +9,7 @@ SRC_DIR = PROJECT_ROOT / "src"
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
-calculate = importlib.import_module("calculate")
+barrett_calculate = importlib.import_module("barrett_calculate")
 
 
 class FakeResponse:
@@ -51,18 +50,18 @@ class FakeSession:
         return FakeResponse("<html></html>")
 
 
-def test_calculate_formats_a_constant_and_acd_to_two_decimals(monkeypatch):
+def test_barrett_calculate_formats_a_constant_and_acd_to_two_decimals(monkeypatch):
     fake_session = FakeSession()
 
-    monkeypatch.setattr(calculate.requests, "Session", lambda: fake_session)
+    monkeypatch.setattr(barrett_calculate.requests, "Session", lambda: fake_session)
     monkeypatch.setattr(
-        calculate,
+        barrett_calculate,
         "parse_iol_results",
         lambda html: {"success": True},
     )
 
     result = asyncio.run(
-        calculate.calculate_iol(
+        barrett_calculate.calculate_barrett_iol(
             right_eye_params={
                 "AL": 23.5,
                 "K1": 43.5,
@@ -80,18 +79,18 @@ def test_calculate_formats_a_constant_and_acd_to_two_decimals(monkeypatch):
     assert fake_session.post_payloads[1]["ctl00$MainContent$OpticalACD"] == "2.40"
 
 
-def test_calculate_converts_selected_k_index_to_barrett_form_value(monkeypatch):
+def test_barrett_calculate_converts_selected_k_index_to_barrett_form_value(monkeypatch):
     fake_session = FakeSession()
 
-    monkeypatch.setattr(calculate.requests, "Session", lambda: fake_session)
+    monkeypatch.setattr(barrett_calculate.requests, "Session", lambda: fake_session)
     monkeypatch.setattr(
-        calculate,
+        barrett_calculate,
         "parse_iol_results",
         lambda html: {"success": True},
     )
 
     asyncio.run(
-        calculate.calculate_iol(
+        barrett_calculate.calculate_barrett_iol(
             right_eye_params={
                 "AL": 23.5,
                 "K1": 43.5,
@@ -101,23 +100,25 @@ def test_calculate_converts_selected_k_index_to_barrett_form_value(monkeypatch):
         )
     )
 
-    assert fake_session.post_payloads[0][
-        "ctl00$MainContent$RadioButtonList1"
-    ] == "337.5"
+    assert (
+        fake_session.post_payloads[0]["ctl00$MainContent$RadioButtonList1"] == "337.5"
+    )
 
 
-def test_calculate_converts_alternate_k_index_to_barrett_form_value(monkeypatch):
+def test_barrett_calculate_converts_alternate_k_index_to_barrett_form_value(
+    monkeypatch,
+):
     fake_session = FakeSession()
 
-    monkeypatch.setattr(calculate.requests, "Session", lambda: fake_session)
+    monkeypatch.setattr(barrett_calculate.requests, "Session", lambda: fake_session)
     monkeypatch.setattr(
-        calculate,
+        barrett_calculate,
         "parse_iol_results",
         lambda html: {"success": True},
     )
 
     asyncio.run(
-        calculate.calculate_iol(
+        barrett_calculate.calculate_barrett_iol(
             right_eye_params={
                 "AL": 23.5,
                 "K1": 43.5,
@@ -127,6 +128,4 @@ def test_calculate_converts_alternate_k_index_to_barrett_form_value(monkeypatch)
         )
     )
 
-    assert fake_session.post_payloads[0][
-        "ctl00$MainContent$RadioButtonList1"
-    ] == "332"
+    assert fake_session.post_payloads[0]["ctl00$MainContent$RadioButtonList1"] == "332"

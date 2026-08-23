@@ -1,6 +1,6 @@
 from workers import WorkerEntrypoint, Response
 from urllib.parse import urlparse
-from calculate import get_hello_message
+from barrett_calculate import get_hello_message
 from webui import get_webui_page
 
 from api import APIHandler
@@ -22,9 +22,11 @@ class Default(WorkerEntrypoint):
         elif path == "/api/extract":
             return await self.handle_extract(request)
         elif path == "/api/calculate":
-            return await self.handle_calculate(request)
+            return await self.handle_barrett_calculate(request)
+        elif path == "/api/calculate-toric":
+            return await self.handle_barrett_toric_calculate(request)
         elif path == "/api/iol-models":
-            return await self.handle_iol_models(request)
+            return await self.handle_barrett_iol_models(request)
         elif path == "/docs":
             return await self.handle_docs()
         elif path == "/openapi.json":
@@ -40,6 +42,7 @@ class Default(WorkerEntrypoint):
                         "GET /hello - 返回问候消息",
                         "POST /api/extract - 从图片提取IOL数据",
                         "POST /api/calculate - 执行IOL计算",
+                        "POST /api/calculate-toric - 执行Barrett Universal II散光计算",
                         "GET /docs - API文档页面（Swagger UI）",
                         "GET /openapi.json - OpenAPI规范JSON",
                     ],
@@ -63,13 +66,19 @@ class Default(WorkerEntrypoint):
         result, status_code = await api_handler.handle_extract(request)
         return Response.json(result, status=status_code)
 
-    async def handle_calculate(self, request):
+    async def handle_barrett_calculate(self, request):
         """处理IOL计算请求"""
         api_handler = APIHandler(self.env)
-        result, status_code = await api_handler.handle_calculate(request)
+        result, status_code = await api_handler.handle_barrett_calculate(request)
         return Response.json(result, status=status_code)
 
-    async def handle_iol_models(self, request):
+    async def handle_barrett_toric_calculate(self, request):
+        """处理 Barrett Universal II Toric 计算请求。"""
+        api_handler = APIHandler(self.env)
+        result, status_code = await api_handler.handle_barrett_toric_calculate(request)
+        return Response.json(result, status=status_code)
+
+    async def handle_barrett_iol_models(self, request):
         """处理IOL晶体型号查询请求"""
         from urllib.parse import parse_qs
 
@@ -77,7 +86,7 @@ class Default(WorkerEntrypoint):
         model_name = query.get("model", [None])[0]
 
         api_handler = APIHandler(self.env)
-        result, status_code = await api_handler.handle_iol_models(
+        result, status_code = await api_handler.handle_barrett_iol_models(
             request, model_name=model_name
         )
         return Response.json(result, status=status_code)

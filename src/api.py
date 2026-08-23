@@ -6,8 +6,9 @@ import json
 
 from barrett_config import DEFAULT_K_INDEX as DEFAULT_BARRETT_K_INDEX
 from barrett_config import normalize_k_index
-from calculate import calculate_iol
-from iol_models import fetch_iol_model_list, fetch_model_a_constant
+from barrett_calculate import calculate_barrett_iol
+from barrett_iol_models import fetch_iol_model_list, fetch_model_a_constant
+from barrett_toric_calculate import calculate_barrett_toric_iol
 from worker_ai import WorkerAI
 
 
@@ -140,7 +141,7 @@ class APIHandler:
                 "message": f"处理过程中发生错误: {str(e)}",
             }, 500
 
-    async def handle_iol_models(self, request, model_name=None):
+    async def handle_barrett_iol_models(self, request, model_name=None):
         """处理IOL晶体型号查询请求"""
         if request.method != "GET":
             return {
@@ -174,7 +175,7 @@ class APIHandler:
                 "message": f"获取晶体型号数据失败: {str(e)}",
             }, 500
 
-    async def handle_calculate(self, request):
+    async def handle_barrett_calculate(self, request):
         """处理IOL计算请求"""
 
         # 只接受POST请求
@@ -198,7 +199,7 @@ class APIHandler:
             body = await request.json()
 
             # 执行计算功能
-            return await self._handle_calculate(body)
+            return await self._handle_barrett_calculate(body)
 
         except json.JSONDecodeError:
             return {"error": "Bad Request", "message": "无效的JSON格式"}, 400
@@ -214,6 +215,35 @@ class APIHandler:
             return {
                 "error": "Internal Server Error",
                 "message": f"处理过程中发生错误: {str(e)}",
+            }, 500
+
+    async def handle_barrett_toric_calculate(self, request):
+        """处理 Barrett Universal II 散光晶体计算请求。"""
+        if request.method != "POST":
+            return {
+                "error": "Method Not Allowed",
+                "message": "此端点只支持POST请求",
+            }, 405
+
+        try:
+            content_type = request.headers.get("content-type", "")
+            if "application/json" not in content_type:
+                return {
+                    "error": "Unsupported Media Type",
+                    "message": "请求体必须是JSON格式",
+                }, 415
+
+            body = await request.json()
+            return await self._handle_barrett_toric_calculate(body)
+        except json.JSONDecodeError:
+            return {"error": "Bad Request", "message": "无效的JSON格式"}, 400
+        except (ValueError, TypeError) as exc:
+            return {"error": "Bad Request", "message": str(exc)}, 400
+        except Exception as exc:
+            print(f"处理Barrett散光计算请求时发生错误: {str(exc)}")
+            return {
+                "error": "Internal Server Error",
+                "message": f"散光计算过程中发生错误: {str(exc)}",
             }, 500
 
     async def _handle_extract_from_image(self, body):
@@ -293,7 +323,7 @@ class APIHandler:
                 "message": f"图片处理过程中发生错误: {str(e)}",
             }, 500
 
-    async def _handle_calculate(self, body):
+    async def _handle_barrett_calculate(self, body):
         """处理IOL计算请求"""
         try:
             # 验证必需的参数
@@ -316,7 +346,7 @@ class APIHandler:
                 }, 400
 
             # 调用计算函数
-            result = await calculate_iol(
+            result = await calculate_barrett_iol(
                 right_eye_params=right_eye_params,
                 left_eye_params=left_eye_params,
                 a_constant=a_constant,
@@ -335,4 +365,51 @@ class APIHandler:
             return {
                 "error": "Internal Server Error",
                 "message": f"计算过程中发生错误: {str(e)}",
+            }, 500
+
+    async def _handle_barrett_toric_calculate(self, body):
+        """标准化并执行独立的 Barrett Universal II Toric 计算。"""
+        if not isinstance(body, dict):
+            return {
+                "error": "Bad Request",
+                "message": "请求体必须是JSON对象",
+            }, 400
+
+        try:
+            # /api/calculate-toric 使用与普通接口相同的 right_eye/left_eye
+            # 字段；toric_right_eye/toric_left_eye 作为显式别名保留。
+            right_eye = body.get("toric_right_eye") or body.get("right_eye")
+            left_eye = body.get("toric_left_eye") or body.get("left_eye")
+            a_constant = self._normalize_a_constant(body.get("a_constant"))
+            patient_name = body.get("patient_name")
+            iol_model = body.get("iol_model")
+            k_index = self._normalize_k_index(body.get("k_index"))
+            cylinder_mode = body.get("cylinder_mode", "-ve")
+
+            if not right_eye and not left_eye:
+                return {
+                    "error": "Bad Request",
+                    "message": "至少需要提供右眼或左眼散光参数",
+                }, 400
+
+            result = await calculate_barrett_toric_iol(
+                right_eye_params=right_eye,
+                left_eye_params=left_eye,
+                a_constant=a_constant,
+                patient_name=patient_name,
+                iol_model=iol_model,
+                k_index=k_index,
+                cylinder_mode=cylinder_mode,
+            )
+            return {
+                "success": True,
+                "data": result,
+                "message": "Barrett Universal II散光计算完成",
+            }, 200
+        except (ValueError, TypeError) as exc:
+            return {"error": "Bad Request", "message": str(exc)}, 400
+        except Exception as exc:
+            return {
+                "error": "Internal Server Error",
+                "message": f"散光计算过程中发生错误: {str(exc)}",
             }, 500

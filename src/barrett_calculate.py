@@ -113,7 +113,7 @@ def parse_iol_results(html_content):
     return result
 
 
-async def calculate_iol(
+async def calculate_barrett_iol(
     right_eye_params=None,
     left_eye_params=None,
     a_constant=119.30,

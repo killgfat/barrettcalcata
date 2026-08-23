@@ -21,6 +21,12 @@ INDEX_PAGE = """
         .github-link:hover { background: rgba(255,255,255,0.15); }
         .github-icon { width: 28px; height: 28px; fill: white; }
         .main-content { padding: 30px; }
+        .mode-switch-band { padding: 16px 30px 0; background: white; }
+        .mode-switch { display: flex; gap: 4px; max-width: 420px; margin: 0 auto; padding: 4px; border: 1px solid #cbd5e1; border-radius: 8px; background: #f1f5f9; }
+        .mode-button { flex: 1; min-height: 44px; border: 0; border-radius: 6px; background: transparent; color: #475569; font-size: 15px; font-weight: bold; cursor: pointer; transition: background 0.2s, color 0.2s, box-shadow 0.2s; }
+        .mode-button:hover { color: #0f172a; }
+        .mode-button.active { background: white; color: #0f766e; box-shadow: 0 1px 4px rgba(15, 23, 42, 0.14); }
+        [hidden] { display: none !important; }
         .form-section { margin-bottom: 30px; padding: 20px; border: 1px solid #ddd; border-radius: 8px; }
         .section-title { font-size: 1.5em; margin-bottom: 15px; color: #333; border-bottom: 2px solid #007bff; padding-bottom: 10px; }
         .form-group { margin-bottom: 15px; }
@@ -43,6 +49,24 @@ INDEX_PAGE = """
         .results-section.show { display: block; }
         .result-card { margin-bottom: 20px; padding: 20px; border: 1px solid #ddd; border-radius: 8px; background: #fafafa; }
         .result-card h4 { color: #333; margin-bottom: 15px; font-size: 1.2em; }
+        .toric-section { border-color: #0f766e; }
+        .toric-section .section-title { border-bottom-color: #0f766e; }
+        .toric-eye-params { display: none; }
+        .toric-eye-params.show { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; }
+        .axis-result { margin-top: 20px; padding: 16px; border: 1px solid #99f6e4; border-radius: 8px; background: #f0fdfa; }
+        .axis-result h5 { margin-bottom: 12px; color: #115e59; font-size: 1.05em; }
+        .axis-layout { display: grid; grid-template-columns: minmax(220px, 360px) 1fr; gap: 20px; align-items: center; }
+        .axis-figure { position: relative; width: 100%; max-width: 360px; aspect-ratio: 1; overflow: hidden; border-radius: 50%; background: #e6fffb; }
+        .axis-figure img { display: block; width: 100%; height: 100%; object-fit: cover; }
+        .axis-line { position: absolute; left: 10%; top: calc(50% - 1px); width: 80%; height: 2px; transform-origin: 50% 50%; background: #dc2626; box-shadow: 0 0 0 1px rgba(255,255,255,0.6); }
+        .axis-line.flat { background: #2563eb; }
+        .axis-line.steep { background: #ea580c; }
+        .axis-line.toric { background: #16a34a; height: 3px; }
+        .axis-line.incision { background: #7c3aed; height: 2px; }
+        .axis-legend { display: grid; gap: 8px; font-size: 0.95em; color: #334155; }
+        .axis-legend-row { display: flex; justify-content: space-between; gap: 16px; border-bottom: 1px solid #ccfbf1; padding-bottom: 6px; }
+        .axis-legend-row strong { color: #0f172a; }
+        @media (max-width: 768px) { .axis-layout { grid-template-columns: 1fr; } .axis-figure { margin: 0 auto; } }
         .result-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
         .result-table th, .result-table td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }
         .result-table th { background: #f8f9fa; font-weight: bold; color: #555; }
@@ -98,7 +122,14 @@ INDEX_PAGE = """
                 </svg>
             </a>
         </div>
-        
+
+        <div class="mode-switch-band" aria-label="计算模式">
+            <div class="mode-switch" role="group">
+                <button type="button" class="mode-button active" id="sphericalModeButton" aria-pressed="true">非散光</button>
+                <button type="button" class="mode-button" id="toricModeButton" aria-pressed="false">散光</button>
+            </div>
+        </div>
+
         <div class="main-content">
             <form id="iolForm">
                 <div class="form-section">
@@ -129,7 +160,7 @@ INDEX_PAGE = """
                     </div>
                 </div>
                 
-                <div class="form-section">
+                <div class="form-section" id="imageRecognitionSection">
                     <h2 class="section-title">图片识别（可选）</h2>
                     <div class="form-group">
                         <label for="imageUpload">上传IOL master晶体单图片</label>
@@ -145,7 +176,7 @@ INDEX_PAGE = """
                     </div>
                 </div>
                 
-                <div class="form-section">
+                <div class="form-section" id="sphericalEyeSection">
                     <h2 class="section-title">眼部参数</h2>
                     
                     <div class="eye-section" id="rightEyeSection">
@@ -221,11 +252,68 @@ INDEX_PAGE = """
                     </div>
                 </div>
                 
-                <div class="btn-container">
+                <div class="btn-container" id="sphericalCalculateContainer">
                     <button type="submit" class="btn" id="calculateBtn" disabled>计算IOL度数</button>
                 </div>
             </form>
-            
+
+            <section class="form-section toric-section" id="toricSection" hidden>
+                <h2 class="section-title">Barrett Universal II 散光晶体</h2>
+                <div class="param-hint" style="margin-bottom: 15px;">
+                    散光计算使用上方患者、晶体型号、A常数和K-index设置；请为至少一只眼睛填写平坦/陡峭子午线、轴位及晶体几何参数。
+                </div>
+                <div class="form-group" style="max-width: 260px;">
+                    <label for="toricCylinderMode">散光符号</label>
+                    <select id="toricCylinderMode" name="toricCylinderMode">
+                        <option value="-ve" selected>负柱镜（-ve Cylinder）</option>
+                        <option value="+ve">正柱镜（+ve Cylinder）</option>
+                    </select>
+                </div>
+
+                <div class="eye-section" id="toricRightEyeSection">
+                    <div class="eye-header">
+                        <input type="checkbox" id="toricRightEyeEnabled">
+                        <label for="toricRightEyeEnabled">右眼 (OD)</label>
+                    </div>
+                    <div class="toric-eye-params" id="toricRightEyeParams">
+                        <div class="form-group"><label for="toricRightFlatK">Flat K (D)</label><input type="number" id="toricRightFlatK" step="0.01" min="30" max="60"></div>
+                        <div class="form-group"><label for="toricRightFlatAxis">Flat Axis (°)</label><input type="number" id="toricRightFlatAxis" step="1" min="0" max="180"></div>
+                        <div class="form-group"><label for="toricRightSteepK">Steep K (D)</label><input type="number" id="toricRightSteepK" step="0.01" min="30" max="60"></div>
+                        <div class="form-group"><label for="toricRightSteepAxis">Steep Axis (°)</label><input type="number" id="toricRightSteepAxis" step="1" min="0" max="180"></div>
+                        <div class="form-group"><label for="toricRightAL">眼轴长度 AL (mm)</label><input type="number" id="toricRightAL" step="0.01" min="12" max="38"></div>
+                        <div class="form-group"><label for="toricRightACD">光学 ACD (mm)</label><input type="number" id="toricRightACD" value="3.00" step="0.01" min="0" max="6"></div>
+                        <div class="form-group"><label for="toricRightRefraction">目标屈光度 (D)</label><input type="number" id="toricRightRefraction" value="0" step="0.01"></div>
+                        <div class="form-group"><label for="toricRightSIA">切口 SIA (D)</label><input type="number" id="toricRightSIA" value="0" step="0.01" min="0" max="2"></div>
+                        <div class="form-group"><label for="toricRightIncision">切口位置 (°)</label><input type="number" id="toricRightIncision" value="0" step="1" min="0" max="360"></div>
+                        <div class="form-group"><label for="toricRightLT">晶体厚度 LT (mm)</label><input type="number" id="toricRightLT" step="0.01" min="2" max="8"></div>
+                        <div class="form-group"><label for="toricRightWTW">WTW (mm)</label><input type="number" id="toricRightWTW" step="0.01" min="8" max="14"></div>
+                    </div>
+                </div>
+
+                <div class="eye-section" id="toricLeftEyeSection">
+                    <div class="eye-header">
+                        <input type="checkbox" id="toricLeftEyeEnabled">
+                        <label for="toricLeftEyeEnabled">左眼 (OS)</label>
+                    </div>
+                    <div class="toric-eye-params" id="toricLeftEyeParams">
+                        <div class="form-group"><label for="toricLeftFlatK">Flat K (D)</label><input type="number" id="toricLeftFlatK" step="0.01" min="30" max="60"></div>
+                        <div class="form-group"><label for="toricLeftFlatAxis">Flat Axis (°)</label><input type="number" id="toricLeftFlatAxis" step="1" min="0" max="180"></div>
+                        <div class="form-group"><label for="toricLeftSteepK">Steep K (D)</label><input type="number" id="toricLeftSteepK" step="0.01" min="30" max="60"></div>
+                        <div class="form-group"><label for="toricLeftSteepAxis">Steep Axis (°)</label><input type="number" id="toricLeftSteepAxis" step="1" min="0" max="180"></div>
+                        <div class="form-group"><label for="toricLeftAL">眼轴长度 AL (mm)</label><input type="number" id="toricLeftAL" step="0.01" min="12" max="38"></div>
+                        <div class="form-group"><label for="toricLeftACD">光学 ACD (mm)</label><input type="number" id="toricLeftACD" value="3.00" step="0.01" min="0" max="6"></div>
+                        <div class="form-group"><label for="toricLeftRefraction">目标屈光度 (D)</label><input type="number" id="toricLeftRefraction" value="0" step="0.01"></div>
+                        <div class="form-group"><label for="toricLeftSIA">切口 SIA (D)</label><input type="number" id="toricLeftSIA" value="0" step="0.01" min="0" max="2"></div>
+                        <div class="form-group"><label for="toricLeftIncision">切口位置 (°)</label><input type="number" id="toricLeftIncision" value="0" step="1" min="0" max="360"></div>
+                        <div class="form-group"><label for="toricLeftLT">晶体厚度 LT (mm)</label><input type="number" id="toricLeftLT" step="0.01" min="2" max="8"></div>
+                        <div class="form-group"><label for="toricLeftWTW">WTW (mm)</label><input type="number" id="toricLeftWTW" step="0.01" min="8" max="14"></div>
+                    </div>
+                </div>
+                <div class="btn-container">
+                    <button type="button" class="btn" id="toricCalculateBtn" style="background: #0f766e;" disabled>计算散光晶体</button>
+                </div>
+            </section>
+
             <div class="loading" id="loading">
                 <div class="spinner"></div>
                 <p>正在计算中，请稍候...</p>
@@ -236,6 +324,11 @@ INDEX_PAGE = """
             <div class="results-section" id="resultsSection">
                 <h2 class="section-title">计算结果</h2>
                 <div id="resultsContent"></div>
+            </div>
+
+            <div class="results-section" id="toricResultsSection" hidden>
+                <h2 class="section-title">散光计算结果与轴位</h2>
+                <div id="toricResultsContent"></div>
             </div>
         </div>
     </div>
@@ -886,6 +979,221 @@ INDEX_PAGE = """
                 loading.classList.remove('show');
             }
         });
+
+        // Barrett Universal II Toric 独立表单
+        const toricRightEyeEnabled = document.getElementById('toricRightEyeEnabled');
+        const toricLeftEyeEnabled = document.getElementById('toricLeftEyeEnabled');
+        const toricCalculateBtn = document.getElementById('toricCalculateBtn');
+        const sphericalModeButton = document.getElementById('sphericalModeButton');
+        const toricModeButton = document.getElementById('toricModeButton');
+        const imageRecognitionSection = document.getElementById('imageRecognitionSection');
+        const sphericalEyeSection = document.getElementById('sphericalEyeSection');
+        const sphericalCalculateContainer = document.getElementById('sphericalCalculateContainer');
+        const toricSection = document.getElementById('toricSection');
+        const resultsSection = document.getElementById('resultsSection');
+        const toricResultsSection = document.getElementById('toricResultsSection');
+
+        function setCalculationMode(mode) {
+            const isToric = mode === 'toric';
+            sphericalModeButton.classList.toggle('active', !isToric);
+            sphericalModeButton.setAttribute('aria-pressed', String(!isToric));
+            toricModeButton.classList.toggle('active', isToric);
+            toricModeButton.setAttribute('aria-pressed', String(isToric));
+            imageRecognitionSection.hidden = isToric;
+            sphericalEyeSection.hidden = isToric;
+            sphericalCalculateContainer.hidden = isToric;
+            toricSection.hidden = !isToric;
+            resultsSection.hidden = isToric;
+            toricResultsSection.hidden = !isToric;
+
+            if (isToric) {
+                imageUpload.value = '';
+                imagePreview.style.display = 'none';
+                validateToricForm();
+            } else {
+                validateForm();
+            }
+        }
+
+        sphericalModeButton.addEventListener('click', () => setCalculationMode('spherical'));
+        toricModeButton.addEventListener('click', () => setCalculationMode('toric'));
+        setCalculationMode('spherical');
+
+        function toricEyeFieldIds(eye) {
+            const prefix = eye === 'right' ? 'toricRight' : 'toricLeft';
+            return [
+                prefix + 'FlatK', prefix + 'FlatAxis', prefix + 'SteepK',
+                prefix + 'SteepAxis', prefix + 'AL', prefix + 'ACD',
+                prefix + 'Refraction', prefix + 'SIA', prefix + 'Incision',
+                prefix + 'LT', prefix + 'WTW'
+            ];
+        }
+
+        function toricEyeIsValid(eye) {
+            const ids = toricEyeFieldIds(eye);
+            const requiredIds = ids.slice(0, 5).concat(ids.slice(9));
+            return requiredIds.every(id => {
+                const input = document.getElementById(id);
+                const value = Number(input.value);
+                return input.value !== '' && Number.isFinite(value);
+            });
+        }
+
+        function validateToricForm() {
+            const hasRight = toricRightEyeEnabled.checked && toricEyeIsValid('right');
+            const hasLeft = toricLeftEyeEnabled.checked && toricEyeIsValid('left');
+            toricCalculateBtn.disabled = !(hasRight || hasLeft);
+        }
+
+        function setToricEyeState(eye, enabled) {
+            const prefix = eye === 'right' ? 'toricRight' : 'toricLeft';
+            document.getElementById(prefix + 'EyeParams').classList.toggle('show', enabled);
+            document.getElementById(prefix + 'EyeSection').classList.toggle('active', enabled);
+            validateToricForm();
+        }
+
+        toricRightEyeEnabled.addEventListener('change', function() {
+            setToricEyeState('right', this.checked);
+        });
+        toricLeftEyeEnabled.addEventListener('change', function() {
+            setToricEyeState('left', this.checked);
+        });
+        document.querySelectorAll('#toricSection input').forEach(input => {
+            input.addEventListener('input', validateToricForm);
+        });
+
+        function readToricEyeData(eye) {
+            const prefix = eye === 'right' ? 'toricRight' : 'toricLeft';
+            const number = id => {
+                const value = document.getElementById(id).value;
+                return value === '' ? undefined : Number(value);
+            };
+            return {
+                flat_k: number(prefix + 'FlatK'),
+                flat_axis: number(prefix + 'FlatAxis'),
+                steep_k: number(prefix + 'SteepK'),
+                steep_axis: number(prefix + 'SteepAxis'),
+                AL: number(prefix + 'AL'),
+                ACD: number(prefix + 'ACD'),
+                target_refraction: number(prefix + 'Refraction'),
+                incision_sia: number(prefix + 'SIA'),
+                incision_location: number(prefix + 'Incision'),
+                lens_thickness: number(prefix + 'LT'),
+                WTW: number(prefix + 'WTW')
+            };
+        }
+
+        function escapeHtml(value) {
+            return String(value ?? '').replace(/[&<>"']/g, char => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+            }[char]));
+        }
+
+        toricCalculateBtn.addEventListener('click', async function() {
+            const errorMessage = document.getElementById('errorMessage');
+            const loading = document.getElementById('loading');
+            const toricResultsSection = document.getElementById('toricResultsSection');
+            errorMessage.classList.remove('show');
+            toricResultsSection.classList.remove('show');
+            loading.classList.add('show');
+            toricCalculateBtn.disabled = true;
+
+            try {
+                const formData = {
+                    patient_name: document.getElementById('patientName').value || null,
+                    a_constant: roundToTwoDecimals(document.getElementById('aConstant').value),
+                    iol_model: document.getElementById('iolModel').value,
+                    k_index: parseFloat(document.getElementById('kIndex').value),
+                    cylinder_mode: document.getElementById('toricCylinderMode').value
+                };
+                if (toricRightEyeEnabled.checked) formData.right_eye = readToricEyeData('right');
+                if (toricLeftEyeEnabled.checked) formData.left_eye = readToricEyeData('left');
+
+                const response = await fetch('/api/calculate-toric', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(formData)
+                });
+                const result = await response.json();
+                if (response.ok && result.success) {
+                    displayToricResults(result.data);
+                } else {
+                    throw new Error(result.message || '散光计算失败');
+                }
+            } catch (error) {
+                errorMessage.textContent = '错误：' + error.message;
+                errorMessage.classList.add('show');
+            } finally {
+                loading.classList.remove('show');
+                validateToricForm();
+            }
+        });
+
+        function displayToricResults(data) {
+            const resultsContent = document.getElementById('toricResultsContent');
+            resultsContent.innerHTML = '';
+            let hasResult = false;
+            [['right_eye', '右眼 (OD)'], ['left_eye', '左眼 (OS)']].forEach(([key, title]) => {
+                if (data[key]) {
+                    resultsContent.appendChild(createToricResultCard(title, data[key], key));
+                    hasResult = true;
+                }
+            });
+            if (!hasResult) {
+                resultsContent.innerHTML = '<p style="text-align: center; color: #666; padding: 20px;">暂无散光计算结果</p>';
+            }
+            document.getElementById('toricResultsSection').classList.add('show');
+        }
+
+        function createToricResultCard(title, eyeData, eyeKey) {
+            const card = document.createElement('div');
+            card.className = 'result-card';
+            const options = Array.isArray(eyeData.iol_options) ? eyeData.iol_options : [];
+            let html = '<h4>' + escapeHtml(title) + '</h4>';
+            if (options.length > 0) {
+                html += '<table class="result-table"><thead><tr><th>球镜 IOL</th><th>散光型号</th><th>轴位</th><th>预期屈光度</th></tr></thead><tbody>';
+                options.forEach((option, index) => {
+                    const recommended = option.recommended || index === 0;
+                    html += '<tr class="' + (recommended ? 'recommended' : '') + '">';
+                    html += '<td>' + escapeHtml(option.iol_power) + (recommended ? '（推荐）' : '') + '</td>';
+                    html += '<td>' + escapeHtml(option.toric_power) + '</td>';
+                    html += '<td>' + escapeHtml(option.axis) + '°</td>';
+                    html += '<td>' + escapeHtml(option.refraction) + '</td></tr>';
+                });
+                html += '</tbody></table>';
+            } else {
+                html += '<p class="param-hint">官方页面未返回可列出的晶体表格，请核对输入和上游页面状态。</p>';
+            }
+            card.innerHTML = html;
+            const axisImage = eyeData.axis_image || {};
+            const axisResult = document.createElement('div');
+            axisResult.className = 'axis-result';
+            axisResult.innerHTML = createAxisImageHtml(axisImage, eyeKey);
+            card.appendChild(axisResult);
+            return card;
+        }
+
+        function createAxisImageHtml(axisImage, eyeKey) {
+            const flat = axisImage.flat_axis;
+            const steep = axisImage.steep_axis;
+            const toric = axisImage.toric_axis;
+            const incision = axisImage.incision_location;
+            const source = axisImage.source_url || 'https://calc.apacrs.org/toric_calculator20/Resources/Eye%20Background%20360.jpg';
+            const fallback = axisImage.fallback_url || '';
+            const line = (axis, className) => axis === null || axis === undefined || axis === '' ? '' :
+                '<span class="axis-line ' + className + '" style="transform: rotate(' + Number(axis) + 'deg);"></span>';
+            return '<h5>原版 Barrett Toric 轴位图</h5>' +
+                '<div class="axis-layout"><div class="axis-figure">' +
+                '<img src="' + escapeHtml(source) + '" data-fallback="' + escapeHtml(fallback) + '" alt="Barrett Toric 轴位图" loading="lazy" onerror="if(this.dataset.fallback){this.onerror=null;this.src=this.dataset.fallback;}else{this.style.display=&quot;none&quot;;}">' +
+                line(flat, 'flat') + line(steep, 'steep') + line(toric, 'toric') + line(incision, 'incision') +
+                '</div><div class="axis-legend">' +
+                '<div class="axis-legend-row"><span>平坦子午线</span><strong>' + escapeHtml(flat) + '°</strong></div>' +
+                '<div class="axis-legend-row"><span>陡峭子午线</span><strong>' + escapeHtml(steep) + '°</strong></div>' +
+                '<div class="axis-legend-row"><span>IOL 建议轴位</span><strong>' + escapeHtml(toric) + '°</strong></div>' +
+                '<div class="axis-legend-row"><span>切口位置</span><strong>' + escapeHtml(incision) + '°</strong></div>' +
+                '<div class="param-hint">轴位图背景来自 Barrett Toric 官方计算器；彩色标记对应返回的子午线和建议植入轴位。</div>' +
+                '</div></div>';
+        }
 
         function displayResults(data) {
             const resultsContent = document.getElementById('resultsContent');

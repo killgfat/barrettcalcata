@@ -8,7 +8,7 @@ from bs4 import BeautifulSoup
 
 from barrett_config import DEFAULT_K_INDEX, to_barrett_k_index_value
 
-BARRETT_URL = "https://calc.apacrs.org/barrett_universal2105/"
+BARRETT_CALCULATE_URL = "https://calc.apacrs.org/barrett_universal2105/"
 
 _HEADERS = {
     "User-Agent": (
@@ -63,7 +63,7 @@ def fetch_iol_model_list():
 
     session = requests.Session()
     session.headers.update(_HEADERS)
-    response = session.get(BARRETT_URL)
+    response = session.get(BARRETT_CALCULATE_URL)
     response.raise_for_status()
 
     soup = BeautifulSoup(response.text, "html.parser")
@@ -92,7 +92,7 @@ def fetch_model_a_constant(model_name):
     session = requests.Session()
     session.headers.update(_HEADERS)
 
-    response = session.get(BARRETT_URL)
+    response = session.get(BARRETT_CALCULATE_URL)
     response.raise_for_status()
 
     fields = _extract_hidden_fields(response.text)
@@ -129,7 +129,7 @@ def fetch_model_a_constant(model_name):
         "ctl00$MainContent$WTW0": "",
     }
 
-    post_response = session.post(BARRETT_URL, data=post_data)
+    post_response = session.post(BARRETT_CALCULATE_URL, data=post_data)
     post_response.raise_for_status()
 
     soup = BeautifulSoup(post_response.text, "html.parser")

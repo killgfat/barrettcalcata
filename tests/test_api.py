@@ -18,7 +18,7 @@ docs = importlib.import_module("docs")
 
 
 @pytest.mark.asyncio
-async def test_calculate_defaults_null_a_constant(monkeypatch):
+async def test_barrett_calculate_defaults_null_a_constant(monkeypatch):
     handler = api.APIHandler(SimpleNamespace())
     captured = {}
 
@@ -26,9 +26,9 @@ async def test_calculate_defaults_null_a_constant(monkeypatch):
         captured.update(kwargs)
         return {"result": "ok"}
 
-    monkeypatch.setattr(api, "calculate_iol", fake_calculate)
+    monkeypatch.setattr(api, "calculate_barrett_iol", fake_calculate)
 
-    result, status_code = await handler._handle_calculate(
+    result, status_code = await handler._handle_barrett_calculate(
         {
             "right_eye": {"AL": 23.5, "K1": 43.5, "K2": 44.0},
             "a_constant": None,
@@ -41,7 +41,7 @@ async def test_calculate_defaults_null_a_constant(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_calculate_rounds_a_constant_and_acd_to_two_decimals(monkeypatch):
+async def test_barrett_calculate_rounds_a_constant_and_acd_to_two_decimals(monkeypatch):
     handler = api.APIHandler(SimpleNamespace())
     captured = {}
 
@@ -49,9 +49,9 @@ async def test_calculate_rounds_a_constant_and_acd_to_two_decimals(monkeypatch):
         captured.update(kwargs)
         return {"result": "ok"}
 
-    monkeypatch.setattr(api, "calculate_iol", fake_calculate)
+    monkeypatch.setattr(api, "calculate_barrett_iol", fake_calculate)
 
-    result, status_code = await handler._handle_calculate(
+    result, status_code = await handler._handle_barrett_calculate(
         {
             "right_eye": {"AL": 23.5, "K1": 43.5, "K2": 44.0, "ACD": 2.456},
             "a_constant": 119.346,
@@ -65,7 +65,7 @@ async def test_calculate_rounds_a_constant_and_acd_to_two_decimals(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_calculate_normalizes_k_index(monkeypatch):
+async def test_barrett_calculate_normalizes_k_index(monkeypatch):
     handler = api.APIHandler(SimpleNamespace())
     captured = {}
 
@@ -73,9 +73,9 @@ async def test_calculate_normalizes_k_index(monkeypatch):
         captured.update(kwargs)
         return {"result": "ok"}
 
-    monkeypatch.setattr(api, "calculate_iol", fake_calculate)
+    monkeypatch.setattr(api, "calculate_barrett_iol", fake_calculate)
 
-    result, status_code = await handler._handle_calculate(
+    result, status_code = await handler._handle_barrett_calculate(
         {
             "right_eye": {"AL": 23.5, "K1": 43.5, "K2": 44.0},
             "k_index": "1.3375",
@@ -88,10 +88,10 @@ async def test_calculate_normalizes_k_index(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_calculate_rejects_unsupported_k_index():
+async def test_barrett_calculate_rejects_unsupported_k_index():
     handler = api.APIHandler(SimpleNamespace())
 
-    result, status_code = await handler._handle_calculate(
+    result, status_code = await handler._handle_barrett_calculate(
         {
             "right_eye": {"AL": 23.5, "K1": 43.5, "K2": 44.0},
             "k_index": 1.34,
@@ -104,10 +104,10 @@ async def test_calculate_rejects_unsupported_k_index():
 
 
 @pytest.mark.asyncio
-async def test_calculate_rejects_null_required_eye_value():
+async def test_barrett_calculate_rejects_null_required_eye_value():
     handler = api.APIHandler(SimpleNamespace())
 
-    result, status_code = await handler._handle_calculate(
+    result, status_code = await handler._handle_barrett_calculate(
         {
             "right_eye": {"AL": None, "K1": 43.5, "K2": 44.0},
         }
@@ -128,6 +128,12 @@ def test_web_ui_uses_supported_worker_endpoints():
     assert "k_index:" in page
     assert "Barrett表单" not in page
     assert "337.5" not in page
+    assert 'id="sphericalModeButton"' in page
+    assert 'id="toricModeButton"' in page
+    assert "setCalculationMode('toric')" in page
+    assert 'id="toricSection" hidden' in page
+    assert 'id="imageRecognitionSection"' in page
+    assert "imageRecognitionSection.hidden = isToric" in page
 
 
 def test_openapi_documents_image_extraction_endpoint():

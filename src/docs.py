@@ -243,6 +243,62 @@ def get_openapi_spec():
                     },
                 }
             },
+            "/api/calculate-toric": {
+                "post": {
+                    "summary": "执行 Barrett Universal II 散光晶体计算",
+                    "description": (
+                        "提交平坦/陡峭角膜曲率及轴位、眼轴、ACD、晶体厚度、"
+                        "WTW 等参数，返回散光晶体型号、球镜度数和建议轴位。"
+                    ),
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "right_eye": {
+                                            "$ref": "#/components/schemas/ToricEye"
+                                        },
+                                        "left_eye": {
+                                            "$ref": "#/components/schemas/ToricEye"
+                                        },
+                                        "a_constant": {
+                                            "type": "number",
+                                            "default": 119.3,
+                                            "minimum": 112,
+                                            "maximum": 125,
+                                        },
+                                        "iol_model": {"type": "string"},
+                                        "patient_name": {"type": "string"},
+                                        "k_index": {
+                                            "type": "number",
+                                            "enum": [1.3375, 1.332],
+                                            "default": 1.3375,
+                                        },
+                                        "cylinder_mode": {
+                                            "type": "string",
+                                            "enum": ["+ve", "-ve"],
+                                            "default": "-ve",
+                                        },
+                                    },
+                                    "anyOf": [
+                                        {"required": ["right_eye"]},
+                                        {"required": ["left_eye"]},
+                                    ],
+                                }
+                            }
+                        },
+                    },
+                    "responses": {
+                        "200": {"description": "散光计算成功并返回轴位图元数据"},
+                        "400": {"description": "缺少必需参数或参数无效"},
+                        "405": {"description": "请求方法不允许（仅支持POST）"},
+                        "415": {"description": "请求体必须是JSON格式"},
+                        "500": {"description": "散光计算失败"},
+                    },
+                }
+            },
         },
         "components": {
             "schemas": {
@@ -259,6 +315,35 @@ def get_openapi_spec():
                         "success": {"type": "boolean", "description": "操作是否成功"},
                         "data": {"type": "object", "description": "计算结果"},
                         "message": {"type": "string", "description": "操作消息"},
+                    },
+                },
+                "ToricEye": {
+                    "type": "object",
+                    "required": [
+                        "flat_k",
+                        "flat_axis",
+                        "steep_k",
+                        "steep_axis",
+                        "AL",
+                        "lens_thickness",
+                        "WTW",
+                    ],
+                    "properties": {
+                        "flat_k": {"type": "number", "minimum": 30, "maximum": 60},
+                        "flat_axis": {"type": "number", "minimum": 0, "maximum": 180},
+                        "steep_k": {"type": "number", "minimum": 30, "maximum": 60},
+                        "steep_axis": {"type": "number", "minimum": 0, "maximum": 180},
+                        "AL": {"type": "number", "minimum": 12, "maximum": 38},
+                        "ACD": {"type": "number", "default": 3.0},
+                        "target_refraction": {"type": "number", "default": 0},
+                        "incision_sia": {"type": "number", "default": 0},
+                        "incision_location": {"type": "number", "default": 0},
+                        "lens_thickness": {
+                            "type": "number",
+                            "minimum": 2,
+                            "maximum": 8,
+                        },
+                        "WTW": {"type": "number", "minimum": 8, "maximum": 14},
                     },
                 },
             }
