@@ -65,6 +65,45 @@ async def test_calculate_rounds_a_constant_and_acd_to_two_decimals(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_calculate_normalizes_k_index(monkeypatch):
+    handler = api.APIHandler(SimpleNamespace())
+    captured = {}
+
+    async def fake_calculate(**kwargs):
+        captured.update(kwargs)
+        return {"result": "ok"}
+
+    monkeypatch.setattr(api, "calculate_iol", fake_calculate)
+
+    result, status_code = await handler._handle_calculate(
+        {
+            "right_eye": {"AL": 23.5, "K1": 43.5, "K2": 44.0},
+            "k_index": "1.3375",
+        }
+    )
+
+    assert status_code == 200
+    assert result["success"] is True
+    assert captured["k_index"] == 1.3375
+
+
+@pytest.mark.asyncio
+async def test_calculate_rejects_unsupported_k_index():
+    handler = api.APIHandler(SimpleNamespace())
+
+    result, status_code = await handler._handle_calculate(
+        {
+            "right_eye": {"AL": 23.5, "K1": 43.5, "K2": 44.0},
+            "k_index": 1.34,
+        }
+    )
+
+    assert status_code == 400
+    assert result["error"] == "Bad Request"
+    assert "k_index" in result["message"]
+
+
+@pytest.mark.asyncio
 async def test_calculate_rejects_null_required_eye_value():
     handler = api.APIHandler(SimpleNamespace())
 
@@ -85,6 +124,8 @@ def test_web_ui_uses_supported_worker_endpoints():
     assert "fetch('/api/extract'" in page
     assert "fetch('/api/calculate'" in page
     assert "fetch('/api'," not in page
+    assert 'id="kIndex"' in page
+    assert "k_index:" in page
 
 
 def test_openapi_documents_image_extraction_endpoint():

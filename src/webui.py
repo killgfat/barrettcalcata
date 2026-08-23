@@ -119,6 +119,14 @@ INDEX_PAGE = """
                         <input type="number" id="aConstant" name="aConstant" value="119.30" step="0.01" required>
                         <div class="param-hint" id="aConstantHint">默认值：119.30（可根据晶体类型调整）</div>
                     </div>
+                    <div class="form-group">
+                        <label for="kIndex">K-index</label>
+                        <select id="kIndex" name="kIndex">
+                            <option value="1.3375" selected>1.3375（Barrett表单值337.5）</option>
+                            <option value="1.332">1.332（Barrett表单值332）</option>
+                        </select>
+                        <div class="param-hint">界面使用真实折射率，提交Barrett时自动转换为对应表单值</div>
+                    </div>
                 </div>
                 
                 <div class="form-section">
@@ -651,6 +659,7 @@ INDEX_PAGE = """
             document.getElementById('patientName').value = '';
             document.getElementById('iolModel').value = 'Personal Constant';
             document.getElementById('aConstant').value = '119.30'; // 恢复默认值
+            document.getElementById('kIndex').value = '1.3375';
             document.getElementById('aConstant').readOnly = false;
             document.getElementById('aConstantHint').textContent =
                 '默认值：119.30（可根据晶体类型调整）';
@@ -815,7 +824,8 @@ INDEX_PAGE = """
                     a_constant: roundToTwoDecimals(
                         document.getElementById('aConstant').value
                     ),
-                    iol_model: document.getElementById('iolModel').value
+                    iol_model: document.getElementById('iolModel').value,
+                    k_index: parseFloat(document.getElementById('kIndex').value)
                 };
 
                 if (rightEyeEnabled.checked) {

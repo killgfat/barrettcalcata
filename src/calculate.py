@@ -3,6 +3,12 @@ import re
 import requests
 from bs4 import BeautifulSoup
 
+from barrett_config import (
+    DEFAULT_K_INDEX,
+    normalize_k_index,
+    to_barrett_k_index_value,
+)
+
 
 def parse_iol_results(html_content):
     """
@@ -113,6 +119,7 @@ async def calculate_iol(
     a_constant=119.30,
     patient_name=None,
     iol_model=None,
+    k_index=DEFAULT_K_INDEX,
 ):
     """
     计算IOL度数
@@ -122,6 +129,7 @@ async def calculate_iol(
     left_eye_params: 左眼参数字典，包含AL, K1, K2, ACD, Refraction, LenThickness, WTW
     a_constant: A常数，默认119.30
     patient_name: 患者姓名，如果没有提供则使用默认值"1"
+    k_index: 角膜等效折射率，默认1.3375
 
     返回:
     计算结果字典
@@ -191,6 +199,8 @@ async def calculate_iol(
     right_eye_params = normalize_eye_params(right_eye_params, "右眼")
     left_eye_params = normalize_eye_params(left_eye_params, "左眼")
     a_constant = normalize_optional_number(a_constant, 119.30, decimal_places=2)
+    k_index = normalize_k_index(k_index)
+    barrett_k_index_value = to_barrett_k_index_value(k_index)
 
     # 确定发送给Barrett站点的晶体型号
     iol_model_name = (
@@ -291,7 +301,7 @@ async def calculate_iol(
             "__VIEWSTATE": viewstate,
             "__VIEWSTATEGENERATOR": viewstate_generator,
             "__EVENTVALIDATION": event_validation,
-            "ctl00$MainContent$RadioButtonList1": "337.5",
+            "ctl00$MainContent$RadioButtonList1": barrett_k_index_value,
             "ctl00$MainContent$Button1": "Calculate",
             "ctl00$MainContent$DoctorName": "1",
             "ctl00$MainContent$PatientName": patient_name,

@@ -3,6 +3,9 @@ API模块 - 处理IOL计算器的API接口
 """
 
 import json
+
+from barrett_config import DEFAULT_K_INDEX as DEFAULT_BARRETT_K_INDEX
+from barrett_config import normalize_k_index
 from calculate import calculate_iol
 from iol_models import fetch_iol_model_list, fetch_model_a_constant
 from worker_ai import WorkerAI
@@ -12,6 +15,7 @@ class APIHandler:
     DEFAULT_A_CONSTANT = 119.30
     DEFAULT_ACD = 3.00
     DEFAULT_REFRACTION = 0.0
+    DEFAULT_K_INDEX = DEFAULT_BARRETT_K_INDEX
 
     def __init__(self, env):
         self.env = env
@@ -59,6 +63,10 @@ class APIHandler:
             return round(float(value), 2)
         except (TypeError, ValueError):
             raise ValueError("a_constant 必须是有效数值")
+
+    def _normalize_k_index(self, value):
+        """标准化角膜K-index。"""
+        return normalize_k_index(value)
 
     def _normalize_request_eye_params(self, eye_params, eye_name):
         """标准化用户提交的眼部参数。"""
@@ -296,6 +304,7 @@ class APIHandler:
                 body.get("left_eye"), "左眼"
             )
             a_constant = self._normalize_a_constant(body.get("a_constant"))
+            k_index = self._normalize_k_index(body.get("k_index"))
             patient_name = body.get("patient_name")
             iol_model = body.get("iol_model")
 
@@ -313,6 +322,7 @@ class APIHandler:
                 a_constant=a_constant,
                 patient_name=patient_name,
                 iol_model=iol_model,
+                k_index=k_index,
             )
 
             # 返回成功结果

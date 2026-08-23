@@ -78,3 +78,55 @@ def test_calculate_formats_a_constant_and_acd_to_two_decimals(monkeypatch):
     assert fake_session.post_payloads[0]["ctl00$MainContent$OpticalACD"] == "2.40"
     assert fake_session.post_payloads[1]["ctl00$MainContent$Aconstant"] == "119.30"
     assert fake_session.post_payloads[1]["ctl00$MainContent$OpticalACD"] == "2.40"
+
+
+def test_calculate_converts_selected_k_index_to_barrett_form_value(monkeypatch):
+    fake_session = FakeSession()
+
+    monkeypatch.setattr(calculate.requests, "Session", lambda: fake_session)
+    monkeypatch.setattr(
+        calculate,
+        "parse_iol_results",
+        lambda html: {"success": True},
+    )
+
+    asyncio.run(
+        calculate.calculate_iol(
+            right_eye_params={
+                "AL": 23.5,
+                "K1": 43.5,
+                "K2": 44.0,
+            },
+            k_index=1.3375,
+        )
+    )
+
+    assert fake_session.post_payloads[0][
+        "ctl00$MainContent$RadioButtonList1"
+    ] == "337.5"
+
+
+def test_calculate_converts_alternate_k_index_to_barrett_form_value(monkeypatch):
+    fake_session = FakeSession()
+
+    monkeypatch.setattr(calculate.requests, "Session", lambda: fake_session)
+    monkeypatch.setattr(
+        calculate,
+        "parse_iol_results",
+        lambda html: {"success": True},
+    )
+
+    asyncio.run(
+        calculate.calculate_iol(
+            right_eye_params={
+                "AL": 23.5,
+                "K1": 43.5,
+                "K2": 44.0,
+            },
+            k_index=1.332,
+        )
+    )
+
+    assert fake_session.post_payloads[0][
+        "ctl00$MainContent$RadioButtonList1"
+    ] == "332"

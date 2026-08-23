@@ -58,7 +58,7 @@ def get_openapi_spec():
             "/api/calculate": {
                 "post": {
                     "summary": "执行IOL计算",
-                    "description": "提交眼睛参数JSON，基于Barrett Universal II公式计算人工晶体度数。至少提供右眼或左眼其中一组参数。",
+                    "description": "提交眼睛参数JSON，基于Barrett Universal II公式计算人工晶体度数。至少提供右眼或左眼其中一组参数。k_index使用真实角膜等效折射率表示，发送给Barrett站点时会转换为其表单值。",
                     "requestBody": {
                         "required": True,
                         "content": {
@@ -170,6 +170,14 @@ def get_openapi_spec():
                                             "type": "string",
                                             "description": "IOL晶体型号名称（可选），如 Alcon SN60WF",
                                         },
+                                        "k_index": {
+                                            "type": "number",
+                                            "format": "float",
+                                            "enum": [1.3375, 1.332],
+                                            "default": 1.3375,
+                                            "description": "角膜等效折射率。1.3375会转换为Barrett表单值337.5，1.332会转换为332。",
+                                            "example": 1.3375,
+                                        },
                                     },
                                 },
                                 "example": {
@@ -188,6 +196,7 @@ def get_openapi_spec():
                                         "Refraction": 0,
                                     },
                                     "a_constant": 119.3,
+                                    "k_index": 1.3375,
                                     "patient_name": "张三",
                                 },
                             }

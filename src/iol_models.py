@@ -6,6 +6,8 @@ import time
 import requests
 from bs4 import BeautifulSoup
 
+from barrett_config import DEFAULT_K_INDEX, to_barrett_k_index_value
+
 BARRETT_URL = "https://calc.apacrs.org/barrett_universal2105/"
 
 _HEADERS = {
@@ -108,7 +110,9 @@ def fetch_model_a_constant(model_name):
         "ctl00$MainContent$PatientNo": "",
         "ctl00$MainContent$LensFactor": "",
         "ctl00$MainContent$Aconstant": "",
-        "ctl00$MainContent$RadioButtonList1": "337.5",
+        "ctl00$MainContent$RadioButtonList1": to_barrett_k_index_value(
+            DEFAULT_K_INDEX
+        ),
         "ctl00$MainContent$Axlength": "",
         "ctl00$MainContent$MeasuredK1": "",
         "ctl00$MainContent$MeasuredK2": "",
