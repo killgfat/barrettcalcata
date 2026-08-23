@@ -126,6 +126,8 @@ def test_web_ui_uses_supported_worker_endpoints():
     assert "fetch('/api'," not in page
     assert 'id="kIndex"' in page
     assert "k_index:" in page
+    assert "Barrett表单" not in page
+    assert "337.5" not in page
 
 
 def test_openapi_documents_image_extraction_endpoint():

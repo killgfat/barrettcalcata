@@ -122,10 +122,10 @@ INDEX_PAGE = """
                     <div class="form-group">
                         <label for="kIndex">K-index</label>
                         <select id="kIndex" name="kIndex">
-                            <option value="1.3375" selected>1.3375（Barrett表单值337.5）</option>
-                            <option value="1.332">1.332（Barrett表单值332）</option>
+                            <option value="1.3375" selected>1.3375</option>
+                            <option value="1.332">1.332</option>
                         </select>
-                        <div class="param-hint">界面使用真实折射率，提交Barrett时自动转换为对应表单值</div>
+                        <div class="param-hint">选择角膜测量使用的 K-index</div>
                     </div>
                 </div>
                 
