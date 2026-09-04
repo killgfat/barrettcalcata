@@ -295,12 +295,12 @@ def _row_result(row: Any, headers: list[str]) -> dict[str, Any] | None:
     for index, cell in enumerate(cells):
         header = headers[index].lower() if index < len(headers) else ""
         number = _number_from_text(cell)
-        if any(token in header for token in ("sphere", "power", "iol")):
-            option.setdefault("iol_power", cell)
+        if any(token in header for token in ("toric", "cylinder", "cyl")):
+            option["toric_power"] = cell
         elif "axis" in header:
             option["axis"] = number if number is not None else cell
-        elif any(token in header for token in ("toric", "cylinder", "cyl")):
-            option["toric_power"] = cell
+        elif any(token in header for token in ("sphere", "power", "iol")):
+            option.setdefault("iol_power", cell)
         elif any(token in header for token in ("refraction", "residual", "spherical")):
             option["refraction"] = cell
 
@@ -376,6 +376,15 @@ def _axis_value(soup: BeautifulSoup, names: tuple[str, ...]) -> float | None:
             if parsed is not None:
                 return parsed
     return None
+
+
+def _net_astigmatism_axis(soup: BeautifulSoup) -> float | None:
+    """Extract the recommended toric axis from the official net-astigmatism field."""
+    value = _find_form_value(soup, ("MainContent_NetCornealAstig",))
+    if not value:
+        return None
+    match = re.search(r"@\s*(\d+(?:\.\d+)?)", value)
+    return _number(match.group(1)) if match else None
 
 
 def parse_toric_results(
@@ -488,7 +497,7 @@ def parse_toric_results(
             else []
         )
         eye_result: dict[str, Any] = {}
-        axis = _axis_value(soup, spec["axis"])
+        axis = _net_astigmatism_axis(soup) or _axis_value(soup, spec["axis"])
         if options:
             eye_result["iol_options"] = options
             axis_values = [
@@ -710,6 +719,10 @@ def _calculate_payload(
         "__VIEWSTATEGENERATOR": hidden.get("__VIEWSTATEGENERATOR", ""),
         "__EVENTVALIDATION": hidden.get("__EVENTVALIDATION", ""),
         "ctl00$MainContent$Button1": "Calculate",
+        "ctl00$MainContent$Koptional1": "",
+        "ctl00$MainContent$Koptional2": "",
+        "ctl00$MainContent$IOLPower": "",
+        "ctl00$MainContent$RadioButtonList3": "1",
         "ctl00$MainContent$DoctorName": "1",
         "ctl00$MainContent$PatientName": patient_name,
         "ctl00$MainContent$PatientNo": "",
@@ -726,6 +739,7 @@ def _calculate_payload(
         "ctl00$MainContent$Cylinder": {
             "+ve": "1", "+": "1", "-ve": "-1", "-": "-1"
         }.get(cylinder_mode, cylinder_mode),
+        "ctl00$MainContent$NetCornealAstig": "",
         "ctl00$MainContent$Eye Select": eye_select,
     }
     selected_params = right_eye_params if eye_select == "Rad1" else left_eye_params
@@ -786,6 +800,7 @@ async def calculate_barrett_toric_iol(
         hidden = _hidden_fields(response.text)
 
         parsed: dict[str, Any] = {}
+        current_hidden = hidden
         for eye_name, eye_params, eye_select in (
             ("right_eye", right_eye_params, "Rad1"),
             ("left_eye", left_eye_params, "Rad2"),
@@ -793,7 +808,7 @@ async def calculate_barrett_toric_iol(
             if not eye_params:
                 continue
             payload = _calculate_payload(
-                hidden,
+                current_hidden,
                 eye_params if eye_select == "Rad1" else None,
                 eye_params if eye_select == "Rad2" else None,
                 a_constant=normalized_a,
@@ -807,6 +822,7 @@ async def calculate_barrett_toric_iol(
                 session, "post", BARRETT_TORIC_URL, data=payload
             )
             calculation_response.raise_for_status()
+            current_hidden = _hidden_fields(calculation_response.text)
             eye_result = parse_toric_results(
                 calculation_response.text, selected_eye=eye_name
             )
@@ -819,7 +835,7 @@ async def calculate_barrett_toric_iol(
             if not has_output:
                 refreshed = _hidden_fields(calculation_response.text)
                 tab_payload = _calculate_payload(
-                    refreshed,
+                    current_hidden,
                     eye_params if eye_select == "Rad1" else None,
                     eye_params if eye_select == "Rad2" else None,
                     a_constant=normalized_a,
