@@ -17,11 +17,7 @@ from urllib.parse import quote
 import requests
 from bs4 import BeautifulSoup
 
-from barrett_config import (
-    DEFAULT_K_INDEX,
-    normalize_k_index,
-    to_barrett_k_index_value,
-)
+from barrett_config import DEFAULT_K_INDEX, normalize_k_index
 
 BARRETT_TORIC_URL = "https://calc.apacrs.org/toric_calculator20/Toric%20Calculator.aspx"
 BARRETT_TORIC_IMAGE_URL = (
@@ -248,6 +244,31 @@ def _hidden_fields(html_content: str) -> dict[str, str]:
     for name in ("__VIEWSTATE", "__VIEWSTATEGENERATOR", "__EVENTVALIDATION"):
         element = soup.find("input", attrs={"name": name})
         fields[name] = element.get("value", "") if element else ""
+    return fields
+
+
+def _successful_form_fields(html_content: str) -> dict[str, str]:
+    """Extract controls that a browser would submit from the current form."""
+    soup = BeautifulSoup(html_content, "html.parser")
+    fields: dict[str, str] = {}
+    for element in soup.find_all(["input", "select", "textarea"]):
+        name = element.get("name")
+        if not name or element.has_attr("disabled"):
+            continue
+        if element.name == "input":
+            input_type = element.get("type", "text").lower()
+            if input_type in {"button", "file", "image", "reset", "submit"}:
+                continue
+            if input_type in {"checkbox", "radio"} and not element.has_attr("checked"):
+                continue
+            fields[name] = element.get("value", "on")
+        elif element.name == "select":
+            selected = element.find("option", selected=True) or element.find("option")
+            fields[name] = (
+                selected.get("value", selected.get_text()) if selected else ""
+            )
+        else:
+            fields[name] = element.get_text()
     return fields
 
 
@@ -622,69 +643,19 @@ def _build_axis_fallback_svg(
     )
 
 
-def _add_payload_aliases(
-    payload: dict[str, str],
-    names: tuple[str, ...],
-    value: Any,
-    suffix: str,
-    places: int = 2,
-) -> None:
-    """Add known ASP.NET aliases; unknown fields are ignored by Web Forms."""
-    formatted = _format(value, places)
-    for name in names:
-        payload[f"ctl00$MainContent${name}{suffix}"] = formatted
-
-
-def _build_eye_payload(
-    payload: dict[str, str],
-    eye_params: dict[str, Any] | None,
-    suffix: str,
-) -> None:
-    """Populate one eye's toric fields, including legacy naming variants."""
-    if not eye_params:
-        return
-    aliases = {
-        "K1": ("K1", "FlatK", "MeasuredK1"),
-        "K1Axis": ("K1Axis", "FlatAxis"),
-        "K2": ("K2", "SteepK", "MeasuredK2"),
-        "K2Axis": ("K2Axis", "SteepAxis"),
-        "AL": ("AxialLength", "Axlength"),
-        "ACD": ("OpticalACD",),
-        "Refraction": ("Refraction", "TargetRefraction"),
-        "incision_sia": ("IncisionSIA", "SIA"),
-        "incision_location": ("IncisionLocation", "IncisionAxis"),
-        "lens_thickness": ("LensThickness", "LenThickness", "LT"),
-        "WTW": ("WTW", "WhiteToWhite"),
-    }
-    for field, names in aliases.items():
-        value = eye_params.get(field)
-        if value is None:
-            legacy_field = {
-                "K1": "flat_k", "K1Axis": "flat_axis",
-                "K2": "steep_k", "K2Axis": "steep_axis",
-            }.get(field)
-            value = eye_params.get(legacy_field) if legacy_field else None
-        _add_payload_aliases(payload, names, value, suffix)
-
-
 def _build_current_official_eye_payload(
     payload: dict[str, str], eye_params: dict[str, Any]
 ) -> None:
     """Populate the field names used by the current Toric Calculator V2 page."""
-    aliases = {
-        "K1": ("MeasuredK",),
-        "K1Axis": ("MeasuredAxis",),
-        "K2": ("MeasuredK0",),
-        "K2Axis": ("MeasuredAxis0",),
-        "AL": ("AxLength",),
-        "ACD": ("OpticalACD",),
-        "Refraction": ("Refraction",),
-        "incision_sia": ("InducedCyl",),
-        "incision_location": ("IncisionAxis",),
-        "lens_thickness": ("LensThickness",),
-        "WTW": ("WTW",),
+    fields = {
+        "K1": "MeasuredK", "K1Axis": "MeasuredAxis",
+        "K2": "MeasuredK0", "K2Axis": "MeasuredAxis0",
+        "AL": "AxLength", "ACD": "OpticalACD",
+        "Refraction": "Refraction", "incision_sia": "InducedCyl",
+        "incision_location": "IncisionAxis", "lens_thickness": "LensThickness",
+        "WTW": "WTW",
     }
-    for field, names in aliases.items():
+    for field, official_name in fields.items():
         value = eye_params.get(field)
         if value is None:
             value = {
@@ -693,11 +664,11 @@ def _build_current_official_eye_payload(
                 "K2": eye_params.get("steep_k"),
                 "K2Axis": eye_params.get("steep_axis"),
             }.get(field)
-        _add_payload_aliases(payload, names, value, "")
+        payload[f"ctl00$MainContent${official_name}"] = _format(value)
 
 
 def _calculate_payload(
-    hidden: dict[str, str],
+    form_fields: dict[str, str],
     right_eye_params: dict[str, Any] | None,
     left_eye_params: dict[str, Any] | None,
     *,
@@ -711,42 +682,29 @@ def _calculate_payload(
     event_argument: str = "",
 ) -> dict[str, str]:
     """Construct the ASP.NET payload for calculation or result-tab requests."""
-    payload = {
+    payload = dict(form_fields)
+    payload.update({
         "__EVENTTARGET": event_target,
         "__EVENTARGUMENT": event_argument,
         "__LASTFOCUS": "",
-        "__VIEWSTATE": hidden.get("__VIEWSTATE", ""),
-        "__VIEWSTATEGENERATOR": hidden.get("__VIEWSTATEGENERATOR", ""),
-        "__EVENTVALIDATION": hidden.get("__EVENTVALIDATION", ""),
-        "ctl00$MainContent$Button1": "Calculate",
         "ctl00$MainContent$Koptional1": "",
         "ctl00$MainContent$Koptional2": "",
         "ctl00$MainContent$IOLPower": "",
         "ctl00$MainContent$RadioButtonList3": "1",
-        "ctl00$MainContent$DoctorName": "1",
+        "ctl00$MainContent$DoctorName": "",
         "ctl00$MainContent$PatientName": patient_name,
         "ctl00$MainContent$PatientNo": "",
-        "ctl00$MainContent$LensFactor": "",
         "ctl00$MainContent$Aconstant": _format(a_constant),
         "ctl00$MainContent$IOLModel": iol_model,
-        "ctl00$MainContent$RadioButtonList1": to_barrett_k_index_value(k_index),
-        # The value is accepted by older pages; newer pages use the named
-        # Cylinder field below.  Keeping both makes the adapter backwards
-        # compatible with the two known Toric page revisions.
-        "ctl00$MainContent$RadioButtonList2": {
-            "+ve": "1", "+": "1", "-ve": "-1", "-": "-1"
-        }.get(cylinder_mode, cylinder_mode),
-        "ctl00$MainContent$Cylinder": {
-            "+ve": "1", "+": "1", "-ve": "-1", "-": "-1"
-        }.get(cylinder_mode, cylinder_mode),
-        "ctl00$MainContent$NetCornealAstig": "",
         "ctl00$MainContent$Eye Select": eye_select,
-    }
+    })
+    payload.setdefault("ctl00$MainContent$LensFactor", " 2.04")
+    if event_target:
+        payload.pop("ctl00$MainContent$Button1", None)
+    else:
+        payload["ctl00$MainContent$Button1"] = "Calculate"
     selected_params = right_eye_params if eye_select == "Rad1" else left_eye_params
     _build_current_official_eye_payload(payload, selected_params or {})
-    # Keep legacy aliases in the request for older revisions of the page.
-    _build_eye_payload(payload, right_eye_params, "")
-    _build_eye_payload(payload, left_eye_params, "0")
     return payload
 
 
@@ -797,10 +755,10 @@ async def calculate_barrett_toric_iol(
         response.raise_for_status()
         if "Just a moment" in response.text or "cf-chl" in response.text:
             raise RuntimeError("Barrett Toric 官方页面当前需要完成 Cloudflare 验证")
-        hidden = _hidden_fields(response.text)
+        form_fields = _successful_form_fields(response.text)
 
         parsed: dict[str, Any] = {}
-        current_hidden = hidden
+        current_form_fields = form_fields
         for eye_name, eye_params, eye_select in (
             ("right_eye", right_eye_params, "Rad1"),
             ("left_eye", left_eye_params, "Rad2"),
@@ -808,7 +766,7 @@ async def calculate_barrett_toric_iol(
             if not eye_params:
                 continue
             payload = _calculate_payload(
-                current_hidden,
+                current_form_fields,
                 eye_params if eye_select == "Rad1" else None,
                 eye_params if eye_select == "Rad2" else None,
                 a_constant=normalized_a,
@@ -822,7 +780,7 @@ async def calculate_barrett_toric_iol(
                 session, "post", BARRETT_TORIC_URL, data=payload
             )
             calculation_response.raise_for_status()
-            current_hidden = _hidden_fields(calculation_response.text)
+            current_form_fields = _successful_form_fields(calculation_response.text)
             eye_result = parse_toric_results(
                 calculation_response.text, selected_eye=eye_name
             )
@@ -833,9 +791,8 @@ async def calculate_barrett_toric_iol(
                 for eye in (eye_result.get(eye_name, {}),)
             )
             if not has_output:
-                refreshed = _hidden_fields(calculation_response.text)
                 tab_payload = _calculate_payload(
-                    current_hidden,
+                    current_form_fields,
                     eye_params if eye_select == "Rad1" else None,
                     eye_params if eye_select == "Rad2" else None,
                     a_constant=normalized_a,
@@ -851,6 +808,7 @@ async def calculate_barrett_toric_iol(
                     session, "post", BARRETT_TORIC_URL, data=tab_payload
                 )
                 tab_response.raise_for_status()
+                current_form_fields = _successful_form_fields(tab_response.text)
                 eye_result = parse_toric_results(
                     tab_response.text, selected_eye=eye_name
                 )

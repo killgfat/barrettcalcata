@@ -195,17 +195,17 @@ def test_barrett_toric_calculate_formats_payload_and_returns_axis_image(monkeypa
     payload = fake_session.post_payloads[0]
     assert payload["ctl00$MainContent$Aconstant"] == "119.35"
     assert payload["ctl00$MainContent$OpticalACD"] == "3.25"
-    assert payload["ctl00$MainContent$FlatAxis"] == "84.00"
-    assert payload["ctl00$MainContent$SteepAxis"] == "174.00"
+    assert payload["ctl00$MainContent$DoctorName"] == ""
+    assert payload["ctl00$MainContent$LensFactor"] == " 2.04"
     assert payload["ctl00$MainContent$MeasuredK"] == "41.50"
     assert payload["ctl00$MainContent$MeasuredK0"] == "43.85"
     assert payload["ctl00$MainContent$MeasuredAxis"] == "84.00"
     assert payload["ctl00$MainContent$MeasuredAxis0"] == "174.00"
     assert payload["ctl00$MainContent$AxLength"] == "24.43"
     assert payload["ctl00$MainContent$Eye Select"] == "Rad1"
-    assert payload["ctl00$MainContent$RadioButtonList1"] == "337.5"
-    assert payload["ctl00$MainContent$RadioButtonList2"] == "-1"
-    assert payload["ctl00$MainContent$Cylinder"] == "-1"
+    assert "ctl00$MainContent$RadioButtonList1" not in payload
+    assert "ctl00$MainContent$RadioButtonList2" not in payload
+    assert "ctl00$MainContent$Cylinder" not in payload
     assert result["right_eye"]["iol_options"][0]["toric_power"] == "T5"
     assert result["right_eye"]["toric_axis"] == 175
     assert (
@@ -234,10 +234,10 @@ def test_toric_payload_accepts_canonical_k_names(monkeypatch):
     }
     asyncio.run(barrett_toric_calculate.calculate_barrett_toric_iol(right_eye_params=eye))
     payload = fake_session.post_payloads[0]
-    assert payload["ctl00$MainContent$K1"] == "41.50"
-    assert payload["ctl00$MainContent$K1Axis"] == "84.00"
-    assert payload["ctl00$MainContent$K2"] == "43.85"
-    assert payload["ctl00$MainContent$K2Axis"] == "174.00"
+    assert payload["ctl00$MainContent$MeasuredK"] == "41.50"
+    assert payload["ctl00$MainContent$MeasuredAxis"] == "84.00"
+    assert payload["ctl00$MainContent$MeasuredK0"] == "43.85"
+    assert payload["ctl00$MainContent$MeasuredAxis0"] == "174.00"
 
 
 def test_current_toric_result_parser_reads_official_fields_and_tables():
@@ -270,6 +270,37 @@ def test_current_toric_result_parser_reads_official_fields_and_tables():
     assert eye["iol_options"][0]["toric_power"] == "T6"
     assert eye["toric_options"][0]["axis"] == 85
     assert eye["toric_axis"] == 85
+
+
+def test_toric_tab_postback_matches_web_forms_successful_controls():
+    form = barrett_toric_calculate._successful_form_fields(
+        """
+        <input type='hidden' name='__VIEWSTATE' value='v'>
+        <input type='hidden' name='__EVENTVALIDATION' value='e'>
+        <input name='ctl00$MainContent$LensFactor' value=' 2.04'>
+        <input name='ctl00$MainContent$RadioButtonList1' value='337.5'
+               disabled='disabled' checked='checked'>
+        <input name='ctl00$MainContent$Button1' value='Calculate'>
+        <input name='ctl00$MainContent$NetCornealAstig'
+               value='Net Astigmatism: 2.65 D @ 175 Degrees'>
+        """
+    )
+    payload = barrett_toric_calculate._calculate_payload(
+        form,
+        None,
+        None,
+        a_constant=119.3,
+        patient_name="Test",
+        iol_model="Personal Constant",
+        k_index=1.3375,
+        cylinder_mode="-ve",
+        event_target="ctl00$MainContent$menuTabs",
+        event_argument="2",
+    )
+    assert payload["ctl00$MainContent$LensFactor"] == " 2.04"
+    assert payload["ctl00$MainContent$NetCornealAstig"].startswith("Net Astigmatism")
+    assert "ctl00$MainContent$Button1" not in payload
+    assert "ctl00$MainContent$RadioButtonList1" not in payload
 
 
 @pytest.mark.asyncio
