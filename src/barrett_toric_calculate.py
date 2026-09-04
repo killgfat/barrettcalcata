@@ -36,6 +36,9 @@ _HEADERS = {
     "Accept-Encoding": "gzip, deflate",
     "Connection": "keep-alive",
     "Upgrade-Insecure-Requests": "1",
+    "Sec-Fetch-Dest": "document",
+    "Sec-Fetch-Mode": "navigate",
+    "Sec-Fetch-Site": "same-origin",
 }
 
 _DEFAULT_ACD = 3.00
@@ -750,6 +753,12 @@ async def calculate_barrett_toric_iol(
 
     session = requests.Session()
     session.headers.update(_HEADERS)
+    session.headers.update(
+        {
+            "Referer": BARRETT_TORIC_URL,
+            "Origin": "https://calc.apacrs.org",
+        }
+    )
     try:
         response = _request(session, "get", BARRETT_TORIC_URL)
         response.raise_for_status()
@@ -835,6 +844,14 @@ async def calculate_barrett_toric_iol(
                 "Barrett Toric 官方计算器暂时拒绝了自动请求（可能需要浏览器验证），"
                 "请稍后重试"
             ) from exc
-        raise RuntimeError(f"请求 Barrett Toric 官方计算器失败: {exc}") from exc
+        response = getattr(exc, "response", None)
+        detail = ""
+        if response is not None:
+            try:
+                detail = (response.text or "").strip()[:240]
+            except Exception:
+                detail = ""
+        suffix = f" ({detail})" if detail else ""
+        raise RuntimeError(f"请求 Barrett Toric 官方计算器失败: {exc}{suffix}") from exc
     except requests.exceptions.RequestException as exc:
         raise RuntimeError(f"请求 Barrett Toric 官方计算器失败: {exc}") from exc
