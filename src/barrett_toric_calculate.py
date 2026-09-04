@@ -378,7 +378,9 @@ def _axis_value(soup: BeautifulSoup, names: tuple[str, ...]) -> float | None:
     return None
 
 
-def parse_toric_results(html_content: str) -> dict[str, Any]:
+def parse_toric_results(
+    html_content: str, selected_eye: str | None = None
+) -> dict[str, Any]:
     """Parse Barrett Toric output into the API's stable result shape."""
     soup = BeautifulSoup(html_content, "html.parser")
     result: dict[str, Any] = {}
@@ -438,8 +440,53 @@ def parse_toric_results(html_content: str) -> dict[str, Any]:
         },
     }
 
+    if selected_eye in {"right_eye", "left_eye"}:
+        # 当前官方页面使用同一组字段，通过 Rad1/Rad2 切换眼别。
+        current_spec = {
+            "suffix": "",
+            "index": 1,
+            "K1": (
+                "MainContent_MeasuredK",
+                "MainContent_FlatK",
+                "MainContent_K1",
+            ),
+            "K1Axis": (
+                "MainContent_MeasuredAxis",
+                "MainContent_FlatAxis",
+                "MainContent_K1Axis",
+            ),
+            "K2": (
+                "MainContent_MeasuredK0",
+                "MainContent_SteepK",
+                "MainContent_K2",
+            ),
+            "K2Axis": (
+                "MainContent_MeasuredAxis0",
+                "MainContent_SteepAxis",
+                "MainContent_K2Axis",
+            ),
+            "AL": (
+                "MainContent_AxLength",
+                "MainContent_AxialLength",
+                "MainContent_Axlength",
+            ),
+            "ACD": ("MainContent_OpticalACD",),
+            "axis": (
+                "MainContent_ToricAxis",
+                "MainContent_IOLAxis",
+                "MainContent_ResultAxis",
+                "MainContent_Axis",
+            ),
+        }
+        eye_specs = {selected_eye: current_spec}
+
     for eye_name, spec in eye_specs.items():
         options = _parse_result_tables(soup, spec["index"])
+        toric_options = (
+            _parse_result_tables(soup, 2)
+            if selected_eye in {"right_eye", "left_eye"}
+            else []
+        )
         eye_result: dict[str, Any] = {}
         axis = _axis_value(soup, spec["axis"])
         if options:
@@ -451,6 +498,16 @@ def parse_toric_results(html_content: str) -> dict[str, Any]:
             ]
             if axis is None and axis_values:
                 axis = axis_values[0]
+        if toric_options:
+            eye_result["toric_options"] = toric_options
+            if axis is None:
+                axis_values = [
+                    option.get("axis")
+                    for option in toric_options
+                    if option.get("axis") is not None
+                ]
+                if axis_values:
+                    axis = axis_values[0]
         for field in ("K1", "K1Axis", "K2", "K2Axis", "AL", "ACD"):
             value = _find_form_value(soup, spec[field])
             if value is not None:
@@ -601,6 +658,35 @@ def _build_eye_payload(
         _add_payload_aliases(payload, names, value, suffix)
 
 
+def _build_current_official_eye_payload(
+    payload: dict[str, str], eye_params: dict[str, Any]
+) -> None:
+    """Populate the field names used by the current Toric Calculator V2 page."""
+    aliases = {
+        "K1": ("MeasuredK",),
+        "K1Axis": ("MeasuredAxis",),
+        "K2": ("MeasuredK0",),
+        "K2Axis": ("MeasuredAxis0",),
+        "AL": ("AxLength",),
+        "ACD": ("OpticalACD",),
+        "Refraction": ("Refraction",),
+        "incision_sia": ("InducedCyl",),
+        "incision_location": ("IncisionAxis",),
+        "lens_thickness": ("LensThickness",),
+        "WTW": ("WTW",),
+    }
+    for field, names in aliases.items():
+        value = eye_params.get(field)
+        if value is None:
+            value = {
+                "K1": eye_params.get("flat_k"),
+                "K1Axis": eye_params.get("flat_axis"),
+                "K2": eye_params.get("steep_k"),
+                "K2Axis": eye_params.get("steep_axis"),
+            }.get(field)
+        _add_payload_aliases(payload, names, value, "")
+
+
 def _calculate_payload(
     hidden: dict[str, str],
     right_eye_params: dict[str, Any] | None,
@@ -611,6 +697,7 @@ def _calculate_payload(
     iol_model: str,
     k_index: float,
     cylinder_mode: str,
+    eye_select: str = "Rad1",
     event_target: str = "",
     event_argument: str = "",
 ) -> dict[str, str]:
@@ -633,9 +720,17 @@ def _calculate_payload(
         # The value is accepted by older pages; newer pages use the named
         # Cylinder field below.  Keeping both makes the adapter backwards
         # compatible with the two known Toric page revisions.
-        "ctl00$MainContent$RadioButtonList2": cylinder_mode,
-        "ctl00$MainContent$Cylinder": cylinder_mode,
+        "ctl00$MainContent$RadioButtonList2": {
+            "+ve": "1", "+": "1", "-ve": "-1", "-": "-1"
+        }.get(cylinder_mode, cylinder_mode),
+        "ctl00$MainContent$Cylinder": {
+            "+ve": "1", "+": "1", "-ve": "-1", "-": "-1"
+        }.get(cylinder_mode, cylinder_mode),
+        "ctl00$MainContent$Eye Select": eye_select,
     }
+    selected_params = right_eye_params if eye_select == "Rad1" else left_eye_params
+    _build_current_official_eye_payload(payload, selected_params or {})
+    # Keep legacy aliases in the request for older revisions of the page.
     _build_eye_payload(payload, right_eye_params, "")
     _build_eye_payload(payload, left_eye_params, "0")
     return payload
@@ -690,48 +785,61 @@ async def calculate_barrett_toric_iol(
             raise RuntimeError("Barrett Toric 官方页面当前需要完成 Cloudflare 验证")
         hidden = _hidden_fields(response.text)
 
-        payload = _calculate_payload(
-            hidden,
-            right_eye_params,
-            left_eye_params,
-            a_constant=normalized_a,
-            patient_name=patient,
-            iol_model=model,
-            k_index=normalized_k,
-            cylinder_mode=mode,
-        )
-        calculation_response = _request(
-            session, "post", BARRETT_TORIC_URL, data=payload
-        )
-        calculation_response.raise_for_status()
-        parsed = parse_toric_results(calculation_response.text)
-
-        # Some older revisions render the output on the second tab.  Retry
-        # with the refreshed hidden fields only when the first response has no
-        # usable options or axis result.
-        has_output = any(
-            eye.get("iol_options") or eye.get("toric_axis")
-            for eye in (parsed.get("right_eye", {}), parsed.get("left_eye", {}))
-        )
-        if not has_output:
-            refreshed = _hidden_fields(calculation_response.text)
-            tab_payload = _calculate_payload(
-                refreshed,
-                right_eye_params,
-                left_eye_params,
+        parsed: dict[str, Any] = {}
+        for eye_name, eye_params, eye_select in (
+            ("right_eye", right_eye_params, "Rad1"),
+            ("left_eye", left_eye_params, "Rad2"),
+        ):
+            if not eye_params:
+                continue
+            payload = _calculate_payload(
+                hidden,
+                eye_params if eye_select == "Rad1" else None,
+                eye_params if eye_select == "Rad2" else None,
                 a_constant=normalized_a,
                 patient_name=patient,
                 iol_model=model,
                 k_index=normalized_k,
                 cylinder_mode=mode,
-                event_target="ctl00$MainContent$menuTabs",
-                event_argument="1",
+                eye_select=eye_select,
             )
-            tab_response = _request(
-                session, "post", BARRETT_TORIC_URL, data=tab_payload
+            calculation_response = _request(
+                session, "post", BARRETT_TORIC_URL, data=payload
             )
-            tab_response.raise_for_status()
-            parsed = parse_toric_results(tab_response.text)
+            calculation_response.raise_for_status()
+            eye_result = parse_toric_results(
+                calculation_response.text, selected_eye=eye_name
+            )
+
+            # Results are rendered on the Toric IOL tab after calculation.
+            has_output = any(
+                eye.get("iol_options") or eye.get("toric_options")
+                for eye in (eye_result.get(eye_name, {}),)
+            )
+            if not has_output:
+                refreshed = _hidden_fields(calculation_response.text)
+                tab_payload = _calculate_payload(
+                    refreshed,
+                    eye_params if eye_select == "Rad1" else None,
+                    eye_params if eye_select == "Rad2" else None,
+                    a_constant=normalized_a,
+                    patient_name=patient,
+                    iol_model=model,
+                    k_index=normalized_k,
+                    cylinder_mode=mode,
+                    eye_select=eye_select,
+                    event_target="ctl00$MainContent$menuTabs",
+                    event_argument="2",
+                )
+                tab_response = _request(
+                    session, "post", BARRETT_TORIC_URL, data=tab_payload
+                )
+                tab_response.raise_for_status()
+                eye_result = parse_toric_results(
+                    tab_response.text, selected_eye=eye_name
+                )
+            if eye_name in eye_result:
+                parsed[eye_name] = eye_result[eye_name]
 
         for eye_name, eye_params in (
             ("right_eye", right_eye_params),

@@ -197,7 +197,15 @@ def test_barrett_toric_calculate_formats_payload_and_returns_axis_image(monkeypa
     assert payload["ctl00$MainContent$OpticalACD"] == "3.25"
     assert payload["ctl00$MainContent$FlatAxis"] == "84.00"
     assert payload["ctl00$MainContent$SteepAxis"] == "174.00"
+    assert payload["ctl00$MainContent$MeasuredK"] == "41.50"
+    assert payload["ctl00$MainContent$MeasuredK0"] == "43.85"
+    assert payload["ctl00$MainContent$MeasuredAxis"] == "84.00"
+    assert payload["ctl00$MainContent$MeasuredAxis0"] == "174.00"
+    assert payload["ctl00$MainContent$AxLength"] == "24.43"
+    assert payload["ctl00$MainContent$Eye Select"] == "Rad1"
     assert payload["ctl00$MainContent$RadioButtonList1"] == "337.5"
+    assert payload["ctl00$MainContent$RadioButtonList2"] == "-1"
+    assert payload["ctl00$MainContent$Cylinder"] == "-1"
     assert result["right_eye"]["iol_options"][0]["toric_power"] == "T5"
     assert result["right_eye"]["toric_axis"] == 175
     assert (
@@ -230,6 +238,38 @@ def test_toric_payload_accepts_canonical_k_names(monkeypatch):
     assert payload["ctl00$MainContent$K1Axis"] == "84.00"
     assert payload["ctl00$MainContent$K2"] == "43.85"
     assert payload["ctl00$MainContent$K2Axis"] == "174.00"
+
+
+def test_current_toric_result_parser_reads_official_fields_and_tables():
+    html = """
+    <input id="MainContent_PatientName" value="Test">
+    <input id="MainContent_MeasuredK" value="41.50">
+    <input id="MainContent_MeasuredAxis" value="84">
+    <input id="MainContent_MeasuredK0" value="43.85">
+    <input id="MainContent_MeasuredAxis0" value="174">
+    <input id="MainContent_AxLength" value="24.43">
+    <input id="MainContent_OpticalACD" value="3.25">
+    <table id="MainContent_GridView1">
+      <tr><th>IOL Power</th><th>Toric Power</th><th>Refraction</th></tr>
+      <tr><td>20.0 S.E.</td><td>T6</td><td>-0.35 S.E.</td></tr>
+    </table>
+    <table id="MainContent_GridView2">
+      <tr><th>Toric Power</th><th>IOL Cylinder</th><th>Residual Astigmatism</th></tr>
+      <tr><td>T6</td><td>3.75</td><td>-0.12 Cyl Axis 85</td></tr>
+    </table>
+    """
+    result = barrett_toric_calculate.parse_toric_results(
+        html, selected_eye="right_eye"
+    )
+    eye = result["right_eye"]
+    assert eye["K1"] == 41.5
+    assert eye["K1Axis"] == 84
+    assert eye["K2"] == 43.85
+    assert eye["K2Axis"] == 174
+    assert eye["AL"] == 24.43
+    assert eye["iol_options"][0]["toric_power"] == "T6"
+    assert eye["toric_options"][0]["axis"] == 85
+    assert eye["toric_axis"] == 85
 
 
 @pytest.mark.asyncio
