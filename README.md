@@ -20,15 +20,15 @@
 
 ### Barrett Universal II Toric API
 
-散光计算使用独立端点 `POST /api/calculate-toric`，至少提交 `right_eye` 或 `left_eye` 一组参数。每只眼睛需要 `flat_k`、`flat_axis`、`steep_k`、`steep_axis`、`AL`、`lens_thickness` 和 `WTW`；`ACD`、目标屈光度、切口 SIA 与切口位置缺省为 `3.00`、`0`、`0` 和 `0`。成功响应中的 `axis_image.source_url` 指向 Barrett 官方轴位背景图，`fallback_url` 是官方资源不可用时使用的自包含轴位图。
+散光计算使用独立端点 `POST /api/calculate-toric`，至少提交 `right_eye` 或 `left_eye` 一组参数。为与普通 Barrett 模块统一，每只眼睛使用 `K1`、`K1Axis`、`K2`、`K2Axis`、`AL`、`lens_thickness` 和 `WTW`；其中 `K1`/`K1Axis` 为平坦子午线及轴位，`K2`/`K2Axis` 为陡峭子午线及轴位。旧版 `flat_k`、`flat_axis`、`steep_k`、`steep_axis` 仍兼容；`ACD`、目标屈光度、切口 SIA 与切口位置缺省为 `3.00`、`0`、`0` 和 `0`。成功响应中的 `axis_image.source_url` 指向 Barrett 官方轴位背景图，`fallback_url` 是官方资源不可用时使用的自包含轴位图。
 
 ```json
 {
   "right_eye": {
-    "flat_k": 41.50,
-    "flat_axis": 84,
-    "steep_k": 43.85,
-    "steep_axis": 174,
+    "K1": 41.50,
+    "K1Axis": 84,
+    "K2": 43.85,
+    "K2Axis": 174,
     "AL": 24.43,
     "ACD": 3.25,
     "target_refraction": 0,

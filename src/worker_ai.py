@@ -244,8 +244,8 @@ class WorkerAI:
                 "2. 【任务描述】请仔细分析这张 IOL master 晶体单图片，准确提取以下数据：\\n"
                 "   - 患者姓名\\n"
                 "   - A常数（A constant）\\n"
-                "   - 右眼（OD）的AL（眼轴长度）、K1、K2（角膜曲率）、ACD（前房深度）\\n"
-                "   - 左眼（OS）的AL、K1、K2、ACD\\n"
+                "   - 右眼（OD）的AL（眼轴长度）、K1、K1Axis、K2、K2Axis（角膜曲率及轴位）、ACD（前房深度）\\n"
+                "   - 左眼（OS）的AL、K1、K1Axis、K2、K2Axis、ACD\\n"
                 "3. 【自我验证步骤】在生成最终结果前，请回答以下自我质询问题：\\n"
                 "   a) 我是否确认了左右眼标签的位置？有没有可能将左右眼数据颠倒？\\n"
                 "   b) 我是否检查了每个数值对应的标签（AL对应眼轴，K1对应角膜曲率等）？\\n"
@@ -260,7 +260,7 @@ class WorkerAI:
                 "\\n"
                 "=== 常见错位识别问题及避免方法 ===\\n"
                 "常见错误1: 左右眼数据颠倒 - 仔细核对 'OD'(右眼) 和 'OS'(左眼) 标签\\n"
-                "常见错误2: AL、K1、K2、ACD 数值错配 - 确保数值与正确的测量项目对应\\n"
+                "常见错误2: AL、K1/K1Axis、K2/K2Axis、ACD 数值错配 - 确保数值与正确的测量项目对应\\n"
                 "常见错误3: 单位混淆 - AL 是 mm，K1/K2 是 D，注意不要混淆\\n"
                 "常见错误4: 小数点位置错误 - 注意小数点位置，如 23.45 不是 2345\\n"
                 "常见错误5: ACD数值读取错误- 仪器不一定测得出ACD的数值，不要识别成Cyl的数值\\n"
@@ -273,13 +273,17 @@ class WorkerAI:
                 '  "right_eye": {\\n'
                 '    "AL": 数值或null,\\n'
                 '    "K1": 数值或null,\\n'
+                '    "K1Axis": 轴位角度或null,\\n'
                 '    "K2": 数值或null,\\n'
+                '    "K2Axis": 轴位角度或null,\\n'
                 '    "ACD": 数值或null\\n'
                 "  },\\n"
                 '  "left_eye": {\\n'
                 '    "AL": 数值或null,\\n'
                 '    "K1": 数值或null,\\n'
+                '    "K1Axis": 轴位角度或null,\\n'
                 '    "K2": 数值或null,\\n'
+                '    "K2Axis": 轴位角度或null,\\n'
                 '    "ACD": 数值或null\\n'
                 "  },\\n"
                 '  "self_verification": {\\n'
@@ -289,13 +293,17 @@ class WorkerAI:
                 '      "right_eye": {\\n'
                 '        "AL": 1-5,\\n'
                 '        "K1": 1-5,\\n'
+                '        "K1Axis": 1-5,\\n'
                 '        "K2": 1-5,\\n'
+                '        "K2Axis": 1-5,\\n'
                 '        "ACD": 1-5\\n'
                 "      },\\n"
                 '      "left_eye": {\\n'
                 '        "AL": 1-5,\\n'
                 '        "K1": 1-5,\\n'
+                '        "K1Axis": 1-5,\\n'
                 '        "K2": 1-5,\\n'
+                '        "K2Axis": 1-5,\\n'
                 '        "ACD": 1-5\\n'
                 "      }\\n"
                 "    },\\n"
@@ -305,12 +313,12 @@ class WorkerAI:
                 "}\\n\\n"
                 "=== 数值范围限制（请严格遵循） ===\\n"
                 "- 眼轴长度 AL: 15.00-35.00mm（正常范围20.00-30.00mm）\\n"
-                "- 角膜曲率 K1, K2: 30.00-65.00D（正常范围35.00-50.00D）\\n"
+                "- 角膜曲率 K1, K2: 30.00-65.00D（正常范围35.00-50.00D）；K1Axis、K2Axis：0-180°\\n"
                 "- 前房深度 ACD: 1.00-6.00mm（正常范围2.00-4.50mm）\\n"
                 "- A常数: 110.00-125.00（常见范围115.00-122.00）\\n\\n"
                 "=== 重要要求 ===\\n"
                 "- 只返回 JSON，不要其他文字\\n"
-                "- 所有数值（AL、K1、K2、ACD、a_constant）必须保留2位小数，如23.45、43.21等\\n"
+                "- 所有数值（AL、K1、K2、ACD、a_constant）必须保留2位小数；轴位K1Axis、K2Axis保留整数或1位小数\\n"
                 "- 数值请提取原始数字，不要单位\\n"
                 "- 如果左右眼数据都存在，请分别提取\\n"
                 "- 如果只有单眼数据，另一眼设为 null\\n"
@@ -472,10 +480,16 @@ class WorkerAI:
                             [d.get("right_eye", {}).get("K1") for d in data_points]
                         )
                     ),
+                    "K1Axis": self._get_consensus_angle(
+                        [d.get("right_eye", {}).get("K1Axis") for d in data_points]
+                    ),
                     "K2": format_to_two_decimal(
                         self._get_consensus_value(
                             [d.get("right_eye", {}).get("K2") for d in data_points]
                         )
+                    ),
+                    "K2Axis": self._get_consensus_angle(
+                        [d.get("right_eye", {}).get("K2Axis") for d in data_points]
                     ),
                     "ACD": format_to_two_decimal(
                         self._get_consensus_value(
@@ -494,10 +508,16 @@ class WorkerAI:
                             [d.get("left_eye", {}).get("K1") for d in data_points]
                         )
                     ),
+                    "K1Axis": self._get_consensus_angle(
+                        [d.get("left_eye", {}).get("K1Axis") for d in data_points]
+                    ),
                     "K2": format_to_two_decimal(
                         self._get_consensus_value(
                             [d.get("left_eye", {}).get("K2") for d in data_points]
                         )
+                    ),
+                    "K2Axis": self._get_consensus_angle(
+                        [d.get("left_eye", {}).get("K2Axis") for d in data_points]
                     ),
                     "ACD": format_to_two_decimal(
                         self._get_consensus_value(
@@ -527,8 +547,18 @@ class WorkerAI:
                     False,
                 ),
                 (
+                    "right_eye.K1Axis",
+                    [d.get("right_eye", {}).get("K1Axis") for d in data_points],
+                    False,
+                ),
+                (
                     "right_eye.K2",
                     [d.get("right_eye", {}).get("K2") for d in data_points],
+                    False,
+                ),
+                (
+                    "right_eye.K2Axis",
+                    [d.get("right_eye", {}).get("K2Axis") for d in data_points],
                     False,
                 ),
                 (
@@ -547,8 +577,18 @@ class WorkerAI:
                     False,
                 ),
                 (
+                    "left_eye.K1Axis",
+                    [d.get("left_eye", {}).get("K1Axis") for d in data_points],
+                    False,
+                ),
+                (
                     "left_eye.K2",
                     [d.get("left_eye", {}).get("K2") for d in data_points],
+                    False,
+                ),
+                (
+                    "left_eye.K2Axis",
+                    [d.get("left_eye", {}).get("K2Axis") for d in data_points],
                     False,
                 ),
                 (
@@ -561,7 +601,9 @@ class WorkerAI:
             for field_name, values, is_string in fields_to_check:
                 total_fields += 1
                 consensus_value = self._get_consensus_value(values, is_string)
-                consensus_info = self._analyze_consensus(values, consensus_value)
+                consensus_info = self._analyze_consensus(
+                    values, consensus_value, tolerance=1.0 if field_name.endswith("Axis") else 0.1
+                )
                 details[field_name] = consensus_info
 
                 if consensus_info["has_consensus"]:
@@ -639,7 +681,11 @@ class WorkerAI:
                     return sum(matching_values) / len(matching_values)
             return None
 
-    def _analyze_consensus(self, values, consensus_value):
+    def _get_consensus_angle(self, values):
+        """获取角膜轴位多数决，接受 0-180 度范围内的一度误差。"""
+        return self._get_consensus_value(values, tolerance=1.0)
+
+    def _analyze_consensus(self, values, consensus_value, tolerance=0.1):
         """
         分析共识情况
 
@@ -667,7 +713,7 @@ class WorkerAI:
                 if v == consensus_value:
                     matching_count += 1
             else:
-                if abs(v - consensus_value) <= 0.1:
+                if abs(v - consensus_value) <= tolerance:
                     matching_count += 1
 
         return {
@@ -693,7 +739,7 @@ class WorkerAI:
                 "请检查以下方面：\n"
                 "1. 患者姓名是否正确\n"
                 "2. A常数是否正确\n"
-                "3. 左右眼的AL、K1、K2、ACD数值是否准确\n"
+                "3. 左右眼的AL、K1/K1Axis、K2/K2Axis、ACD数值是否准确\n"
                 "4. 数值范围是否合理（AL通常在20-30mm，K值通常在35-50D）\n\n"
                 "请只回答：\n"
                 "- 如果数据完全正确，回答：正确\n"
@@ -761,7 +807,7 @@ class WorkerAI:
             prompt2 = (
                 "以下是从 IOL master 晶体单图片中提取的文本内容：\n\n"
                 f"{initial_response}\n\n"
-                "请使用自我验证的方法，仔细提取患者姓名、A 常数、左右眼的 AL、K1、K2、ACD 数据，"
+                "请使用自我验证的方法，仔细提取患者姓名、A 常数、左右眼的 AL、K1、K1Axis、K2、K2Axis、ACD 数据，"
                 "返回 JSON 格式。如果找不到某个字段就设为 null。\n\n"
                 "=== 自我验证要求 ===\n"
                 "在提取数据前，请思考：\n"
@@ -778,13 +824,17 @@ class WorkerAI:
                 '  "right_eye": {\n'
                 '    "AL": 数值或null,\n'
                 '    "K1": 数值或null,\n'
+                '    "K1Axis": 轴位角度或null,\n'
                 '    "K2": 数值或null,\n'
+                '    "K2Axis": 轴位角度或null,\n'
                 '    "ACD": 数值或null\n'
                 "  },\n"
                 '  "left_eye": {\n'
                 '    "AL": 数值或null,\n'
                 '    "K1": 数值或null,\n'
+                '    "K1Axis": 轴位角度或null,\n'
                 '    "K2": 数值或null,\n'
+                '    "K2Axis": 轴位角度或null,\n'
                 '    "ACD": 数值或null\n'
                 "  },\n"
                 '  "self_verification": {\n'
@@ -794,13 +844,17 @@ class WorkerAI:
                 '      "right_eye": {\n'
                 '        "AL": 1-5,\n'
                 '        "K1": 1-5,\n'
+                '        "K1Axis": 1-5,\n'
                 '        "K2": 1-5,\n'
+                '        "K2Axis": 1-5,\n'
                 '        "ACD": 1-5\n'
                 "      },\n"
                 '      "left_eye": {\n'
                 '        "AL": 1-5,\n'
                 '        "K1": 1-5,\n'
+                '        "K1Axis": 1-5,\n'
                 '        "K2": 1-5,\n'
+                '        "K2Axis": 1-5,\n'
                 '        "ACD": 1-5\n'
                 "      }\n"
                 "    },\n"
@@ -810,12 +864,12 @@ class WorkerAI:
                 "}\n\n"
                 "=== 数值范围限制（请严格遵循） ===\n"
                 "- 眼轴长度 AL: 12.00-38.00mm（正常范围20.00-30.00mm）\n"
-                "- 角膜曲率 K1, K2: 30.00-60.00D（正常范围35.00-50.00D）\n"
+                "- 角膜曲率 K1, K2: 30.00-60.00D（正常范围35.00-50.00D）；K1Axis、K2Axis：0-180°\n"
                 "- 前房深度 ACD: 0.00-6.00mm（正常范围2.00-4.50mm）\n"
                 "- A常数: 110.00-125.00（常见范围115.00-122.00）\n\n"
                 "=== 重要要求 ===\n"
                 "- 只返回 JSON，不要其他文字\n"
-                "- 所有数值（AL、K1、K2、ACD、a_constant）必须保留2位小数\n"
+                "- 所有数值（AL、K1、K2、ACD、a_constant）必须保留2位小数；K1Axis、K2Axis必须在0-180°范围内\n"
                 "- 即使原始数据是整数，也要写成2位小数格式（如23写成23.00）\n"
                 "- 请确保数值精度和格式正确\n"
                 "- 如果提取的数值超出上述合理范围，请仔细检查文本内容，确保识别准确\n"
@@ -917,6 +971,20 @@ class WorkerAI:
             except (ValueError, TypeError):
                 return None
 
+        def format_axis(value):
+            """清洗角膜轴位，轴位必须位于0-180度。"""
+            normalized = self._clean_number(value)
+            if normalized is None or not 0 <= normalized <= 180:
+                return None
+            return round(normalized, 1)
+
+        def eye_value(eye_data, *names):
+            """从眼部结果读取规范字段，并兼容常见轴位别名。"""
+            for name in names:
+                if name in eye_data:
+                    return eye_data.get(name)
+            return None
+
         # 提取核心数据字段，兼容新旧格式
         cleaned = {
             "patient_name": data.get("patient_name"),
@@ -930,8 +998,14 @@ class WorkerAI:
                 "K1": format_to_two_decimal(
                     self._clean_number(data.get("right_eye", {}).get("K1"))
                 ),
+                "K1Axis": format_axis(
+                    eye_value(data.get("right_eye", {}), "K1Axis", "K1_axis", "K1AxisDeg")
+                ),
                 "K2": format_to_two_decimal(
                     self._clean_number(data.get("right_eye", {}).get("K2"))
+                ),
+                "K2Axis": format_axis(
+                    eye_value(data.get("right_eye", {}), "K2Axis", "K2_axis", "K2AxisDeg")
                 ),
                 "ACD": format_to_two_decimal(
                     self._clean_number(data.get("right_eye", {}).get("ACD"))
@@ -944,8 +1018,14 @@ class WorkerAI:
                 "K1": format_to_two_decimal(
                     self._clean_number(data.get("left_eye", {}).get("K1"))
                 ),
+                "K1Axis": format_axis(
+                    eye_value(data.get("left_eye", {}), "K1Axis", "K1_axis", "K1AxisDeg")
+                ),
                 "K2": format_to_two_decimal(
                     self._clean_number(data.get("left_eye", {}).get("K2"))
+                ),
+                "K2Axis": format_axis(
+                    eye_value(data.get("left_eye", {}), "K2Axis", "K2_axis", "K2AxisDeg")
                 ),
                 "ACD": format_to_two_decimal(
                     self._clean_number(data.get("left_eye", {}).get("ACD"))

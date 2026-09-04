@@ -109,10 +109,9 @@ def normalize_toric_eye_params(
 ) -> dict[str, Any] | None:
     """Normalize one eye's Barrett Toric parameters.
 
-    The API accepts descriptive snake-case names and the names commonly used
-    by IOL Master exports (``K1``, ``K1Axis``, ``Axlength`` and so on).  Flat
-    and steep meridians are kept explicit because the Barrett form requires
-    both the power and axis for each meridian.
+    The API uses the same canonical names as the non-toric calculator:
+    ``K1``, ``K1Axis``, ``K2`` and ``K2Axis``.  Descriptive ``flat_*`` /
+    ``steep_*`` names remain accepted as backwards-compatible aliases.
 
     ``lens_thickness`` and ``WTW`` are required by the official Toric form;
     unlike the non-toric calculator they are not silently guessed.
@@ -214,7 +213,13 @@ def normalize_toric_eye_params(
         14,
     )
 
+    # Keep the public shape aligned with the ordinary Barrett calculator.
+    # Legacy flat/steep keys are retained so older clients do not break.
     return {
+        "K1": flat_k,
+        "K1Axis": flat_axis,
+        "K2": steep_k,
+        "K2Axis": steep_axis,
         "flat_k": flat_k,
         "flat_axis": flat_axis,
         "steep_k": steep_k,
@@ -390,16 +395,16 @@ def parse_toric_results(html_content: str) -> dict[str, Any]:
         "right_eye": {
             "suffix": "",
             "index": 1,
-            "flat_k": ("MainContent_FlatK", "MainContent_K1", "MainContent_MeasuredK1"),
-            "flat_axis": ("MainContent_FlatAxis", "MainContent_K1Axis"),
-            "steep_k": (
-                "MainContent_SteepK",
+            "K1": ("MainContent_K1", "MainContent_FlatK", "MainContent_MeasuredK1"),
+            "K1Axis": ("MainContent_K1Axis", "MainContent_FlatAxis"),
+            "K2": (
                 "MainContent_K2",
+                "MainContent_SteepK",
                 "MainContent_MeasuredK2",
             ),
-            "steep_axis": ("MainContent_SteepAxis", "MainContent_K2Axis"),
-            "al": ("MainContent_AxialLength", "MainContent_Axlength"),
-            "acd": ("MainContent_OpticalACD",),
+            "K2Axis": ("MainContent_K2Axis", "MainContent_SteepAxis"),
+            "AL": ("MainContent_AxialLength", "MainContent_Axlength"),
+            "ACD": ("MainContent_OpticalACD",),
             "axis": (
                 "MainContent_ToricAxis",
                 "MainContent_IOLAxis",
@@ -410,20 +415,20 @@ def parse_toric_results(html_content: str) -> dict[str, Any]:
         "left_eye": {
             "suffix": "0",
             "index": 2,
-            "flat_k": (
-                "MainContent_FlatK0",
+            "K1": (
                 "MainContent_K10",
+                "MainContent_FlatK0",
                 "MainContent_MeasuredK10",
             ),
-            "flat_axis": ("MainContent_FlatAxis0", "MainContent_K1Axis0"),
-            "steep_k": (
-                "MainContent_SteepK0",
+            "K1Axis": ("MainContent_K1Axis0", "MainContent_FlatAxis0"),
+            "K2": (
                 "MainContent_K20",
+                "MainContent_SteepK0",
                 "MainContent_MeasuredK20",
             ),
-            "steep_axis": ("MainContent_SteepAxis0", "MainContent_K2Axis0"),
-            "al": ("MainContent_AxialLength0", "MainContent_Axlength0"),
-            "acd": ("MainContent_OpticalACD0",),
+            "K2Axis": ("MainContent_K2Axis0", "MainContent_SteepAxis0"),
+            "AL": ("MainContent_AxialLength0", "MainContent_Axlength0"),
+            "ACD": ("MainContent_OpticalACD0",),
             "axis": (
                 "MainContent_ToricAxis0",
                 "MainContent_IOLAxis0",
@@ -446,10 +451,24 @@ def parse_toric_results(html_content: str) -> dict[str, Any]:
             ]
             if axis is None and axis_values:
                 axis = axis_values[0]
-        for field in ("flat_k", "flat_axis", "steep_k", "steep_axis", "al", "acd"):
+        for field in ("K1", "K1Axis", "K2", "K2Axis", "AL", "ACD"):
             value = _find_form_value(soup, spec[field])
             if value is not None:
                 eye_result[field] = _number_from_text(value)
+        # Legacy result aliases for callers that used the first Toric API.
+        if "K1" in eye_result:
+            eye_result["flat_k"] = eye_result["K1"]
+        if "K1Axis" in eye_result:
+            eye_result["flat_axis"] = eye_result["K1Axis"]
+        if "K2" in eye_result:
+            eye_result["steep_k"] = eye_result["K2"]
+        if "K2Axis" in eye_result:
+            eye_result["steep_axis"] = eye_result["K2Axis"]
+        # Historical parser output used lowercase ``al``/``acd`` keys.
+        if "AL" in eye_result:
+            eye_result["al"] = eye_result["AL"]
+        if "ACD" in eye_result:
+            eye_result["acd"] = eye_result["ACD"]
         if axis is not None:
             eye_result["toric_axis"] = axis
         if eye_result:
@@ -469,8 +488,8 @@ def build_axis_image_metadata(
     if toric_axis is None and options:
         toric_axis = options[0].get("axis")
     fallback_svg = _build_axis_fallback_svg(
-        flat_axis=eye_params.get("flat_axis"),
-        steep_axis=eye_params.get("steep_axis"),
+        flat_axis=eye_params.get("K1Axis", eye_params.get("flat_axis")),
+        steep_axis=eye_params.get("K2Axis", eye_params.get("steep_axis")),
         toric_axis=toric_axis,
         incision_location=eye_params.get("incision_location"),
     )
@@ -479,8 +498,10 @@ def build_axis_image_metadata(
         "fallback_url": "data:image/svg+xml;charset=utf-8,"
         + quote(fallback_svg, safe=""),
         "alt": "Barrett Toric Calculator 眼轴位图",
-        "flat_axis": eye_params.get("flat_axis"),
-        "steep_axis": eye_params.get("steep_axis"),
+        "K1Axis": eye_params.get("K1Axis", eye_params.get("flat_axis")),
+        "K2Axis": eye_params.get("K2Axis", eye_params.get("steep_axis")),
+        "flat_axis": eye_params.get("K1Axis", eye_params.get("flat_axis")),
+        "steep_axis": eye_params.get("K2Axis", eye_params.get("steep_axis")),
         "toric_axis": toric_axis,
         "incision_location": eye_params.get("incision_location"),
     }
@@ -557,10 +578,10 @@ def _build_eye_payload(
     if not eye_params:
         return
     aliases = {
-        "flat_k": ("FlatK", "K1", "MeasuredK1"),
-        "flat_axis": ("FlatAxis", "K1Axis"),
-        "steep_k": ("SteepK", "K2", "MeasuredK2"),
-        "steep_axis": ("SteepAxis", "K2Axis"),
+        "K1": ("K1", "FlatK", "MeasuredK1"),
+        "K1Axis": ("K1Axis", "FlatAxis"),
+        "K2": ("K2", "SteepK", "MeasuredK2"),
+        "K2Axis": ("K2Axis", "SteepAxis"),
         "AL": ("AxialLength", "Axlength"),
         "ACD": ("OpticalACD",),
         "Refraction": ("Refraction", "TargetRefraction"),
@@ -570,7 +591,14 @@ def _build_eye_payload(
         "WTW": ("WTW", "WhiteToWhite"),
     }
     for field, names in aliases.items():
-        _add_payload_aliases(payload, names, eye_params[field], suffix)
+        value = eye_params.get(field)
+        if value is None:
+            legacy_field = {
+                "K1": "flat_k", "K1Axis": "flat_axis",
+                "K2": "steep_k", "K2Axis": "steep_axis",
+            }.get(field)
+            value = eye_params.get(legacy_field) if legacy_field else None
+        _add_payload_aliases(payload, names, value, suffix)
 
 
 def _calculate_payload(

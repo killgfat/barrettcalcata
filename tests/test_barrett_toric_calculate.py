@@ -76,8 +76,32 @@ def test_normalize_toric_eye_accepts_iol_master_aliases():
     assert result["flat_axis"] == 84
     assert result["steep_k"] == 43.85
     assert result["steep_axis"] == 174
+    assert result["K1"] == 41.5
+    assert result["K1Axis"] == 84
+    assert result["K2"] == 43.85
+    assert result["K2Axis"] == 174
     assert result["ACD"] == 3.25
     assert result["incision_location"] == 10
+
+
+def test_worker_ai_cleans_k_axes_for_toric_reuse():
+    worker = api.WorkerAI()
+    cleaned = worker._validate_and_clean_data(
+        {
+            "right_eye": {
+                "AL": "24.43 mm",
+                "K1": "41.50 D",
+                "K1Axis": "84°",
+                "K2": "43.85 D",
+                "K2Axis": "174°",
+            },
+            "left_eye": {"K1_axis": 91, "K2Axis": 181},
+        }
+    )
+    assert cleaned["right_eye"]["K1Axis"] == 84.0
+    assert cleaned["right_eye"]["K2Axis"] == 174.0
+    assert cleaned["left_eye"]["K1Axis"] == 91.0
+    assert cleaned["left_eye"]["K2Axis"] is None
 
 
 def test_normalize_toric_eye_rejects_missing_geometry_and_out_of_range_axis():
@@ -126,6 +150,32 @@ def test_barrett_toric_calculate_formats_payload_and_returns_axis_image(monkeypa
         result["right_eye"]["axis_image"]["source_url"]
         == barrett_toric_calculate.BARRETT_TORIC_IMAGE_URL
     )
+
+
+def test_toric_payload_accepts_canonical_k_names(monkeypatch):
+    fake_session = FakeSession()
+    monkeypatch.setattr(
+        barrett_toric_calculate.requests, "Session", lambda: fake_session
+    )
+    eye = sample_eye()
+    eye = {
+        "K1": eye["K1"],
+        "K1Axis": eye["K1Axis"],
+        "K2": eye["K2"],
+        "K2Axis": eye["K2Axis"],
+        "AL": eye["AxialLength"],
+        "ACD": eye["ACD"],
+        "SIA": eye["SIA"],
+        "IncisionLocation": eye["IncisionLocation"],
+        "LensThickness": eye["LensThickness"],
+        "WTW": eye["WTW"],
+    }
+    asyncio.run(barrett_toric_calculate.calculate_barrett_toric_iol(right_eye_params=eye))
+    payload = fake_session.post_payloads[0]
+    assert payload["ctl00$MainContent$K1"] == "41.50"
+    assert payload["ctl00$MainContent$K1Axis"] == "84.00"
+    assert payload["ctl00$MainContent$K2"] == "43.85"
+    assert payload["ctl00$MainContent$K2Axis"] == "174.00"
 
 
 @pytest.mark.asyncio

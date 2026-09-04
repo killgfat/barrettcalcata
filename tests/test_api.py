@@ -141,3 +141,8 @@ def test_openapi_documents_image_extraction_endpoint():
 
     assert "/api/extract" in specification["paths"]
     assert "post" in specification["paths"]["/api/extract"]
+
+
+def test_openapi_toric_uses_canonical_k_names():
+    schema = docs.get_openapi_spec()["components"]["schemas"]["ToricEye"]
+    assert schema["required"][:4] == ["K1", "K1Axis", "K2", "K2Axis"]

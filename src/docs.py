@@ -247,8 +247,8 @@ def get_openapi_spec():
                 "post": {
                     "summary": "执行 Barrett Universal II 散光晶体计算",
                     "description": (
-                        "提交平坦/陡峭角膜曲率及轴位、眼轴、ACD、晶体厚度、"
-                        "WTW 等参数，返回散光晶体型号、球镜度数和建议轴位。"
+                        "提交 K1/K1Axis、K2/K2Axis 角膜曲率及轴位、眼轴、ACD、"
+                        "晶体厚度、WTW 等参数，返回散光晶体型号、球镜度数和建议轴位。"
                     ),
                     "requestBody": {
                         "required": True,
@@ -320,19 +320,19 @@ def get_openapi_spec():
                 "ToricEye": {
                     "type": "object",
                     "required": [
-                        "flat_k",
-                        "flat_axis",
-                        "steep_k",
-                        "steep_axis",
+                        "K1",
+                        "K1Axis",
+                        "K2",
+                        "K2Axis",
                         "AL",
                         "lens_thickness",
                         "WTW",
                     ],
                     "properties": {
-                        "flat_k": {"type": "number", "minimum": 30, "maximum": 60},
-                        "flat_axis": {"type": "number", "minimum": 0, "maximum": 180},
-                        "steep_k": {"type": "number", "minimum": 30, "maximum": 60},
-                        "steep_axis": {"type": "number", "minimum": 0, "maximum": 180},
+                        "K1": {"type": "number", "minimum": 30, "maximum": 60},
+                        "K1Axis": {"type": "number", "minimum": 0, "maximum": 180},
+                        "K2": {"type": "number", "minimum": 30, "maximum": 60},
+                        "K2Axis": {"type": "number", "minimum": 0, "maximum": 180},
                         "AL": {"type": "number", "minimum": 12, "maximum": 38},
                         "ACD": {"type": "number", "default": 3.0},
                         "target_refraction": {"type": "number", "default": 0},

@@ -276,10 +276,10 @@ INDEX_PAGE = """
                         <label for="toricRightEyeEnabled">右眼 (OD)</label>
                     </div>
                     <div class="toric-eye-params" id="toricRightEyeParams">
-                        <div class="form-group"><label for="toricRightFlatK">Flat K (D)</label><input type="number" id="toricRightFlatK" step="0.01" min="30" max="60"></div>
-                        <div class="form-group"><label for="toricRightFlatAxis">Flat Axis (°)</label><input type="number" id="toricRightFlatAxis" step="1" min="0" max="180"></div>
-                        <div class="form-group"><label for="toricRightSteepK">Steep K (D)</label><input type="number" id="toricRightSteepK" step="0.01" min="30" max="60"></div>
-                        <div class="form-group"><label for="toricRightSteepAxis">Steep Axis (°)</label><input type="number" id="toricRightSteepAxis" step="1" min="0" max="180"></div>
+                        <div class="form-group"><label for="toricRightFlatK">K1 / Flat K (D)</label><input type="number" id="toricRightFlatK" step="0.01" min="30" max="60"></div>
+                        <div class="form-group"><label for="toricRightFlatAxis">K1 Axis (°)</label><input type="number" id="toricRightFlatAxis" step="1" min="0" max="180"></div>
+                        <div class="form-group"><label for="toricRightSteepK">K2 / Steep K (D)</label><input type="number" id="toricRightSteepK" step="0.01" min="30" max="60"></div>
+                        <div class="form-group"><label for="toricRightSteepAxis">K2 Axis (°)</label><input type="number" id="toricRightSteepAxis" step="1" min="0" max="180"></div>
                         <div class="form-group"><label for="toricRightAL">眼轴长度 AL (mm)</label><input type="number" id="toricRightAL" step="0.01" min="12" max="38"></div>
                         <div class="form-group"><label for="toricRightACD">光学 ACD (mm)</label><input type="number" id="toricRightACD" value="3.00" step="0.01" min="0" max="6"></div>
                         <div class="form-group"><label for="toricRightRefraction">目标屈光度 (D)</label><input type="number" id="toricRightRefraction" value="0" step="0.01"></div>
@@ -296,10 +296,10 @@ INDEX_PAGE = """
                         <label for="toricLeftEyeEnabled">左眼 (OS)</label>
                     </div>
                     <div class="toric-eye-params" id="toricLeftEyeParams">
-                        <div class="form-group"><label for="toricLeftFlatK">Flat K (D)</label><input type="number" id="toricLeftFlatK" step="0.01" min="30" max="60"></div>
-                        <div class="form-group"><label for="toricLeftFlatAxis">Flat Axis (°)</label><input type="number" id="toricLeftFlatAxis" step="1" min="0" max="180"></div>
-                        <div class="form-group"><label for="toricLeftSteepK">Steep K (D)</label><input type="number" id="toricLeftSteepK" step="0.01" min="30" max="60"></div>
-                        <div class="form-group"><label for="toricLeftSteepAxis">Steep Axis (°)</label><input type="number" id="toricLeftSteepAxis" step="1" min="0" max="180"></div>
+                        <div class="form-group"><label for="toricLeftFlatK">K1 / Flat K (D)</label><input type="number" id="toricLeftFlatK" step="0.01" min="30" max="60"></div>
+                        <div class="form-group"><label for="toricLeftFlatAxis">K1 Axis (°)</label><input type="number" id="toricLeftFlatAxis" step="1" min="0" max="180"></div>
+                        <div class="form-group"><label for="toricLeftSteepK">K2 / Steep K (D)</label><input type="number" id="toricLeftSteepK" step="0.01" min="30" max="60"></div>
+                        <div class="form-group"><label for="toricLeftSteepAxis">K2 Axis (°)</label><input type="number" id="toricLeftSteepAxis" step="1" min="0" max="180"></div>
                         <div class="form-group"><label for="toricLeftAL">眼轴长度 AL (mm)</label><input type="number" id="toricLeftAL" step="0.01" min="12" max="38"></div>
                         <div class="form-group"><label for="toricLeftACD">光学 ACD (mm)</label><input type="number" id="toricLeftACD" value="3.00" step="0.01" min="0" max="6"></div>
                         <div class="form-group"><label for="toricLeftRefraction">目标屈光度 (D)</label><input type="number" id="toricLeftRefraction" value="0" step="0.01"></div>
@@ -819,6 +819,35 @@ INDEX_PAGE = """
                 document.getElementById('aConstant').value = formatToTwoDecimals(data.a_constant);
             }
 
+            // 同时把 AI 识别出的 K1/K2 及轴位填入散光表单，保持两种计算模式一致。
+            const fillToricEye = (eye, eyeData) => {
+                if (!eyeData) return;
+                const prefix = eye === 'right' ? 'toricRight' : 'toricLeft';
+                const values = {
+                    FlatK: eyeData.K1,
+                    FlatAxis: eyeData.K1Axis,
+                    SteepK: eyeData.K2,
+                    SteepAxis: eyeData.K2Axis,
+                    AL: eyeData.AL,
+                    ACD: eyeData.ACD
+                };
+                let hasValue = false;
+                Object.entries(values).forEach(([field, value]) => {
+                    if (value !== null && value !== undefined && value !== '') {
+                        const input = document.getElementById(prefix + field);
+                        if (input) input.value = value;
+                        hasValue = true;
+                    }
+                });
+                if (hasValue) {
+                    const checkbox = document.getElementById(prefix + 'EyeEnabled');
+                    checkbox.checked = true;
+                    checkbox.dispatchEvent(new Event('change'));
+                }
+            };
+            fillToricEye('right', data.right_eye);
+            fillToricEye('left', data.left_eye);
+
             // 填充右眼数据
             if (data.right_eye && (data.right_eye.AL || data.right_eye.K1 || data.right_eye.K2 || (data.right_eye.ACD !== null && data.right_eye.ACD !== undefined))) {
                 rightEyeEnabled.checked = true;
@@ -1069,10 +1098,10 @@ INDEX_PAGE = """
                 return value === '' ? undefined : Number(value);
             };
             return {
-                flat_k: number(prefix + 'FlatK'),
-                flat_axis: number(prefix + 'FlatAxis'),
-                steep_k: number(prefix + 'SteepK'),
-                steep_axis: number(prefix + 'SteepAxis'),
+                K1: number(prefix + 'FlatK'),
+                K1Axis: number(prefix + 'FlatAxis'),
+                K2: number(prefix + 'SteepK'),
+                K2Axis: number(prefix + 'SteepAxis'),
                 AL: number(prefix + 'AL'),
                 ACD: number(prefix + 'ACD'),
                 target_refraction: number(prefix + 'Refraction'),
@@ -1174,8 +1203,8 @@ INDEX_PAGE = """
         }
 
         function createAxisImageHtml(axisImage, eyeKey) {
-            const flat = axisImage.flat_axis;
-            const steep = axisImage.steep_axis;
+            const flat = axisImage.K1Axis ?? axisImage.flat_axis;
+            const steep = axisImage.K2Axis ?? axisImage.steep_axis;
             const toric = axisImage.toric_axis;
             const incision = axisImage.incision_location;
             const source = axisImage.source_url || 'https://calc.apacrs.org/toric_calculator20/Resources/Eye%20Background%20360.jpg';
