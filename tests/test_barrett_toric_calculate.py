@@ -267,3 +267,10 @@ def test_barrett_toric_endpoint_is_documented_and_rendered():
     assert 'id="toricRightFlatAxis"' in page
     assert 'id="toricResultsSection"' in page
     assert "Eye%20Background%20360.jpg" in page
+    assert page.index('for="toricRightAL"') < page.index('for="toricRightFlatK"')
+    assert page.index('for="toricRightFlatK"') < page.index(
+        'for="toricRightFlatAxis"'
+    )
+    assert page.index('for="toricRightFlatAxis"') < page.index(
+        'for="toricRightSteepK"'
+    )

@@ -133,7 +133,8 @@ def test_web_ui_uses_supported_worker_endpoints():
     assert "setCalculationMode('toric')" in page
     assert 'id="toricSection" hidden' in page
     assert 'id="imageRecognitionSection"' in page
-    assert "imageRecognitionSection.hidden = isToric" in page
+    assert "imageRecognitionSection.hidden = false" in page
+    assert "imageUpload.value = '';" not in page
 
 
 def test_openapi_documents_image_extraction_endpoint():

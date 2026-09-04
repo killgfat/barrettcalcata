@@ -276,13 +276,13 @@ INDEX_PAGE = """
                         <label for="toricRightEyeEnabled">右眼 (OD)</label>
                     </div>
                     <div class="toric-eye-params" id="toricRightEyeParams">
-                        <div class="form-group"><label for="toricRightFlatK">K1 / Flat K (D)</label><input type="number" id="toricRightFlatK" step="0.01" min="30" max="60"></div>
-                        <div class="form-group"><label for="toricRightFlatAxis">K1 Axis (°)</label><input type="number" id="toricRightFlatAxis" step="1" min="0" max="180"></div>
-                        <div class="form-group"><label for="toricRightSteepK">K2 / Steep K (D)</label><input type="number" id="toricRightSteepK" step="0.01" min="30" max="60"></div>
-                        <div class="form-group"><label for="toricRightSteepAxis">K2 Axis (°)</label><input type="number" id="toricRightSteepAxis" step="1" min="0" max="180"></div>
-                        <div class="form-group"><label for="toricRightAL">眼轴长度 AL (mm)</label><input type="number" id="toricRightAL" step="0.01" min="12" max="38"></div>
-                        <div class="form-group"><label for="toricRightACD">光学 ACD (mm)</label><input type="number" id="toricRightACD" value="3.00" step="0.01" min="0" max="6"></div>
-                        <div class="form-group"><label for="toricRightRefraction">目标屈光度 (D)</label><input type="number" id="toricRightRefraction" value="0" step="0.01"></div>
+                        <div class="form-group"><label for="toricRightAL">眼轴长度 (AL) mm</label><input type="number" id="toricRightAL" step="0.01" min="12" max="38"></div>
+                        <div class="form-group"><label for="toricRightFlatK">角膜曲率 K1 D</label><input type="number" id="toricRightFlatK" step="0.01" min="30" max="60"></div>
+                        <div class="form-group"><label for="toricRightFlatAxis">K1 轴位 °</label><input type="number" id="toricRightFlatAxis" step="1" min="0" max="180"></div>
+                        <div class="form-group"><label for="toricRightSteepK">角膜曲率 K2 D</label><input type="number" id="toricRightSteepK" step="0.01" min="30" max="60"></div>
+                        <div class="form-group"><label for="toricRightSteepAxis">K2 轴位 °</label><input type="number" id="toricRightSteepAxis" step="1" min="0" max="180"></div>
+                        <div class="form-group"><label for="toricRightACD">ACD mm（可选）</label><input type="number" id="toricRightACD" value="3.00" step="0.01" min="0" max="6"></div>
+                        <div class="form-group"><label for="toricRightRefraction">目标屈光度 D（可选）</label><input type="number" id="toricRightRefraction" value="0" step="0.01"></div>
                         <div class="form-group"><label for="toricRightSIA">切口 SIA (D)</label><input type="number" id="toricRightSIA" value="0" step="0.01" min="0" max="2"></div>
                         <div class="form-group"><label for="toricRightIncision">切口位置 (°)</label><input type="number" id="toricRightIncision" value="0" step="1" min="0" max="360"></div>
                         <div class="form-group"><label for="toricRightLT">晶体厚度 LT (mm)</label><input type="number" id="toricRightLT" step="0.01" min="2" max="8"></div>
@@ -296,13 +296,13 @@ INDEX_PAGE = """
                         <label for="toricLeftEyeEnabled">左眼 (OS)</label>
                     </div>
                     <div class="toric-eye-params" id="toricLeftEyeParams">
-                        <div class="form-group"><label for="toricLeftFlatK">K1 / Flat K (D)</label><input type="number" id="toricLeftFlatK" step="0.01" min="30" max="60"></div>
-                        <div class="form-group"><label for="toricLeftFlatAxis">K1 Axis (°)</label><input type="number" id="toricLeftFlatAxis" step="1" min="0" max="180"></div>
-                        <div class="form-group"><label for="toricLeftSteepK">K2 / Steep K (D)</label><input type="number" id="toricLeftSteepK" step="0.01" min="30" max="60"></div>
-                        <div class="form-group"><label for="toricLeftSteepAxis">K2 Axis (°)</label><input type="number" id="toricLeftSteepAxis" step="1" min="0" max="180"></div>
-                        <div class="form-group"><label for="toricLeftAL">眼轴长度 AL (mm)</label><input type="number" id="toricLeftAL" step="0.01" min="12" max="38"></div>
-                        <div class="form-group"><label for="toricLeftACD">光学 ACD (mm)</label><input type="number" id="toricLeftACD" value="3.00" step="0.01" min="0" max="6"></div>
-                        <div class="form-group"><label for="toricLeftRefraction">目标屈光度 (D)</label><input type="number" id="toricLeftRefraction" value="0" step="0.01"></div>
+                        <div class="form-group"><label for="toricLeftAL">眼轴长度 (AL) mm</label><input type="number" id="toricLeftAL" step="0.01" min="12" max="38"></div>
+                        <div class="form-group"><label for="toricLeftFlatK">角膜曲率 K1 D</label><input type="number" id="toricLeftFlatK" step="0.01" min="30" max="60"></div>
+                        <div class="form-group"><label for="toricLeftFlatAxis">K1 轴位 °</label><input type="number" id="toricLeftFlatAxis" step="1" min="0" max="180"></div>
+                        <div class="form-group"><label for="toricLeftSteepK">角膜曲率 K2 D</label><input type="number" id="toricLeftSteepK" step="0.01" min="30" max="60"></div>
+                        <div class="form-group"><label for="toricLeftSteepAxis">K2 轴位 °</label><input type="number" id="toricLeftSteepAxis" step="1" min="0" max="180"></div>
+                        <div class="form-group"><label for="toricLeftACD">ACD mm（可选）</label><input type="number" id="toricLeftACD" value="3.00" step="0.01" min="0" max="6"></div>
+                        <div class="form-group"><label for="toricLeftRefraction">目标屈光度 D（可选）</label><input type="number" id="toricLeftRefraction" value="0" step="0.01"></div>
                         <div class="form-group"><label for="toricLeftSIA">切口 SIA (D)</label><input type="number" id="toricLeftSIA" value="0" step="0.01" min="0" max="2"></div>
                         <div class="form-group"><label for="toricLeftIncision">切口位置 (°)</label><input type="number" id="toricLeftIncision" value="0" step="1" min="0" max="360"></div>
                         <div class="form-group"><label for="toricLeftLT">晶体厚度 LT (mm)</label><input type="number" id="toricLeftLT" step="0.01" min="2" max="8"></div>
@@ -747,6 +747,14 @@ INDEX_PAGE = """
             document.getElementById('leftK2').value = '';
             document.getElementById('leftACD').value = '';
             document.getElementById('leftRefraction').value = '';
+
+            // 清除散光表单中由图片识别负责填充的字段，保留手工输入的 LT、WTW 和切口参数。
+            ['Right', 'Left'].forEach(eye => {
+                ['AL', 'FlatK', 'FlatAxis', 'SteepK', 'SteepAxis', 'ACD']
+                    .forEach(field => {
+                        document.getElementById('toric' + eye + field).value = '';
+                    });
+            });
             
             // 清除患者姓名和A常数
             document.getElementById('patientName').value = '';
@@ -1028,7 +1036,7 @@ INDEX_PAGE = """
             sphericalModeButton.setAttribute('aria-pressed', String(!isToric));
             toricModeButton.classList.toggle('active', isToric);
             toricModeButton.setAttribute('aria-pressed', String(isToric));
-            imageRecognitionSection.hidden = isToric;
+            imageRecognitionSection.hidden = false;
             sphericalEyeSection.hidden = isToric;
             sphericalCalculateContainer.hidden = isToric;
             toricSection.hidden = !isToric;
@@ -1036,8 +1044,6 @@ INDEX_PAGE = """
             toricResultsSection.hidden = !isToric;
 
             if (isToric) {
-                imageUpload.value = '';
-                imagePreview.style.display = 'none';
                 validateToricForm();
             } else {
                 validateForm();
