@@ -600,7 +600,11 @@ class WorkerAI:
 
             for field_name, values, is_string in fields_to_check:
                 total_fields += 1
-                consensus_value = self._get_consensus_value(values, is_string)
+                consensus_value = (
+                    self._get_consensus_angle(values)
+                    if field_name.endswith("Axis")
+                    else self._get_consensus_value(values, is_string)
+                )
                 consensus_info = self._analyze_consensus(
                     values, consensus_value, tolerance=1.0 if field_name.endswith("Axis") else 0.1
                 )

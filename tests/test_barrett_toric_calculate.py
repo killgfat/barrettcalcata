@@ -104,6 +104,60 @@ def test_worker_ai_cleans_k_axes_for_toric_reuse():
     assert cleaned["left_eye"]["K2Axis"] is None
 
 
+def test_worker_ai_consensus_allows_one_degree_axis_tolerance():
+    worker = api.WorkerAI()
+    data_points = [
+        {
+            "patient_name": "Test",
+            "a_constant": 119,
+            "right_eye": {
+                "AL": 24.43,
+                "K1": 41.5,
+                "K1Axis": 84.0,
+                "K2": 43.85,
+                "K2Axis": 174.0,
+                "ACD": 3.25,
+            },
+            "left_eye": {},
+        },
+        {
+            "patient_name": "Test",
+            "a_constant": 119,
+            "right_eye": {
+                "AL": 24.43,
+                "K1": 41.5,
+                "K1Axis": 84.5,
+                "K2": 43.85,
+                "K2Axis": 174.5,
+                "ACD": 3.25,
+            },
+            "left_eye": {},
+        },
+        {
+            "patient_name": "Test",
+            "a_constant": 119,
+            "right_eye": {
+                "AL": 24.43,
+                "K1": 41.5,
+                "K1Axis": 84.0,
+                "K2": 43.85,
+                "K2Axis": 174.0,
+                "ACD": 3.25,
+            },
+            "left_eye": {},
+        },
+    ]
+
+    result = worker._perform_consensus_analysis(
+        [{"data": data} for data in data_points]
+    )
+
+    assert result["details"]["right_eye.K1Axis"]["has_consensus"]
+    assert result["details"]["right_eye.K2Axis"]["has_consensus"]
+    assert result["consensus_data"]["right_eye"]["K1Axis"] == pytest.approx(84.1667)
+    assert result["consensus_data"]["right_eye"]["K2Axis"] == pytest.approx(174.1667)
+
+
 def test_normalize_toric_eye_rejects_missing_geometry_and_out_of_range_axis():
     with pytest.raises(ValueError, match="晶体厚度"):
         barrett_toric_calculate.normalize_toric_eye_params(
