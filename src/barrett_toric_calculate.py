@@ -585,12 +585,7 @@ def build_axis_image_metadata(
     toric_axis = eye_result.get("toric_axis")
     if toric_axis is None and options:
         toric_axis = options[0].get("axis")
-    fallback_svg = _build_axis_fallback_svg(
-        flat_axis=eye_params.get("K1Axis", eye_params.get("flat_axis")),
-        steep_axis=eye_params.get("K2Axis", eye_params.get("steep_axis")),
-        toric_axis=toric_axis,
-        incision_location=eye_params.get("incision_location"),
-    )
+    fallback_svg = _build_axis_fallback_svg(toric_axis=toric_axis)
     return {
         "source_url": BARRETT_TORIC_IMAGE_URL,
         "fallback_url": "data:image/svg+xml;charset=utf-8,"
@@ -606,31 +601,22 @@ def build_axis_image_metadata(
 
 
 def _build_axis_fallback_svg(
-    *,
-    flat_axis: Any,
-    steep_axis: Any,
-    toric_axis: Any,
-    incision_location: Any,
+    *, toric_axis: Any
 ) -> str:
-    """Create a self-contained fallback when the official image is blocked."""
+    """Create a fallback image containing only the IOL alignment axis."""
     lines = []
-    for angle, color, width in (
-        (flat_axis, "#2563eb", 3),
-        (steep_axis, "#ea580c", 3),
-        (toric_axis, "#16a34a", 5),
-        (incision_location, "#7c3aed", 2),
-    ):
-        if angle is None:
-            continue
+    if toric_axis is not None:
+        angle = toric_axis
         try:
             normalized = float(angle)
         except (TypeError, ValueError):
-            continue
-        lines.append(
-            f'<line x1="32" y1="180" x2="328" y2="180" '
-            f'stroke="{color}" stroke-width="{width}" '
-            f'transform="rotate({normalized:g} 180 180)" />'
-        )
+            normalized = None
+        if normalized is not None:
+            lines.append(
+                f'<line x1="32" y1="180" x2="328" y2="180" '
+                f'stroke="#16a34a" stroke-width="1" '
+                f'transform="rotate({normalized:g} 180 180)" />'
+            )
     ticks = []
     for angle in range(0, 360, 30):
         ticks.append(

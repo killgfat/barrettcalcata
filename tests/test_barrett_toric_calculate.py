@@ -1,6 +1,7 @@
 import asyncio
 import importlib
 import sys
+from urllib.parse import unquote
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -256,6 +257,29 @@ def test_toric_default_incision_angle_is_135_in_ui_and_openapi():
         ["incision_location"]["default"]
         == 135
     )
+
+
+def test_axis_image_renders_only_a_thin_iol_axis():
+    metadata = barrett_toric_calculate.build_axis_image_metadata(
+        {
+            "K1Axis": 84,
+            "K2Axis": 174,
+            "incision_location": 135,
+        },
+        {"toric_axis": 175},
+    )
+    svg = unquote(metadata["fallback_url"].split(",", 1)[1])
+    assert 'stroke="#16a34a" stroke-width="1"' in svg
+    assert 'stroke="#2563eb"' not in svg
+    assert 'stroke="#ea580c"' not in svg
+    assert 'stroke="#7c3aed"' not in svg
+
+    page = webui.get_webui_page()
+    assert "line(toric, 'toric')" in page
+    assert "line(flat, 'flat')" not in page
+    assert "line(steep, 'steep')" not in page
+    assert "line(incision, 'incision')" not in page
+    assert ".axis-line.toric" not in page
 
 
 def test_current_toric_result_parser_reads_official_fields_and_tables():

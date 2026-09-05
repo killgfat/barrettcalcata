@@ -58,11 +58,7 @@ INDEX_PAGE = """
         .axis-layout { display: grid; grid-template-columns: minmax(220px, 360px) 1fr; gap: 20px; align-items: center; }
         .axis-figure { position: relative; width: 100%; max-width: 360px; aspect-ratio: 1; overflow: hidden; border-radius: 50%; background: #e6fffb; }
         .axis-figure img { display: block; width: 100%; height: 100%; object-fit: cover; }
-        .axis-line { position: absolute; left: 10%; top: calc(50% - 1px); width: 80%; height: 2px; transform-origin: 50% 50%; background: #dc2626; box-shadow: 0 0 0 1px rgba(255,255,255,0.6); }
-        .axis-line.flat { background: #2563eb; }
-        .axis-line.steep { background: #ea580c; }
-        .axis-line.toric { background: #16a34a; height: 3px; }
-        .axis-line.incision { background: #7c3aed; height: 2px; }
+        .axis-line { position: absolute; left: 10%; top: calc(50% - 0.5px); width: 80%; height: 1px; transform-origin: 50% 50%; background: #16a34a; }
         .axis-legend { display: grid; gap: 8px; font-size: 0.95em; color: #334155; }
         .axis-legend-row { display: flex; justify-content: space-between; gap: 16px; border-bottom: 1px solid #ccfbf1; padding-bottom: 6px; }
         .axis-legend-row strong { color: #0f172a; }
@@ -1209,10 +1205,7 @@ INDEX_PAGE = """
         }
 
         function createAxisImageHtml(axisImage, eyeKey) {
-            const flat = axisImage.K1Axis ?? axisImage.flat_axis;
-            const steep = axisImage.K2Axis ?? axisImage.steep_axis;
             const toric = axisImage.toric_axis;
-            const incision = axisImage.incision_location;
             const source = axisImage.source_url || 'https://calc.apacrs.org/toric_calculator20/Resources/Eye%20Background%20360.jpg';
             const fallback = axisImage.fallback_url || '';
             const line = (axis, className) => axis === null || axis === undefined || axis === '' ? '' :
@@ -1220,13 +1213,10 @@ INDEX_PAGE = """
             return '<h5>原版 Barrett Toric 轴位图</h5>' +
                 '<div class="axis-layout"><div class="axis-figure">' +
                 '<img src="' + escapeHtml(source) + '" data-fallback="' + escapeHtml(fallback) + '" alt="Barrett Toric 轴位图" loading="lazy" onerror="if(this.dataset.fallback){this.onerror=null;this.src=this.dataset.fallback;}else{this.style.display=&quot;none&quot;;}">' +
-                line(flat, 'flat') + line(steep, 'steep') + line(toric, 'toric') + line(incision, 'incision') +
+                line(toric, 'toric') +
                 '</div><div class="axis-legend">' +
-                '<div class="axis-legend-row"><span>平坦子午线</span><strong>' + escapeHtml(flat) + '°</strong></div>' +
-                '<div class="axis-legend-row"><span>陡峭子午线</span><strong>' + escapeHtml(steep) + '°</strong></div>' +
                 '<div class="axis-legend-row"><span>IOL 建议轴位</span><strong>' + escapeHtml(toric) + '°</strong></div>' +
-                '<div class="axis-legend-row"><span>切口位置</span><strong>' + escapeHtml(incision) + '°</strong></div>' +
-                '<div class="param-hint">轴位图背景来自 Barrett Toric 官方计算器；彩色标记对应返回的子午线和建议植入轴位。</div>' +
+                '<div class="param-hint">轴位图背景来自 Barrett Toric 官方计算器；绿色细线表示建议植入轴位。</div>' +
                 '</div></div>';
         }
 
