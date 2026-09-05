@@ -268,7 +268,11 @@ def _successful_form_fields(html_content: str) -> dict[str, str]:
                 continue
             if input_type in {"checkbox", "radio"} and not element.has_attr("checked"):
                 continue
-            fields[name] = element.get("value", "on")
+            # Text controls without a value attribute submit an empty string;
+            # only checkbox/radio controls use the HTML default value "on".
+            fields[name] = element.get(
+                "value", "on" if input_type in {"checkbox", "radio"} else ""
+            )
         elif element.name == "select":
             selected = element.find("option", selected=True) or element.find("option")
             fields[name] = (
