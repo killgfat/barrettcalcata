@@ -821,6 +821,7 @@ async def calculate_barrett_toric_iol(
 
         parsed: dict[str, Any] = {}
         current_form_fields = form_fields
+        multiple_eyes = bool(right_eye_params and left_eye_params)
         for eye_name, eye_params, eye_select in (
             ("right_eye", right_eye_params, "Rad1"),
             ("left_eye", left_eye_params, "Rad2"),
@@ -866,7 +867,7 @@ async def calculate_barrett_toric_iol(
                 eye.get("iol_options") or eye.get("toric_options")
                 for eye in (eye_result.get(eye_name, {}),)
             )
-            if not has_output:
+            if not has_output and not multiple_eyes:
                 tab_payload = _calculate_payload(
                     current_form_fields,
                     eye_params if eye_select == "Rad1" else None,
@@ -891,6 +892,60 @@ async def calculate_barrett_toric_iol(
                 )
             if eye_name in eye_result:
                 parsed[eye_name] = eye_result[eye_name]
+
+        # With both eyes present, the official workflow calculates each eye
+        # first and only then opens the Toric IOL tab.  Loading that tab between
+        # calculations causes the ASP.NET page state to reject the next eye.
+        if multiple_eyes:
+            for eye_name, eye_params, eye_select in (
+                ("right_eye", right_eye_params, "Rad1"),
+                ("left_eye", left_eye_params, "Rad2"),
+            ):
+                if not eye_params:
+                    continue
+                if (
+                    current_form_fields.get("ctl00$MainContent$Eye Select")
+                    != eye_select
+                ):
+                    selection_response = _request(
+                        session,
+                        "post",
+                        BARRETT_TORIC_URL,
+                        data=_eye_selection_payload(
+                            current_form_fields, eye_select
+                        ),
+                    )
+                    selection_response.raise_for_status()
+                    _persist_response_cookies(session, selection_response)
+                    current_form_fields = _successful_form_fields(
+                        selection_response.text
+                    )
+                tab_response = _request(
+                    session,
+                    "post",
+                    BARRETT_TORIC_URL,
+                    data=_calculate_payload(
+                        current_form_fields,
+                        eye_params if eye_select == "Rad1" else None,
+                        eye_params if eye_select == "Rad2" else None,
+                        a_constant=normalized_a,
+                        patient_name=patient,
+                        iol_model=model,
+                        k_index=normalized_k,
+                        cylinder_mode=mode,
+                        eye_select=eye_select,
+                        event_target="ctl00$MainContent$menuTabs",
+                        event_argument="2",
+                    ),
+                )
+                tab_response.raise_for_status()
+                _persist_response_cookies(session, tab_response)
+                tab_result = parse_toric_results(
+                    tab_response.text, selected_eye=eye_name
+                )
+                if eye_name in tab_result:
+                    parsed.setdefault(eye_name, {}).update(tab_result[eye_name])
+                current_form_fields = _successful_form_fields(tab_response.text)
 
         for eye_name, eye_params in (
             ("right_eye", right_eye_params),
