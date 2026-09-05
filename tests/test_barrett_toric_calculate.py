@@ -192,7 +192,7 @@ def test_barrett_toric_calculate_formats_payload_and_returns_axis_image(monkeypa
         )
     )
 
-    payload = fake_session.post_payloads[0]
+    payload = fake_session.post_payloads[-1]
     assert payload["ctl00$MainContent$Aconstant"] == "119.35"
     assert payload["ctl00$MainContent$OpticalACD"] == "3.25"
     assert payload["ctl00$MainContent$DoctorName"] == ""
@@ -233,7 +233,7 @@ def test_toric_payload_accepts_canonical_k_names(monkeypatch):
         "WTW": eye["WTW"],
     }
     asyncio.run(barrett_toric_calculate.calculate_barrett_toric_iol(right_eye_params=eye))
-    payload = fake_session.post_payloads[0]
+    payload = fake_session.post_payloads[-1]
     assert payload["ctl00$MainContent$MeasuredK"] == "41.50"
     assert payload["ctl00$MainContent$MeasuredAxis"] == "84.00"
     assert payload["ctl00$MainContent$MeasuredK0"] == "43.85"

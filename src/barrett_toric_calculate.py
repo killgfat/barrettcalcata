@@ -725,6 +725,23 @@ def _calculate_payload(
     return payload
 
 
+def _eye_selection_payload(
+    form_fields: dict[str, str], eye_select: str
+) -> dict[str, str]:
+    """Build the radio-button postback used to activate an eye on the page."""
+    payload = dict(form_fields)
+    payload.update(
+        {
+            "__EVENTTARGET": f"ctl00$MainContent${eye_select}",
+            "__EVENTARGUMENT": "",
+            "__LASTFOCUS": "",
+            "ctl00$MainContent$Eye Select": eye_select,
+        }
+    )
+    payload.pop("ctl00$MainContent$Button1", None)
+    return payload
+
+
 def _request(session: requests.Session, method: str, url: str, **kwargs: Any) -> Any:
     """Call a requests session with a bounded timeout and test-friendly fallback."""
     try:
@@ -788,6 +805,18 @@ async def calculate_barrett_toric_iol(
         ):
             if not eye_params:
                 continue
+            # The current page requires an eye-selection postback before the
+            # calculate event.  This establishes the per-eye server state and
+            # refreshes ASP.NET's hidden validation fields.
+            if current_form_fields.get("ctl00$MainContent$Eye Select") != eye_select:
+                selection_response = _request(
+                    session,
+                    "post",
+                    BARRETT_TORIC_URL,
+                    data=_eye_selection_payload(current_form_fields, eye_select),
+                )
+                selection_response.raise_for_status()
+                current_form_fields = _successful_form_fields(selection_response.text)
             payload = _calculate_payload(
                 current_form_fields,
                 eye_params if eye_select == "Rad1" else None,
