@@ -284,7 +284,7 @@ INDEX_PAGE = """
                         <div class="form-group"><label for="toricRightACD">ACD mm（可选）</label><input type="number" id="toricRightACD" value="3.00" step="0.01" min="0" max="6"></div>
                         <div class="form-group"><label for="toricRightRefraction">目标屈光度 D（可选）</label><input type="number" id="toricRightRefraction" value="0" step="0.01"></div>
                         <div class="form-group"><label for="toricRightSIA">切口 SIA (D)</label><input type="number" id="toricRightSIA" value="0" step="0.01" min="0" max="2"></div>
-                        <div class="form-group"><label for="toricRightIncision">切口位置 (°)</label><input type="number" id="toricRightIncision" value="0" step="1" min="0" max="360"></div>
+                        <div class="form-group"><label for="toricRightIncision">切口位置 (°)</label><input type="number" id="toricRightIncision" value="135" step="1" min="0" max="360"></div>
                         <div class="form-group"><label for="toricRightLT">晶体厚度 LT (mm)</label><input type="number" id="toricRightLT" step="0.01" min="2" max="8"></div>
                         <div class="form-group"><label for="toricRightWTW">WTW (mm)</label><input type="number" id="toricRightWTW" step="0.01" min="8" max="14"></div>
                     </div>
@@ -304,7 +304,7 @@ INDEX_PAGE = """
                         <div class="form-group"><label for="toricLeftACD">ACD mm（可选）</label><input type="number" id="toricLeftACD" value="3.00" step="0.01" min="0" max="6"></div>
                         <div class="form-group"><label for="toricLeftRefraction">目标屈光度 D（可选）</label><input type="number" id="toricLeftRefraction" value="0" step="0.01"></div>
                         <div class="form-group"><label for="toricLeftSIA">切口 SIA (D)</label><input type="number" id="toricLeftSIA" value="0" step="0.01" min="0" max="2"></div>
-                        <div class="form-group"><label for="toricLeftIncision">切口位置 (°)</label><input type="number" id="toricLeftIncision" value="0" step="1" min="0" max="360"></div>
+                        <div class="form-group"><label for="toricLeftIncision">切口位置 (°)</label><input type="number" id="toricLeftIncision" value="135" step="1" min="0" max="360"></div>
                         <div class="form-group"><label for="toricLeftLT">晶体厚度 LT (mm)</label><input type="number" id="toricLeftLT" step="0.01" min="2" max="8"></div>
                         <div class="form-group"><label for="toricLeftWTW">WTW (mm)</label><input type="number" id="toricLeftWTW" step="0.01" min="8" max="14"></div>
                     </div>

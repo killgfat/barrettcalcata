@@ -337,7 +337,7 @@ def get_openapi_spec():
                         "ACD": {"type": "number", "default": 3.0},
                         "target_refraction": {"type": "number", "default": 0},
                         "incision_sia": {"type": "number", "default": 0},
-                        "incision_location": {"type": "number", "default": 0},
+                        "incision_location": {"type": "number", "default": 135},
                         "lens_thickness": {
                             "type": "number",
                             "minimum": 2,

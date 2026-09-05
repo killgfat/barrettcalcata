@@ -178,6 +178,13 @@ def test_normalize_toric_eye_rejects_missing_geometry_and_out_of_range_axis():
         barrett_toric_calculate.normalize_toric_eye_params(invalid, "右眼")
 
 
+def test_normalize_toric_eye_defaults_incision_location_to_135():
+    eye = sample_eye()
+    eye.pop("IncisionLocation")
+    result = barrett_toric_calculate.normalize_toric_eye_params(eye, "右眼")
+    assert result["incision_location"] == 135.0
+
+
 def test_barrett_toric_calculate_formats_payload_and_returns_axis_image(monkeypatch):
     fake_session = FakeSession()
     monkeypatch.setattr(
@@ -238,6 +245,17 @@ def test_toric_payload_accepts_canonical_k_names(monkeypatch):
     assert payload["ctl00$MainContent$MeasuredAxis"] == "84.00"
     assert payload["ctl00$MainContent$MeasuredK0"] == "43.85"
     assert payload["ctl00$MainContent$MeasuredAxis0"] == "174.00"
+
+
+def test_toric_default_incision_angle_is_135_in_ui_and_openapi():
+    page = webui.get_webui_page()
+    assert 'id="toricRightIncision" value="135"' in page
+    assert 'id="toricLeftIncision" value="135"' in page
+    assert (
+        docs.get_openapi_spec()["components"]["schemas"]["ToricEye"]["properties"]
+        ["incision_location"]["default"]
+        == 135
+    )
 
 
 def test_current_toric_result_parser_reads_official_fields_and_tables():
