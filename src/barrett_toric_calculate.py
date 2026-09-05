@@ -752,6 +752,27 @@ def _request(session: requests.Session, method: str, url: str, **kwargs: Any) ->
         return getattr(session, method)(url, **kwargs)
 
 
+def _persist_response_cookies(
+    session: requests.Session, response: Any
+) -> None:
+    """Persist upstream cookies for runtimes with a limited Session jar."""
+    cookies = getattr(response, "cookies", None)
+    if cookies is None:
+        return
+    try:
+        for cookie in cookies:
+            session.cookies.set(
+                cookie.name,
+                cookie.value,
+                domain=getattr(cookie, "domain", None),
+                path=getattr(cookie, "path", None),
+            )
+    except (AttributeError, TypeError):
+        # Native requests already manages its cookie jar; this is only a
+        # compatibility guard for the Workers Python HTTP implementation.
+        return
+
+
 async def calculate_barrett_toric_iol(
     right_eye_params: dict[str, Any] | None = None,
     left_eye_params: dict[str, Any] | None = None,
@@ -794,6 +815,7 @@ async def calculate_barrett_toric_iol(
     try:
         response = _request(session, "get", BARRETT_TORIC_URL)
         response.raise_for_status()
+        _persist_response_cookies(session, response)
         if "Just a moment" in response.text or "cf-chl" in response.text:
             raise RuntimeError("Barrett Toric 官方页面当前需要完成 Cloudflare 验证")
         form_fields = _successful_form_fields(response.text)
@@ -817,6 +839,7 @@ async def calculate_barrett_toric_iol(
                     data=_eye_selection_payload(current_form_fields, eye_select),
                 )
                 selection_response.raise_for_status()
+                _persist_response_cookies(session, selection_response)
                 current_form_fields = _successful_form_fields(selection_response.text)
             payload = _calculate_payload(
                 current_form_fields,
@@ -833,6 +856,7 @@ async def calculate_barrett_toric_iol(
                 session, "post", BARRETT_TORIC_URL, data=payload
             )
             calculation_response.raise_for_status()
+            _persist_response_cookies(session, calculation_response)
             current_form_fields = _successful_form_fields(calculation_response.text)
             eye_result = parse_toric_results(
                 calculation_response.text, selected_eye=eye_name
@@ -861,6 +885,7 @@ async def calculate_barrett_toric_iol(
                     session, "post", BARRETT_TORIC_URL, data=tab_payload
                 )
                 tab_response.raise_for_status()
+                _persist_response_cookies(session, tab_response)
                 current_form_fields = _successful_form_fields(tab_response.text)
                 eye_result = parse_toric_results(
                     tab_response.text, selected_eye=eye_name
