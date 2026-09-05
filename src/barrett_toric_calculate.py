@@ -701,7 +701,6 @@ def _calculate_payload(
         "ctl00$MainContent$Koptional1": "",
         "ctl00$MainContent$Koptional2": "",
         "ctl00$MainContent$IOLPower": "",
-        "ctl00$MainContent$RadioButtonList3": "1",
         "ctl00$MainContent$DoctorName": "",
         "ctl00$MainContent$PatientName": patient_name,
         "ctl00$MainContent$PatientNo": "",
