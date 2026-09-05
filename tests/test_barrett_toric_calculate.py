@@ -203,8 +203,8 @@ def test_barrett_toric_calculate_formats_payload_and_returns_axis_image(monkeypa
     assert payload["ctl00$MainContent$MeasuredAxis0"] == "174.00"
     assert payload["ctl00$MainContent$AxLength"] == "24.43"
     assert payload["ctl00$MainContent$Eye Select"] == "Rad1"
-    assert "ctl00$MainContent$RadioButtonList1" not in payload
-    assert "ctl00$MainContent$RadioButtonList2" not in payload
+    assert payload["ctl00$MainContent$RadioButtonList1"] == "337.5"
+    assert payload["ctl00$MainContent$RadioButtonList2"] == "-1"
     assert "ctl00$MainContent$Cylinder" not in payload
     assert result["right_eye"]["iol_options"][0]["toric_power"] == "T5"
     assert result["right_eye"]["toric_axis"] == 175
@@ -300,7 +300,7 @@ def test_toric_tab_postback_matches_web_forms_successful_controls():
     assert payload["ctl00$MainContent$LensFactor"] == " 2.04"
     assert payload["ctl00$MainContent$NetCornealAstig"].startswith("Net Astigmatism")
     assert "ctl00$MainContent$Button1" not in payload
-    assert "ctl00$MainContent$RadioButtonList1" not in payload
+    assert payload["ctl00$MainContent$RadioButtonList1"] == "337.5"
 
 
 @pytest.mark.asyncio

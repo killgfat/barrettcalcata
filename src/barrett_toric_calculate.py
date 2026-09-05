@@ -17,7 +17,11 @@ from urllib.parse import quote
 import requests
 from bs4 import BeautifulSoup
 
-from barrett_config import DEFAULT_K_INDEX, normalize_k_index
+from barrett_config import (
+    DEFAULT_K_INDEX,
+    normalize_k_index,
+    to_barrett_k_index_value,
+)
 
 BARRETT_TORIC_URL = "https://calc.apacrs.org/toric_calculator20/Toric%20Calculator.aspx"
 BARRETT_TORIC_IMAGE_URL = (
@@ -700,6 +704,12 @@ def _calculate_payload(
         "ctl00$MainContent$Aconstant": _format(a_constant),
         "ctl00$MainContent$IOLModel": iol_model,
         "ctl00$MainContent$Eye Select": eye_select,
+        # Although the inputs are rendered disabled, the official page's
+        # client-side form submission includes these selected radio values.
+        "ctl00$MainContent$RadioButtonList1": to_barrett_k_index_value(k_index),
+        "ctl00$MainContent$RadioButtonList2": {
+            "+ve": "1", "+": "1", "-ve": "-1", "-": "-1"
+        }.get(cylinder_mode, cylinder_mode),
     })
     payload.setdefault("ctl00$MainContent$LensFactor", " 2.04")
     if event_target:
