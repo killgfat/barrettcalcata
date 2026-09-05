@@ -715,7 +715,8 @@ def _calculate_payload(
             "+ve": "1", "+": "1", "-ve": "-1", "-": "-1"
         }.get(cylinder_mode, cylinder_mode),
     })
-    payload.setdefault("ctl00$MainContent$LensFactor", " 2.04")
+    if not payload.get("ctl00$MainContent$LensFactor", "").strip():
+        payload["ctl00$MainContent$LensFactor"] = " 2.04"
     if event_target:
         payload.pop("ctl00$MainContent$Button1", None)
     else:
