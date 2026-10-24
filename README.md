@@ -35,14 +35,26 @@ https://barrettcalcata.killgfat.com
     uv run ruff check src tests
     uv run ruff format --check src tests
 
-### 部署
+## 快速部署
 
-    # 仅 AI 识图需要；密钥不要写入源码
+### 一键部署（推荐）
+
+[![Deploy to Cloudflare Workers](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/killgfat/barrettcalcata)
+
+> 部署后在 Cloudflare 控制台的高级选项中配置 `OPENAI_API_KEY` 机密变量。
+
+### 手动部署
+
+    # 安装依赖
+    uv sync
+
+    # 设置 API 密钥（可选，仅 AI 识图功能需要）
     npx wrangler secret put OPENAI_API_KEY
 
+    # 部署
     npm run deploy
 
-默认使用 Git 跟踪的 wrangler.jsonc。私有 Cloudflare 配置和密钥不应提交到仓库。
+默认使用 Git 跟踪的 `wrangler.jsonc`。私有 Cloudflare 配置和密钥不应提交到仓库。
 
 ## 使用方式
 
