@@ -38,6 +38,10 @@ INDEX_PAGE = """
         .mode-switch-hint { max-width: 720px; margin: 8px auto 0; text-align: center; }
         .formula-summary { margin-bottom: 15px; padding: 10px 14px; border: 1px solid #cbd5e1; border-radius: 8px; background: #f1f5f9; color: #0f172a; font-size: 0.95em; white-space: pre-line; line-height: 1.55; }
         .formula-input-hint { max-width: 760px; margin: 6px auto 0; text-align: center; }
+        .haigis-constants { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px; margin-top: 8px; }
+        .haigis-constants-label { color: #475569; font-size: 14px; font-weight: bold; }
+        .haigis-constants input { width: 88px; padding: 6px 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; }
+        .haigis-constants-note { color: #64748b; font-size: 12px; }
         .mode-button { flex: 1; min-height: 44px; border: 0; border-radius: 6px; background: transparent; color: #475569; font-size: 15px; font-weight: bold; cursor: pointer; transition: background 0.2s, color 0.2s, box-shadow 0.2s; }
         .mode-button:hover { color: #0f172a; }
         .mode-button.active { background: white; color: #0f766e; box-shadow: 0 1px 4px rgba(15, 23, 42, 0.14); }
@@ -154,6 +158,13 @@ INDEX_PAGE = """
             </div>
             <div id="executionModeHint" class="param-hint mode-switch-hint"></div>
             <div id="formulaInputHint" class="param-hint formula-input-hint"></div>
+            <div class="haigis-constants" id="haigisConstants" hidden>
+                <span class="haigis-constants-label">Haigis 常数</span>
+                <input type="number" id="haigisA0" step="0.001" placeholder="a0">
+                <input type="number" id="haigisA1" step="0.001" placeholder="a1">
+                <input type="number" id="haigisA2" step="0.001" placeholder="a2">
+                <span class="haigis-constants-note">照抄 IOL Master 的 a0/a1/a2；不填则用 A 常数近似</span>
+            </div>
         </div>
 
         <div class="main-content">
@@ -1024,15 +1035,21 @@ INDEX_PAGE = """
 
                 const formula = selectedFormula;
                 const executionMode = resolveExecutionMode();
+                const haigisConstantsValue = formula === 'haigis' ? readHaigisConstants() : null;
+
+                const payload = {
+                    ...formData,
+                    formula: formula,
+                    mode: executionMode
+                };
+                if (haigisConstantsValue) {
+                    payload.haigis_constants = haigisConstantsValue;
+                }
 
                 const response = await fetch('/api/calculate', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        ...formData,
-                        formula: formula,
-                        mode: executionMode
-                    })
+                    body: JSON.stringify(payload)
                 });
 
                 const result = await response.json();
@@ -1067,6 +1084,10 @@ INDEX_PAGE = """
         const executionModeControls = document.getElementById('executionModeControls');
         const executionModeSwitch = document.getElementById('executionModeSwitch');
         const executionModeState = document.getElementById('executionModeState');
+        const haigisConstants = document.getElementById('haigisConstants');
+        const haigisA0 = document.getElementById('haigisA0');
+        const haigisA1 = document.getElementById('haigisA1');
+        const haigisA2 = document.getElementById('haigisA2');
         const executionModeHint = document.getElementById('executionModeHint');
         const formulaInputHint = document.getElementById('formulaInputHint');
 
@@ -1080,7 +1101,7 @@ INDEX_PAGE = """
             barrett: 'Barrett 本地/在线均使用 ACD（可选）；本地还使用 LT/WTW（可选），缺失时会警告并降置信度。',
             srkt: 'SRK/T 由 A 常数和 K 自行推导 ACD；填写的 ACD、LT、WTW 会被忽略。',
             hoffer_q: 'Hoffer Q 由 A 常数和 AL/K 推导 pACD；填写的 ACD、LT、WTW 会被忽略。',
-            haigis: 'Haigis 使用实测 ACD；留空时默认 3.20 mm 并降低置信度；LT/WTW 会被忽略。'
+            haigis: 'Haigis 使用实测 ACD；a0/a1/a2 请照抄 IOL Master（不填则用 A 常数近似，可能差 1–3 D）；LT/WTW 会被忽略。'
         };
 
         let selectedFormula = 'barrett';
@@ -1114,6 +1135,7 @@ INDEX_PAGE = """
                 ? EXECUTION_MODE_HINTS[resolveExecutionMode()]
                 : LOCAL_FORMULA_HINT;
             formulaInputHint.textContent = FORMULA_INPUT_HINTS[selectedFormula] || '';
+            haigisConstants.hidden = selectedFormula !== 'haigis';
         }
 
         function selectFormula(name) {
@@ -1133,6 +1155,14 @@ INDEX_PAGE = """
             syncFormulaControls();
         }
 
+        function readHaigisConstants() {
+            const a0 = parseFloat(haigisA0.value);
+            const a1 = parseFloat(haigisA1.value);
+            const a2 = parseFloat(haigisA2.value);
+            if (![a0, a1, a2].every(Number.isFinite)) return null;
+            return {a0: a0, a1: a1, a2: a2};
+        }
+
         function setCalculationMode(mode) {
             const isToric = mode === 'toric';
             sphericalModeButton.classList.toggle('active', !isToric);
@@ -1148,6 +1178,7 @@ INDEX_PAGE = """
             formulaSwitch.hidden = isToric;
             executionModeHint.hidden = isToric;
             formulaInputHint.hidden = isToric;
+            haigisConstants.hidden = isToric;
             if (isToric) {
                 executionModeControls.hidden = true;
             }
@@ -1420,17 +1451,22 @@ INDEX_PAGE = """
             const card = document.createElement('div');
             card.className = 'result-card';
 
+            // 统一按晶体度数从低到高显示，避免不同公式返回顺序不一致
+            const sortedOptions = (eyeData.iol_options || []).slice().sort(
+                (a, b) => parseFloat(a.iol_power) - parseFloat(b.iol_power)
+            );
+
             // 根据目标屈光度找到最接近的晶体度数
             let closestOption = null;
             let minDiff = Infinity;
             
             // 首先重置所有选项的推荐状态
-            eyeData.iol_options.forEach(option => {
+            sortedOptions.forEach(option => {
                 option.recommended = false;
             });
             
             // 找到最接近目标屈光度的选项
-            eyeData.iol_options.forEach(option => {
+            sortedOptions.forEach(option => {
                 const refractionValue = parseFloat(option.refraction);
                 const diff = Math.abs(refractionValue - targetRefraction);
                 if (diff < minDiff) {
@@ -1448,7 +1484,7 @@ INDEX_PAGE = """
             tableHTML += '<table class="result-table">';
             tableHTML += '<thead><tr><th>IOL度数</th><th>预期屈光度</th><th>推荐</th></tr></thead><tbody>';
 
-            eyeData.iol_options.forEach(option => {
+            sortedOptions.forEach(option => {
                 const rowClass = option.recommended ? 'recommended' : '';
                 tableHTML += '<tr class="' + rowClass + '">';
                 tableHTML += '<td>' + option.iol_power + '</td>';

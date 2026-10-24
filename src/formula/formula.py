@@ -194,6 +194,7 @@ def _online_used_inputs(eye, request):
 def _build_eye_result(formula, eye, request, solved):
     """把一个公式的原始结果映射为 API 的单眼结构。"""
     predicted = solved["predicted_refraction"]
+    iol_options = sorted(solved["iol_options"], key=lambda row: float(row["iol_power"]))
     caps = CAPABILITIES[formula]
     ignored_inputs = list(caps.ignored_inputs)
     if formula == "haigis" and request.haigis_constants is not None:
@@ -206,7 +207,7 @@ def _build_eye_result(formula, eye, request, solved):
         ),
         "prediction": "offline",
         "constants": solved["constants_text"],
-        "iol_options": solved["iol_options"],
+        "iol_options": iol_options,
         "recommended_power": solved["iol_power_text"],
         "predicted_refraction": (
             round(predicted, 2) if math.isfinite(predicted) else None

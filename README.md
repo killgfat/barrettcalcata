@@ -201,6 +201,9 @@ PubMed / Crossref / Wiley 目录中均**无法检索**，因此代码与文档�
 优化三常数。若已在自有数据上优化，可在请求中传
 `haigis_constants: {a0, a1, a2}`；此时不再由 A 常数推导 a0，`a_constant`
 会出现在 `ignored_inputs` 中，实际使用的 a0/a1/a2 记录在 `used_inputs`。
+WebUI 在 Haigis 模式下也会显示 a0/a1/a2 输入框，应直接照抄 IOL Master 使用的
+晶体专属优化常数。IOL Master 的 Haigis 常数随晶体型号差异很大，仅用 A 常数
+推导的 a0 与 IOL Master 结果相差 1–3 D 是常见现象；未填写时结果会标记低置信度。
 
 ### 5. 统一免责声明
 

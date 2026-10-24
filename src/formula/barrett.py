@@ -572,6 +572,8 @@ def build_iol_table(
                 "recommended": False,
             }
         )
+    # 统一按晶体度数从低到高返回，避免不同公式顺序不一致。
+    rows.sort(key=lambda row: float(row["iol_power"]))
     # 推荐档 = 预测屈光度最接近目标值的一档（与 Web UI 逻辑一致）。
     target_value = _as_float(target, "target_refraction")
     best = None

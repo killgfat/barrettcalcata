@@ -181,6 +181,11 @@ def calculate(
         acd_value = as_float(acd, "ACD")
 
     a0, a1, a2, custom = _resolve_constants(constants, a_value)
+    if not custom:
+        warnings.append(
+            "未提供晶体专属 a0/a1/a2，a0 由 A 常数近似；"
+            "与 IOL Master 的 Haigis 结果可能相差 1–3 D"
+        )
     elp = _elp(al_value, acd_value, a0, a1, a2)
     k_haigis = _haigis_k(k_ref)
     exact_power = _power(

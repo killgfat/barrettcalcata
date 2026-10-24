@@ -68,6 +68,16 @@ def test_execution_mode_hint_wording_is_accurate():
     assert "本地实现，基于公开发表公式；不保证准确性" in page
 
 
+def test_haigis_constants_inputs_exist_and_are_optional():
+    page = get_page()
+
+    assert 'class="haigis-constants" id="haigisConstants" hidden' in page
+    for field in ("a0", "a1", "a2"):
+        assert 'id="haigisA' + field[-1] + '"' in page
+    assert "readHaigisConstants" in page
+    assert "payload.haigis_constants" in page
+
+
 def test_formula_specific_input_hints_exist():
     page = get_page()
 
@@ -94,6 +104,8 @@ def test_result_summary_shows_confidence_constants_and_input_usage():
     assert "置信度" in page
     assert "常数：" in page
     assert "警告：" in page
+    assert "sortedOptions" in page
+    assert "parseFloat(a.iol_power) - parseFloat(b.iol_power)" in page
 
 
 def test_calculate_payload_sends_formula_and_execution_mode():

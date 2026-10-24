@@ -55,6 +55,8 @@ def test_formula_returns_unified_nine_row_result(name):
 
     options = result["iol_options"]
     assert len(options) == 9
+    powers = [float(row["iol_power"]) for row in options]
+    assert powers == sorted(powers)
     recommended = [row for row in options if row["recommended"]]
     assert len(recommended) == 1
     assert float(recommended[0]["iol_power"]) == result["iol_power"]
@@ -173,6 +175,13 @@ def test_haigis_frozen_reference_value():
     # Dc = 331.5 / r（Haigis 的 1.3315 约定），不是直接用 1.3375 的 K。
     assert result["iol_power_exact"] == pytest.approx(21.3347964482, abs=1e-6)
     assert result["elp"] == pytest.approx(5.3443, abs=1e-3)
+
+
+def test_haigis_without_custom_constants_warns_about_iol_master_difference():
+    result = formulas.haigis.calculate(REFERENCE_AL, REFERENCE_K, acd=3.2)
+
+    assert result["low_confidence"] is True
+    assert any("IOL Master" in warning for warning in result["warnings"])
 
 
 def test_haigis_without_acd_warns_and_downgrades_confidence():

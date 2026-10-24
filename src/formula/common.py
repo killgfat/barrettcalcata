@@ -250,6 +250,7 @@ def build_table(
 
     if not rows:
         raise ValueError("无法生成 IOL 度数表：所有档位的预测屈光度都不可用")
+    rows.sort(key=lambda row: float(row["iol_power"]))
     best_index = min(
         range(len(rows)),
         key=lambda index: abs(float(rows[index]["refraction"]) - target_value),

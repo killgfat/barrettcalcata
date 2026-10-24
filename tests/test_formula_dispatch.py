@@ -74,6 +74,8 @@ def test_offline_output_contract_and_provided_inputs():
     assert eye["used_inputs"]["WTW"] == 11.9
     assert eye["ignored_inputs"] == []
     assert all(row["optic"] is None for row in eye["iol_options"])
+    powers = [float(row["iol_power"]) for row in eye["iol_options"]]
+    assert powers == sorted(powers)
 
 
 def test_srkt_marks_measured_acd_as_ignored():
@@ -97,6 +99,15 @@ def test_hoffer_q_marks_measured_acd_as_ignored():
     eye = data["right_eye"]
     assert eye["used_inputs"]["ACD"] is None
     assert eye["ignored_inputs"] == ["ACD", "LenThickness", "WTW"]
+
+
+def test_all_formula_tables_are_ascending_by_iol_power():
+    for formula_name in formula.FORMULA_NAMES:
+        body = reference_body()
+        body["formula"] = formula_name
+        eye = run_calculation(body)["right_eye"]
+        powers = [float(row["iol_power"]) for row in eye["iol_options"]]
+        assert powers == sorted(powers)
 
 
 def test_haigis_custom_constants_override_a_constant():
