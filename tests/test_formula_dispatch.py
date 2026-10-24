@@ -16,6 +16,7 @@ if str(SRC_DIR) not in sys.path:
 import formula
 from formula.types import (
     CalculationRequest,
+    InputValidationError,
     ToricCalculationRequest,
     UnsupportedModeError,
 )
@@ -96,6 +97,35 @@ def test_hoffer_q_marks_measured_acd_as_ignored():
     eye = data["right_eye"]
     assert eye["used_inputs"]["ACD"] is None
     assert eye["ignored_inputs"] == ["ACD", "LenThickness", "WTW"]
+
+
+def test_haigis_custom_constants_override_a_constant():
+    body = {
+        "right_eye": {"AL": 23.5, "K1": 43.5, "K2": 44.0, "ACD": 3.2},
+        "formula": "haigis",
+        "a_constant": 118.7,
+        "haigis_constants": {"a0": 1.80, "a1": 0.40, "a2": 0.10},
+    }
+    data = run_calculation(body)
+    eye = data["right_eye"]
+
+    assert eye["used_inputs"]["a0"] == 1.8
+    assert eye["used_inputs"]["a1"] == 0.4
+    assert eye["used_inputs"]["a2"] == 0.1
+    assert eye["used_inputs"]["a_constant"] is None
+    assert "a_constant" in eye["ignored_inputs"]
+    assert "自定义 a0" in eye["constants"]
+
+
+def test_haigis_constants_are_rejected_for_other_formulas():
+    with pytest.raises(InputValidationError, match="haigis_constants"):
+        CalculationRequest.from_mapping(
+            {
+                "right_eye": {"AL": 23.5, "K1": 43.5, "K2": 44.0},
+                "formula": "srkt",
+                "haigis_constants": {"a0": 1.8, "a1": 0.4, "a2": 0.1},
+            }
+        )
 
 
 def test_haigis_missing_acd_uses_documented_default():

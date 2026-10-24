@@ -206,6 +206,19 @@ def get_openapi_spec():
                                             "description": "本地 IOL 候选表步长（D）。",
                                             "example": 0.5,
                                         },
+                                        "haigis_constants": {
+                                            "type": "object",
+                                            "description": (
+                                                "仅 formula=haigis 可用。提供优化后的 a0/a1/a2 时，"
+                                                "不再由 A 常数推导 a0；a_constant 会被忽略。"
+                                            ),
+                                            "properties": {
+                                                "a0": {"type": "number"},
+                                                "a1": {"type": "number"},
+                                                "a2": {"type": "number"},
+                                            },
+                                            "required": ["a0", "a1", "a2"],
+                                        },
                                     },
                                 },
                                 "example": {

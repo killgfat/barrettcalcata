@@ -74,7 +74,9 @@ CAPABILITIES = {
         required_inputs=("AL", "K1", "K2"),
         optional_inputs=("ACD",),
         ignored_inputs=("LenThickness", "WTW"),
-        constants="A-constant（推导近似 a0）；a1=0.40，a2=0.10",
+        constants=(
+            "A-constant（推导近似 a0）；a1=0.40，a2=0.10；或 haigis_constants(a0/a1/a2)"
+        ),
     ),
 }
 
@@ -158,6 +160,11 @@ def _used_inputs(formula, eye, request, solved):
                 "WTW": None,
             }
         )
+        if request.haigis_constants is not None:
+            used["a_constant"] = None
+            used["a0"] = request.haigis_constants.a0
+            used["a1"] = request.haigis_constants.a1
+            used["a2"] = request.haigis_constants.a2
     else:
         used.update({"ACD": None, "LenThickness": None, "WTW": None})
     return used
@@ -188,6 +195,9 @@ def _build_eye_result(formula, eye, request, solved):
     """把一个公式的原始结果映射为 API 的单眼结构。"""
     predicted = solved["predicted_refraction"]
     caps = CAPABILITIES[formula]
+    ignored_inputs = list(caps.ignored_inputs)
+    if formula == "haigis" and request.haigis_constants is not None:
+        ignored_inputs.append("a_constant")
     return {
         "biometry": (
             f"AL {eye.al:.2f} mm; "
@@ -207,7 +217,7 @@ def _build_eye_result(formula, eye, request, solved):
         "warnings": solved["warnings"],
         "provided_inputs": eye.provided_inputs(),
         "used_inputs": _used_inputs(formula, eye, request, solved),
-        "ignored_inputs": list(caps.ignored_inputs),
+        "ignored_inputs": ignored_inputs,
     }
 
 
@@ -228,16 +238,21 @@ def _calculate_offline(request, formula):
             wtw=eye.wtw,
             target=eye.target_refraction,
         )
+        calculate_kwargs = {
+            "target": eye.target_refraction,
+            "a_constant": request.a_constant,
+            "k_index": request.k_index,
+            "acd": eye.acd,
+            "lt": eye.lt,
+            "wtw": eye.wtw,
+            "step": request.step,
+        }
+        if formula == "haigis":
+            calculate_kwargs["constants"] = request.haigis_constants
         solved = _MODULES[formula].calculate(
             eye.al,
             eye.k_mean,
-            target=eye.target_refraction,
-            a_constant=request.a_constant,
-            k_index=request.k_index,
-            acd=eye.acd,
-            lt=eye.lt,
-            wtw=eye.wtw,
-            step=request.step,
+            **calculate_kwargs,
         )
         solved_eyes[eye_name] = solved
         eyes[eye_name] = _build_eye_result(formula, eye, request, solved)

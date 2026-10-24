@@ -125,6 +125,33 @@ class EyeInput:
 
 
 @dataclass(frozen=True)
+class HaigisConstants:
+    """Haigis 优化后的三常数；提供后不再用 A 常数推导 a0。"""
+
+    a0: float
+    a1: float
+    a2: float
+
+    @classmethod
+    def from_mapping(cls, value):
+        if not isinstance(value, dict):
+            raise InputValidationError("haigis_constants 必须是JSON对象")
+        try:
+            a0 = common.as_float(value.get("a0"), "haigis_constants.a0")
+            a1 = common.as_float(value.get("a1"), "haigis_constants.a1")
+            a2 = common.as_float(value.get("a2"), "haigis_constants.a2")
+        except ValueError as exc:
+            raise InputValidationError(str(exc)) from exc
+        if not -10.0 <= a0 <= 10.0:
+            raise InputValidationError("haigis_constants.a0 超出合理范围 -10~10")
+        if not -2.0 <= a1 <= 2.0:
+            raise InputValidationError("haigis_constants.a1 超出合理范围 -2~2")
+        if not -1.0 <= a2 <= 1.0:
+            raise InputValidationError("haigis_constants.a2 超出合理范围 -1~1")
+        return cls(a0=a0, a1=a1, a2=a2)
+
+
+@dataclass(frozen=True)
 class CalculationRequest:
     """普通（非散光）IOL 计算请求。"""
 
@@ -137,6 +164,7 @@ class CalculationRequest:
     step: float = 0.5
     patient_name: str | None = None
     iol_model: str | None = None
+    haigis_constants: HaigisConstants | None = None
 
     @classmethod
     def from_mapping(cls, body):
@@ -161,6 +189,12 @@ class CalculationRequest:
 
         patient_name = body.get("patient_name")
         iol_model = body.get("iol_model")
+        raw_constants = body.get("haigis_constants")
+        haigis_constants = None
+        if raw_constants not in (None, ""):
+            if formula != "haigis":
+                raise InputValidationError("haigis_constants 只适用于 formula=haigis")
+            haigis_constants = HaigisConstants.from_mapping(raw_constants)
         return cls(
             right_eye=right_eye,
             left_eye=left_eye,
@@ -171,6 +205,7 @@ class CalculationRequest:
             step=common.parse_step(body.get("step", 0.5)),
             patient_name=str(patient_name) if patient_name is not None else None,
             iol_model=str(iol_model) if iol_model is not None else None,
+            haigis_constants=haigis_constants,
         )
 
 
@@ -241,6 +276,7 @@ __all__ = [
     "EyeInput",
     "FormulaCapabilities",
     "FormulaError",
+    "HaigisConstants",
     "InputValidationError",
     "ToricCalculationRequest",
     "UnsupportedFormulaError",

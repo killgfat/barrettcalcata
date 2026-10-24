@@ -92,9 +92,25 @@ def _haigis_k(k_reference):
     return k_reference * HAIGIS_KERATOMETRY_MM / REFERENCE_KERATOMETRY_MM
 
 
-def _elp(al, acd, a0):
+def _resolve_constants(constants, a_constant):
+    """返回 (a0, a1, a2, 是否为自定义常数)。"""
+    if constants is None:
+        return _a0(a_constant), A1, A2, False
+
+    if isinstance(constants, dict):
+        a0 = as_float(constants.get("a0"), "haigis_constants.a0")
+        a1 = as_float(constants.get("a1"), "haigis_constants.a1")
+        a2 = as_float(constants.get("a2"), "haigis_constants.a2")
+    else:
+        a0 = as_float(getattr(constants, "a0", None), "haigis_constants.a0")
+        a1 = as_float(getattr(constants, "a1", None), "haigis_constants.a1")
+        a2 = as_float(getattr(constants, "a2", None), "haigis_constants.a2")
+    return a0, a1, a2, True
+
+
+def _elp(al, acd, a0, a1=A1, a2=A2):
     """Haigis 的有效晶体位置 d（mm，自角膜顶点起算）。"""
-    return a0 + A1 * acd + A2 * al
+    return a0 + a1 * acd + a2 * al
 
 
 def _power(al, elp, k_target):
@@ -114,6 +130,7 @@ def refraction_for_power(
     a_constant=DEFAULT_A_CONSTANT,
     k_index=1.3375,
     acd=None,
+    constants=None,
 ):
     """给定 IOL 度数，返回 Haigis 预测屈光度（D，眼镜平面）。
 
@@ -123,7 +140,8 @@ def refraction_for_power(
     k_ref = normalize_k_to_reference(k_value, k_index)
     a_value = as_float(a_constant, "a_constant")
     acd_value = DEFAULT_ACD if acd is None else as_float(acd, "ACD")
-    elp = _elp(al_value, acd_value, _a0(a_value))
+    a0, a1, a2, _ = _resolve_constants(constants, a_value)
+    elp = _elp(al_value, acd_value, a0, a1, a2)
     return _invert_vergence_target(
         al_value,
         elp,
@@ -142,6 +160,7 @@ def calculate(
     lt=None,
     wtw=None,
     step=0.5,
+    constants=None,
 ):
     """按统一返回结构计算 Haigis。
 
@@ -161,8 +180,8 @@ def calculate(
     else:
         acd_value = as_float(acd, "ACD")
 
-    a0 = _a0(a_value)
-    elp = _elp(al_value, acd_value, a0)
+    a0, a1, a2, custom = _resolve_constants(constants, a_value)
+    elp = _elp(al_value, acd_value, a0, a1, a2)
     k_haigis = _haigis_k(k_ref)
     exact_power = _power(
         al_value,
@@ -185,8 +204,15 @@ def calculate(
         a_constant=a_value,
         lens_factor=None,
         constants_text=(
-            f"A={a_value:.2f}; a0={a0:.2f}; a1={A1:.2f}; a2={A2:.2f}; "
-            f"ACD={acd_value:.2f} mm; K(1.3315)={k_haigis:.2f} D"
+            (
+                f"自定义 a0={a0:.4f}; a1={a1:.4f}; a2={a2:.4f}; "
+                f"ACD={acd_value:.2f} mm; K(1.3315)={k_haigis:.2f} D"
+            )
+            if custom
+            else (
+                f"A={a_value:.2f}; a0={a0:.2f}; a1={a1:.2f}; a2={a2:.2f}; "
+                f"ACD={acd_value:.2f} mm; K(1.3315)={k_haigis:.2f} D"
+            )
         ),
         model=MODEL,
         model_note=MODEL_NOTE,

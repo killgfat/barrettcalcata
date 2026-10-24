@@ -1,6 +1,6 @@
 from urllib.parse import urlparse
 
-from workers import WorkerEntrypoint, Response
+from workers import Response, WorkerEntrypoint
 
 from api import APIHandler
 from docs import get_openapi_json, get_swagger_ui_html
