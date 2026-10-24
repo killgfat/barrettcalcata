@@ -30,7 +30,8 @@ INDEX_PAGE = """
         .formula-field select { padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; background: #fff; color: #0f172a; }
         .formula-field select:focus { outline: none; border-color: #007bff; box-shadow: 0 0 5px rgba(0,123,255,0.3); }
         .mode-switch-hint { max-width: 720px; margin: 8px auto 0; text-align: center; }
-        .formula-summary { margin-bottom: 15px; padding: 10px 14px; border: 1px solid #cbd5e1; border-radius: 8px; background: #f1f5f9; color: #0f172a; font-size: 0.95em; }
+        .formula-summary { margin-bottom: 15px; padding: 10px 14px; border: 1px solid #cbd5e1; border-radius: 8px; background: #f1f5f9; color: #0f172a; font-size: 0.95em; white-space: pre-line; line-height: 1.55; }
+        .formula-input-hint { max-width: 760px; margin: 6px auto 0; text-align: center; }
         .mode-button { flex: 1; min-height: 44px; border: 0; border-radius: 6px; background: transparent; color: #475569; font-size: 15px; font-weight: bold; cursor: pointer; transition: background 0.2s, color 0.2s, box-shadow 0.2s; }
         .mode-button:hover { color: #0f172a; }
         .mode-button.active { background: white; color: #0f766e; box-shadow: 0 1px 4px rgba(15, 23, 42, 0.14); }
@@ -153,6 +154,7 @@ INDEX_PAGE = """
                 </div>
             </div>
             <div id="executionModeHint" class="param-hint mode-switch-hint"></div>
+            <div id="formulaInputHint" class="param-hint formula-input-hint"></div>
         </div>
 
         <div class="main-content">
@@ -231,7 +233,7 @@ INDEX_PAGE = """
                             </div>
                             <div class="form-group">
                                 <label for="rightACD">ACD mm（可选）</label>
-                                <input type="number" id="rightACD" name="rightACD" step="0.01" min="0" max="6" placeholder="默认3.00">
+                                <input type="number" id="rightACD" name="rightACD" step="0.01" min="0.5" max="8" placeholder="留空由公式决定">
                             </div>
                             <div class="form-group">
                                 <label for="rightRefraction">目标屈光度 D（可选）</label>
@@ -267,7 +269,7 @@ INDEX_PAGE = """
                             </div>
                             <div class="form-group">
                                 <label for="leftACD">ACD mm（可选）</label>
-                                <input type="number" id="leftACD" name="leftACD" step="0.01" min="0" max="6" placeholder="默认3.00">
+                                <input type="number" id="leftACD" name="leftACD" step="0.01" min="0.5" max="8" placeholder="留空由公式决定">
                             </div>
                             <div class="form-group">
                                 <label for="leftRefraction">目标屈光度 D（可选）</label>
@@ -1066,6 +1068,7 @@ INDEX_PAGE = """
         const executionModeField = document.getElementById('executionModeField');
         const executionModeSelect = document.getElementById('executionModeSelect');
         const executionModeHint = document.getElementById('executionModeHint');
+        const formulaInputHint = document.getElementById('formulaInputHint');
 
         // Barrett 支持在线/本地，其他公式固定本地执行
         const EXECUTION_MODE_HINTS = {
@@ -1073,6 +1076,12 @@ INDEX_PAGE = """
             offline: '本地近似实现（Gaussian 聚散度 + 公开校准网格，非官方公式复刻），不保证准确性'
         };
         const LOCAL_FORMULA_HINT = '本地实现，基于公开发表公式；不保证准确性';
+        const FORMULA_INPUT_HINTS = {
+            barrett: 'Barrett 本地/在线均使用 ACD（可选）；本地还使用 LT/WTW（可选），缺失时会警告并降置信度。',
+            srkt: 'SRK/T 由 A 常数和 K 自行推导 ACD；填写的 ACD、LT、WTW 会被忽略。',
+            hoffer_q: 'Hoffer Q 由 A 常数和 AL/K 推导 pACD；填写的 ACD、LT、WTW 会被忽略。',
+            haigis: 'Haigis 使用实测 ACD；留空时默认 3.20 mm 并降低置信度；LT/WTW 会被忽略。'
+        };
 
         function resolveExecutionMode() {
             const formula = formulaSelect.value;
@@ -1088,6 +1097,7 @@ INDEX_PAGE = """
             executionModeHint.textContent = isBarrett
                 ? EXECUTION_MODE_HINTS[resolveExecutionMode()]
                 : LOCAL_FORMULA_HINT;
+            formulaInputHint.textContent = FORMULA_INPUT_HINTS[formulaSelect.value] || '';
         }
 
         function setCalculationMode(mode) {
@@ -1104,6 +1114,7 @@ INDEX_PAGE = """
             toricResultsSection.hidden = !isToric;
             formulaControls.hidden = isToric;
             executionModeHint.hidden = isToric;
+            formulaInputHint.hidden = isToric;
 
             if (isToric) {
                 validateToricForm();
@@ -1289,12 +1300,45 @@ INDEX_PAGE = """
                 '</div></div>';
         }
 
+        function formatUsedInputs(used) {
+            if (!used) return '';
+            const parts = [];
+            const labels = [['AL', 'AL'], ['K', 'K'], ['ACD', 'ACD'], ['LenThickness', 'LT'], ['WTW', 'WTW'], ['Refraction', '目标']];
+            labels.forEach((item) => {
+                const key = item[0];
+                const label = item[1];
+                if (used[key] === null || used[key] === undefined) return;
+                let value = used[key];
+                if (key === 'ACD' && used.ACD_defaulted) value += '(默认)';
+                parts.push(label + '=' + value);
+            });
+            if (used.a_constant !== null && used.a_constant !== undefined) parts.push('A=' + used.a_constant);
+            if (used.a0 !== null && used.a0 !== undefined) parts.push('a0=' + used.a0);
+            if (used.a1 !== null && used.a1 !== undefined) parts.push('a1=' + used.a1);
+            if (used.a2 !== null && used.a2 !== undefined) parts.push('a2=' + used.a2);
+            return parts.join(', ');
+        }
+
         function createFormulaSummary(data) {
             const formulaLabel = data && data.formula_label ? data.formula_label : 'Barrett Universal II';
             const modeLabel = data && data.mode === 'online' ? '在线' : '本地';
+            const lines = ['公式：' + formulaLabel + '（' + modeLabel + '）'];
+            [['右眼', 'right_eye'], ['左眼', 'left_eye']].forEach((item) => {
+                const label = item[0];
+                const eye = data && data[item[1]];
+                if (!eye) return;
+                const confidence = eye.confidence === 'LOW_CONFIDENCE' ? '低置信度' : (eye.confidence || '未知');
+                lines.push(label + '：置信度 ' + confidence);
+                if (eye.constants) lines.push('  常数：' + eye.constants);
+                if (eye.elp !== null && eye.elp !== undefined) lines.push('  ELP：' + eye.elp + ' mm');
+                const used = formatUsedInputs(eye.used_inputs);
+                if (used) lines.push('  使用输入：' + used);
+                if (eye.ignored_inputs && eye.ignored_inputs.length) lines.push('  未使用：' + eye.ignored_inputs.join('、'));
+                if (eye.warnings && eye.warnings.length) lines.push('  警告：' + eye.warnings.join('；'));
+            });
             const summary = document.createElement('div');
             summary.className = 'formula-summary';
-            summary.textContent = '公式：' + formulaLabel + '（' + modeLabel + '）';
+            summary.textContent = lines.join(String.fromCharCode(10));
             return summary;
         }
 

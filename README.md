@@ -60,8 +60,10 @@
 
 Web UI 顶部的「公式」选择器可在 **Barrett Universal II / Hoffer Q / SRK/T /
 Haigis** 之间切换；选中 Barrett 时还会出现「执行方式」开关（在线 / 本地，默认
-本地），其余三个公式一律本地计算，不提供在线选项。散光（Toric）模式仍由独立的
-Barrett 官网接口计算，不受公式选择影响。
+本地），其余三个公式一律本地计算，不提供在线选项。选择器下方会说明该公式是否
+使用 ACD/LT/WTW；结果顶部显示实际公式、执行方式、每眼置信度、常数、ELP、
+使用/忽略的输入和警告。散光（Toric）模式仍由独立的 Barrett 官网接口计算，不受
+公式选择影响。
 
 `POST /api/calculate` 通过 `formula` 与 `mode` 两个参数表达同样的选择：
 

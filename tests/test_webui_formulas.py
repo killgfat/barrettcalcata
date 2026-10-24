@@ -24,6 +24,7 @@ def test_formula_and_execution_mode_controls_exist():
     assert 'id="formulaSelect"' in page
     assert 'id="executionModeSelect"' in page
     assert 'id="executionModeHint"' in page
+    assert 'id="formulaInputHint"' in page
     assert 'class="param-hint mode-switch-hint"' in page
 
 
@@ -42,6 +43,34 @@ def test_execution_mode_hint_wording_is_accurate():
         "本地近似实现（Gaussian 聚散度 + 公开校准网格，非官方公式复刻），不保证准确性"
     ) in page
     assert "本地实现，基于公开发表公式；不保证准确性" in page
+
+
+def test_formula_specific_input_hints_exist():
+    page = get_page()
+
+    assert "SRK/T 由 A 常数和 K 自行推导 ACD" in page
+    assert "Hoffer Q 由 A 常数和 AL/K 推导 pACD" in page
+    assert "Haigis 使用实测 ACD" in page
+    assert "Barrett 本地/在线均使用 ACD" in page
+
+
+def test_acd_no_longer_claims_a_global_3_00_default():
+    page = get_page()
+
+    assert page.count('placeholder="留空由公式决定"') == 2
+    assert 'placeholder="默认3.00"' not in page
+    assert 'min="0.5" max="8"' in page
+
+
+def test_result_summary_shows_confidence_constants_and_input_usage():
+    page = get_page()
+
+    assert "formatUsedInputs" in page
+    assert "used_inputs" in page
+    assert "ignored_inputs" in page
+    assert "置信度" in page
+    assert "常数：" in page
+    assert "警告：" in page
 
 
 def test_calculate_payload_sends_formula_and_execution_mode():
