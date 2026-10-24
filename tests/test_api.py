@@ -1,10 +1,9 @@
 import importlib
+import sys
 from pathlib import Path
 from types import SimpleNamespace
-import sys
 
 import pytest
-
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SRC_DIR = PROJECT_ROOT / "src"
@@ -13,6 +12,7 @@ if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
 api = importlib.import_module("api")
+formula = importlib.import_module("formula")
 webui = importlib.import_module("webui")
 docs = importlib.import_module("docs")
 
@@ -22,11 +22,11 @@ async def test_barrett_calculate_defaults_null_a_constant(monkeypatch):
     handler = api.APIHandler(SimpleNamespace())
     captured = {}
 
-    async def fake_calculate(**kwargs):
-        captured.update(kwargs)
-        return {"result": "ok"}
+    async def fake_calculate(request):
+        captured["request"] = request
+        return {"mode": "online"}
 
-    monkeypatch.setattr(api, "calculate_barrett_iol", fake_calculate)
+    monkeypatch.setattr(api, "calculate", fake_calculate)
 
     result, status_code = await handler._handle_barrett_calculate(
         {
@@ -38,7 +38,7 @@ async def test_barrett_calculate_defaults_null_a_constant(monkeypatch):
 
     assert status_code == 200
     assert result["success"] is True
-    assert captured["a_constant"] == 119.3
+    assert captured["request"].a_constant == 119.3
 
 
 @pytest.mark.asyncio
@@ -46,11 +46,11 @@ async def test_barrett_calculate_rounds_a_constant_and_acd_to_two_decimals(monke
     handler = api.APIHandler(SimpleNamespace())
     captured = {}
 
-    async def fake_calculate(**kwargs):
-        captured.update(kwargs)
-        return {"result": "ok"}
+    async def fake_calculate(request):
+        captured["request"] = request
+        return {"mode": "online"}
 
-    monkeypatch.setattr(api, "calculate_barrett_iol", fake_calculate)
+    monkeypatch.setattr(api, "calculate", fake_calculate)
 
     result, status_code = await handler._handle_barrett_calculate(
         {
@@ -62,8 +62,8 @@ async def test_barrett_calculate_rounds_a_constant_and_acd_to_two_decimals(monke
 
     assert status_code == 200
     assert result["success"] is True
-    assert captured["a_constant"] == 119.35
-    assert captured["right_eye_params"]["ACD"] == 2.46
+    assert captured["request"].a_constant == 119.35
+    assert captured["request"].right_eye.acd == 2.46
 
 
 @pytest.mark.asyncio
@@ -71,11 +71,11 @@ async def test_barrett_calculate_normalizes_k_index(monkeypatch):
     handler = api.APIHandler(SimpleNamespace())
     captured = {}
 
-    async def fake_calculate(**kwargs):
-        captured.update(kwargs)
-        return {"result": "ok"}
+    async def fake_calculate(request):
+        captured["request"] = request
+        return {"mode": "online"}
 
-    monkeypatch.setattr(api, "calculate_barrett_iol", fake_calculate)
+    monkeypatch.setattr(api, "calculate", fake_calculate)
 
     result, status_code = await handler._handle_barrett_calculate(
         {
@@ -87,7 +87,7 @@ async def test_barrett_calculate_normalizes_k_index(monkeypatch):
 
     assert status_code == 200
     assert result["success"] is True
-    assert captured["k_index"] == 1.3375
+    assert captured["request"].k_index == 1.3375
 
 
 @pytest.mark.asyncio
@@ -131,7 +131,9 @@ async def test_barrett_calculate_defaults_to_offline(monkeypatch):
     async def fail_online(**kwargs):
         raise AssertionError("offline 模式不应调用官网")
 
-    monkeypatch.setattr(api, "calculate_barrett_iol", fail_online)
+    monkeypatch.setattr(
+        formula.barrett_online, "calculate_barrett_iol", fail_online
+    )
 
     result, status_code = await handler._handle_barrett_calculate(
         {
@@ -252,13 +254,8 @@ async def test_barrett_calculate_rejects_unknown_formula():
 
 
 @pytest.mark.asyncio
-async def test_barrett_calculate_rejects_online_for_non_barrett_formula(monkeypatch):
+async def test_barrett_calculate_rejects_online_for_non_barrett_formula():
     handler = api.APIHandler(SimpleNamespace())
-
-    async def fail_online(**kwargs):
-        raise AssertionError("非 Barrett 公式不应调用官网")
-
-    monkeypatch.setattr(api, "calculate_barrett_iol", fail_online)
 
     result, status_code = await handler._handle_barrett_calculate(
         {
@@ -295,7 +292,9 @@ async def test_barrett_calculate_online_reports_formula(monkeypatch):
     async def fake_calculate(**kwargs):
         return {"right_eye": {"iol_options": []}}
 
-    monkeypatch.setattr(api, "calculate_barrett_iol", fake_calculate)
+    monkeypatch.setattr(
+        formula.barrett_online, "calculate_barrett_iol", fake_calculate
+    )
 
     result, status_code = await handler._handle_barrett_calculate(
         {
@@ -309,7 +308,7 @@ async def test_barrett_calculate_online_reports_formula(monkeypatch):
     assert data["formula"] == "barrett"
     assert data["formula_label"] == "Barrett Universal II"
     assert data["mode"] == "online"
-    assert data["right_eye"] == {"iol_options": []}
+    assert data["right_eye"]["iol_options"] == []
 
 
 def test_web_ui_uses_supported_worker_endpoints():

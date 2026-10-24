@@ -6,7 +6,12 @@ import time
 import requests
 from bs4 import BeautifulSoup
 
-from barrett_config import DEFAULT_K_INDEX, to_barrett_k_index_value
+from .config import DEFAULT_K_INDEX, to_barrett_k_index_value
+
+
+class IOLModelError(RuntimeError):
+    """IOL 型号/常数查询失败。"""
+
 
 BARRETT_CALCULATE_URL = "https://calc.apacrs.org/barrett_universal2105/"
 
@@ -69,7 +74,7 @@ def fetch_iol_model_list():
     soup = BeautifulSoup(response.text, "html.parser")
     select = soup.find("select", {"id": "MainContent_IOLModel"})
     if not select:
-        raise Exception("无法找到IOL型号下拉列表")
+        raise IOLModelError("无法找到IOL型号下拉列表")
 
     models = []
     for option in select.find_all("option"):
@@ -157,7 +162,7 @@ def fetch_model_a_constant(model_name):
                 pass
 
     if a_constant is None:
-        raise Exception(f"无法获取 {model_name} 的A常数")
+        raise IOLModelError(f"无法获取 {model_name} 的A常数")
 
     _a_constant_cache[model_name] = {
         "a_constant": a_constant,

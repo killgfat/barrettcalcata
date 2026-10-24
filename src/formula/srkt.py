@@ -34,9 +34,9 @@ import math
 
 from .common import (
     N_AQUEOUS,
+    SPECTACLE_VERTEX_M,
     as_float,
     build_formula_result,
-    corneal_target,
     normalize_k_to_reference,
     validate_eye,
 )
@@ -65,6 +65,15 @@ KERATOMETRY_MM = 337.5  # 1.3375 折射率下 K = 337.5 / R
 TARGET_SEARCH_MIN = -25.0
 TARGET_SEARCH_MAX = 25.0
 BISECTION_STEPS = 100
+
+
+def _corneal_target(target, vertex=SPECTACLE_VERTEX_M):
+    """把眼镜平面目标屈光度折算到角膜平面（SRK/T 自己的目标处理）。"""
+    target_value = as_float(target, "target_refraction")
+    denominator = 1.0 - vertex * target_value
+    if denominator <= 1e-6:
+        raise ValueError("target_refraction 过大，无法折算到角膜平面")
+    return target_value / denominator
 
 
 def _acd(al, k_prime, a_constant):
@@ -99,7 +108,7 @@ def _power(al, k_ref, a_constant, target):
     通过 K' 进入光学度数计算。
     """
     elp = _acd(al, k_ref, a_constant)
-    k_prime = k_ref + corneal_target(target)
+    k_prime = k_ref + _corneal_target(target)
     return _power_for_elp(al, k_prime, elp)
 
 
@@ -162,7 +171,7 @@ def calculate(
 
     # ELP 用术前 K 推导，目标屈光度只影响光学部分的 K'。
     elp = _acd(al_value, k_ref, a_value)
-    k_prime = k_ref + corneal_target(target_value)
+    k_prime = k_ref + _corneal_target(target_value)
     exact_power = _power_for_elp(al_value, k_prime, elp)
 
     def refraction_at(power):

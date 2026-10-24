@@ -9,7 +9,7 @@ SRC_DIR = PROJECT_ROOT / "src"
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
-barrett_calculate = importlib.import_module("barrett_calculate")
+barrett_calculate = importlib.import_module("formula.barrett_online")
 
 
 class FakeResponse:

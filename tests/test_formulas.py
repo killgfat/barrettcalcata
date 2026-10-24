@@ -11,8 +11,8 @@ SRC_DIR = PROJECT_ROOT / "src"
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
-formulas = importlib.import_module("formulas")
-barrett_offline = importlib.import_module("barrett_offline")
+formulas = importlib.import_module("formula")
+barrett_offline = importlib.import_module("formula.barrett")
 
 FORMULA_MODULES = {
     "barrett": formulas.barrett,
@@ -59,7 +59,8 @@ def test_formula_returns_unified_nine_row_result(name):
     assert len(recommended) == 1
     assert float(recommended[0]["iol_power"]) == result["iol_power"]
     assert recommended[0]["iol_power"] == result["iol_power_text"]
-    assert recommended[0]["optic"] == "Biconvex"
+    # 本地公式不知道具体晶体设计；不再硬编码 Biconvex。
+    assert recommended[0]["optic"] is None
     assert len(recommended[0]["refraction"].split(".")[1]) == 2
 
 
@@ -131,14 +132,29 @@ def test_srkt_frozen_reference_values():
     )
 
 
+def test_srkt_target_derivative_is_clinically_directed():
+    # 非零 target 只通过 K' 进入光学部分；dP/dRx 应为负、量级约 1 D/D。
+    low = formulas.srkt.calculate(23.5, 44.0, target=-1.0)["iol_power_exact"]
+    high = formulas.srkt.calculate(23.5, 44.0, target=1.0)["iol_power_exact"]
+    derivative = (high - low) / 2.0
+    assert -1.5 < derivative < -0.8
+
+
 def test_hoffer_q_frozen_reference_values():
     # 输入与来源：Hoffer 1993 公式，A=118.7，target=0。
     # AL=22.0 走 m=1/g=28 分支；AL=23.5/24.5 走 m=-1/g=23.5 分支。
     assert formulas.hoffer_q.calculate(22.0, 44.0)["iol_power_exact"] == pytest.approx(
         25.7341015593, abs=1e-6
     )
+    assert formulas.hoffer_q.calculate(23.0, 44.0)["iol_power_exact"] == pytest.approx(
+        21.9969036891, abs=1e-6
+    )
     assert formulas.hoffer_q.calculate(23.5, 44.0)["iol_power_exact"] == pytest.approx(
         20.2261181952, abs=1e-6
+    )
+    # AL 超出 18.5-31.0 时仅 Q 修正使用截断值，光学计算仍用原始 AL。
+    assert formulas.hoffer_q.calculate(32.0, 44.0)["iol_power_exact"] == pytest.approx(
+        -3.7617436309, abs=1e-6
     )
     assert formulas.hoffer_q.calculate(24.5, 43.0)["iol_power_exact"] == pytest.approx(
         18.2360205273, abs=1e-6

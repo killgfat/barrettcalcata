@@ -528,8 +528,8 @@ def build_iol_table(
 ):
     """生成 IOL 度数候选表（按 step 步进，默认 0.5 D）。
 
-    每行与官网结果的字段保持一致：iol_power、refraction、recommended，
-    并额外给出 optic 以便 Web UI 复用。
+    每行包含 iol_power、refraction、recommended；本地实现不知道具体晶体
+    设计，optic 固定为 None，不再伪装成 Biconvex。
     """
     al_value, k_value = _validate_eye(al, k)
     k_ref = normalize_k_to_reference(k_value, k_index)
@@ -567,7 +567,7 @@ def build_iol_table(
         rows.append(
             {
                 "iol_power": _format_power(power),
-                "optic": "Biconvex",
+                "optic": None,
                 "refraction": f"{detail['refraction']:.2f}",
                 "recommended": False,
             }
@@ -696,13 +696,85 @@ def solve_iol_power(
     }
 
 
+LABEL = "Barrett Universal II"
+
+CITATIONS = (
+    (
+        "Barrett GD. Intraocular lens calculation formulas for new intraocular "
+        "lens implants. J Cataract Refract Surg. 1987;13(4):389-396."
+    ),
+    (
+        "Barrett GD. An improved universal theoretical formula for intraocular "
+        "lens power prediction. J Cataract Refract Surg. 1993;19(6):713-720. "
+        "PMID 8271166."
+    ),
+    (
+        "Barrett GD. Barrett Formulas: Strategies to Improve IOL Power "
+        "Prediction. In: Intraocular Lens Calculations. Springer; 2024. "
+        "doi:10.1007/978-3-031-50666-6_37."
+    ),
+)
+
+
+def calculate(
+    al,
+    k,
+    target=0.0,
+    a_constant=DEFAULT_A_CONSTANT,
+    k_index=DEFAULT_K_INDEX,
+    acd=None,
+    lt=None,
+    wtw=None,
+    step=0.5,
+):
+    """按统一字段计算 Barrett 本地近似，并标记缺失的可选生物测量。
+
+    ACD/LT/WTW 缺失时不再由 API 层静默填充；ELP 只使用实际提供的参数，
+    并在 warnings/confidence 中明确说明这是部分参数近似。
+    """
+    solved = solve_iol_power(
+        al,
+        k,
+        target=target,
+        a_constant=a_constant,
+        k_index=k_index,
+        step=step,
+        acd=acd,
+        lt=lt,
+        wtw=wtw,
+    )
+    solved["constants_text"] = (
+        f"A={solved['a_constant']:.2f}; "
+        f"LF={solved['lens_factor']:.2f}; "
+        f"K index={k_index}"
+    )
+
+    missing = []
+    if acd is None:
+        missing.append("ACD")
+    if lt is None:
+        missing.append("LenThickness")
+    if wtw is None:
+        missing.append("WTW")
+    if missing:
+        solved["warnings"].append(
+            "未提供 " + "/".join(missing) + "；Barrett 本地 ELP 使用实际提供的参数近似"
+        )
+        solved["low_confidence"] = True
+        solved["confidence"] = "LOW_CONFIDENCE"
+    return solved
+
+
 __all__ = [
+    "CITATIONS",
+    "LABEL",
     "MODEL_ID",
     "MODEL_NOTE",
     "OfflineInputError",
     "a_constant_to_lens_factor",
     "assess_input_domain",
     "build_iol_table",
+    "calculate",
     "iol_power_for_target",
     "lens_factor_to_a_constant",
     "normalize_k_to_reference",

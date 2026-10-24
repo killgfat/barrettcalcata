@@ -45,11 +45,15 @@
 
 ### 模块命名
 
-- `src/barrett_calculate.py`：Barrett Universal II 普通晶体计算（官网在线路径）
-- `src/barrett_offline.py`：Barrett Universal II 离线近似计算核心（零网络）
-- `src/barrett_toric_calculate.py`：Barrett Universal II Toric 散光晶体计算与轴位图数据
-- `src/barrett_iol_models.py`：Barrett 晶体型号与常数同步
-- `src/barrett_config.py`：普通和散光计算共用的 K-index 配置
+- `src/formula/formula.py`：唯一公式调度入口（能力检查、单双眼编排、结果组装）
+- `src/formula/types.py`：`EyeInput` / `CalculationRequest` / `ToricCalculationRequest` / 能力声明
+- `src/formula/common.py`：通用输入校验、适用域、取整与候选表
+- `src/formula/barrett.py`：Barrett Universal II 本地近似核心（零网络）
+- `src/formula/barrett_online.py`：Barrett Universal II 普通晶体官网在线路径
+- `src/formula/barrett_toric.py`：Barrett Universal II Toric 散光晶体计算与轴位图数据
+- `src/formula/iol_models.py`：Barrett 晶体型号与常数同步
+- `src/formula/config.py`：普通和散光计算共用的 K-index 配置
+- `src/formula/srkt.py`、`hoffer_q.py`、`haigis.py`：三个独立本地公式实现
 - `scripts/calibrate_offline.py`：一次性离线校准脚本（生成 docs/calibration_report.md）
 
 ## 离线模式
@@ -62,15 +66,23 @@ Barrett 官网接口计算，不受公式选择影响。
 `POST /api/calculate` 通过 `formula` 与 `mode` 两个参数表达同样的选择：
 
 - `mode = "offline"`（默认）：本地计算，零网络调用；Barrett 走
-  `src/barrett_offline.py` 的近似核心，其余公式走 `src/formulas/`。
+  `src/formula/barrett.py` 的近似核心，其余公式走 `src/formula/`。
   输入仍是 `right_eye` / `left_eye` / `a_constant` / `k_index`，返回结构与在线模式兼容
   （`iol_options` 可直接被 Web UI 使用），并额外返回 `formula`、`formula_label`、
-  `mode`、`model`、`confidence`、`warnings`、`elp` 等字段。
+  `mode`、`model`、`confidence`、`warnings`、`elp`、`formula_capabilities` 等字段。
+  每只眼还返回 `provided_inputs`、`used_inputs`、`ignored_inputs`，明确哪些输入
+  实际参与计算、哪些被公式忽略。
 - `mode = "online"`：显式走原有的 Barrett 官网路径，行为与返回结构保持不变；
   该选项只对 `formula = "barrett"` 有效，其他公式传 `online` 会被拒绝。
 - `formula = "barrett" | "hoffer_q" | "srkt" | "haigis"`（默认 `barrett`）：
   选择本地公式实现，详见下文「本地公式实现与引用」。响应 `data` 中新增
   `formula`、`formula_label`、`mode`，每只眼的 `iol_options` 结构保持不变。
+
+**ACD 缺省处理**：API 不再为所有公式统一填充 `ACD=3.00`。未提供时：
+Barrett 只用实际提供的参数近似 ELP 并给出 warning；SRK/T 与 Hoffer Q 本来就
+不使用实测 ACD；Haigis 使用 3.20 mm 并标记 `ACD_defaulted`、降为
+`LOW_CONFIDENCE`；在线 Barrett 由官网适配器沿用 3.00 mm 并在 `used_inputs`
+中标记。
 
 示例：
 
@@ -124,14 +136,14 @@ python scripts/calibrate_offline.py --no-download
 ## 本地公式实现与引用
 
 Web UI 的「公式」选择器与 `POST /api/calculate` 的 `formula` 参数共用同一套
-本地实现（`src/formulas/`）。四个公式的执行方式如下：
+本地实现（`src/formula/`）。四个公式的执行方式如下：
 
 | formula | 展示名 | 执行方式 | 实现位置 |
 |---------|--------|----------|----------|
-| `barrett` | Barrett Universal II | 本地（默认）/ 官网在线 | `src/formulas/barrett.py`（本地） / `src/barrett_calculate.py`（在线） |
-| `hoffer_q` | Hoffer Q | 仅本地 | `src/formulas/hoffer_q.py` |
-| `srkt` | SRK/T | 仅本地 | `src/formulas/srkt.py` |
-| `haigis` | Haigis | 仅本地 | `src/formulas/haigis.py` |
+| `barrett` | Barrett Universal II | 本地（默认）/ 官网在线 | `src/formula/barrett.py`（本地） / `src/formula/barrett_online.py`（在线） |
+| `hoffer_q` | Hoffer Q | 仅本地 | `src/formula/hoffer_q.py` |
+| `srkt` | SRK/T | 仅本地 | `src/formula/srkt.py` |
+| `haigis` | Haigis | 仅本地 | `src/formula/haigis.py` |
 
 ### 1. Barrett Universal II
 

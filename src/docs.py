@@ -197,6 +197,15 @@ def get_openapi_spec():
                                             "description": "计算公式。barrett 支持 offline/online；srkt、hoffer_q、haigis 只支持 offline（本地实现）。",
                                             "example": "barrett",
                                         },
+                                        "step": {
+                                            "type": "number",
+                                            "format": "float",
+                                            "default": 0.5,
+                                            "minimum": 0.1,
+                                            "maximum": 2.0,
+                                            "description": "本地 IOL 候选表步长（D）。",
+                                            "example": 0.5,
+                                        },
                                     },
                                 },
                                 "example": {
@@ -236,25 +245,77 @@ def get_openapi_spec():
                                             "mode": "offline",
                                             "model": "BUII-ALK-offline-surrogate/1.0",
                                             "calibration_report": "docs/calibration_report.md",
+                                            "formula_capabilities": {
+                                                "name": "barrett",
+                                                "label": "Barrett Universal II",
+                                                "modes": ["offline", "online"],
+                                                "required_inputs": ["AL", "K1", "K2"],
+                                                "optional_inputs": ["ACD", "LenThickness", "WTW"],
+                                                "ignored_inputs": [],
+                                                "constants": "A-constant / Lens Factor",
+                                                "supports_toric": True,
+                                            },
                                             "right_eye": {
+                                                "provided_inputs": {
+                                                    "AL": 23.5,
+                                                    "K1": 43.5,
+                                                    "K2": 44.0,
+                                                    "ACD": 3.2,
+                                                    "Refraction": 0,
+                                                    "LenThickness": 4.6,
+                                                    "WTW": 11.9,
+                                                },
+                                                "used_inputs": {
+                                                    "AL": 23.5,
+                                                    "K": 43.75,
+                                                    "Refraction": 0,
+                                                    "a_constant": 119.3,
+                                                    "k_index": 1.3375,
+                                                    "step": 0.5,
+                                                    "ACD": 3.2,
+                                                    "LenThickness": 4.6,
+                                                    "WTW": 11.9,
+                                                },
+                                                "ignored_inputs": [],
                                                 "iol_options": [
                                                     {
                                                         "iol_power": "20.0",
-                                                        "optic": "TECNIS ZCB00",
+                                                        "optic": None,
                                                         "refraction": "-0.25",
                                                         "recommended": True,
                                                     }
-                                                ]
+                                                ],
                                             },
                                             "left_eye": {
+                                                "provided_inputs": {
+                                                    "AL": 23.3,
+                                                    "K1": 43.8,
+                                                    "K2": 44.2,
+                                                    "ACD": 3.2,
+                                                    "Refraction": 0,
+                                                    "LenThickness": 4.6,
+                                                    "WTW": 11.9,
+                                                },
+                                                "used_inputs": {
+                                                    "AL": 23.3,
+                                                    "K": 44.0,
+                                                    "Refraction": 0,
+                                                    "a_constant": 119.3,
+                                                    "k_index": 1.3375,
+                                                    "step": 0.5,
+                                                    "ACD": 3.2,
+                                                    "LenThickness": 4.6,
+                                                    "WTW": 11.9,
+                                                },
+                                                "ignored_inputs": [],
                                                 "iol_options": [
                                                     {
                                                         "iol_power": "20.5",
-                                                        "optic": "TECNIS ZCB00",
+                                                        "optic": None,
                                                         "refraction": "-0.12",
                                                         "recommended": True,
                                                     }
-                                                ]
+                                                ],
                                             },
                                         },
                                         "message": "IOL计算完成",

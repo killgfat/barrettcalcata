@@ -1,10 +1,11 @@
-from workers import WorkerEntrypoint, Response
 from urllib.parse import urlparse
-from barrett_calculate import get_hello_message
-from webui import get_webui_page
+
+from workers import WorkerEntrypoint, Response
 
 from api import APIHandler
-from docs import get_swagger_ui_html, get_openapi_json
+from docs import get_openapi_json, get_swagger_ui_html
+from formula import get_hello_message
+from webui import get_webui_page
 
 
 class Default(WorkerEntrypoint):

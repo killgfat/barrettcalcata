@@ -15,11 +15,10 @@ A 常数只用于推导默认的 a0（0.62467*A - 72.434），这是由 A 常数
 from __future__ import annotations
 
 from .common import (
+    SPECTACLE_VERTEX_M,
     VERGENCE_SCALE,
     as_float,
     build_formula_result,
-    corneal_target,
-    invert_vergence_target,
     normalize_k_to_reference,
     validate_eye,
 )
@@ -53,6 +52,34 @@ HAIGIS_KERATOMETRY_MM = 331.5
 REFERENCE_KERATOMETRY_MM = 337.5
 
 MISSING_ACD_WARNING = "缺少术前 ACD，使用默认值 3.20 mm（Haigis 建议使用实测 ACD）"
+
+
+def _corneal_target(target, vertex=SPECTACLE_VERTEX_M):
+    """把眼镜平面目标屈光度折算到角膜平面。"""
+    target_value = as_float(target, "target_refraction")
+    denominator = 1.0 - vertex * target_value
+    if denominator <= 1e-6:
+        raise ValueError("target_refraction 过大，无法折算到角膜平面")
+    return target_value / denominator
+
+
+def _invert_vergence_target(al, elp, k, iol_power, vertex=SPECTACLE_VERTEX_M):
+    """由 Haigis 的聚散度式反解眼镜平面屈光度。"""
+    al_value = as_float(al, "AL")
+    elp_value = as_float(elp, "ELP")
+    k_value = as_float(k, "K")
+    power_value = as_float(iol_power, "iol_power")
+    if al_value - elp_value <= 1e-6:
+        return float("nan")
+    vergence_after_iol = VERGENCE_SCALE / (al_value - elp_value) - power_value
+    if vergence_after_iol <= 0:
+        return float("nan")
+    k_target = VERGENCE_SCALE / (VERGENCE_SCALE / vergence_after_iol + elp_value)
+    corneal_refraction = k_target - k_value
+    denominator = 1.0 + vertex * corneal_refraction
+    if denominator <= 1e-6:
+        return float("nan")
+    return corneal_refraction / denominator
 
 
 def _a0(a_constant):
@@ -97,7 +124,7 @@ def refraction_for_power(
     a_value = as_float(a_constant, "a_constant")
     acd_value = DEFAULT_ACD if acd is None else as_float(acd, "ACD")
     elp = _elp(al_value, acd_value, _a0(a_value))
-    return invert_vergence_target(
+    return _invert_vergence_target(
         al_value,
         elp,
         _haigis_k(k_ref),
@@ -140,12 +167,12 @@ def calculate(
     exact_power = _power(
         al_value,
         elp,
-        k_haigis + corneal_target(target_value),
+        k_haigis + _corneal_target(target_value),
     )
 
     def refraction_at(power):
         """返回该 IOL 度数对应的预测屈光度。"""
-        return invert_vergence_target(al_value, elp, k_haigis, power)
+        return _invert_vergence_target(al_value, elp, k_haigis, power)
 
     return build_formula_result(
         al=al_value,

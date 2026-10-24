@@ -1,7 +1,8 @@
-"""本地公式包共用工具：输入校验、适用域评估、度数表与结果组装。
+"""公式层通用工具：输入校验、适用域评估、度数表与结果组装。
 
-本模块只依赖标准库，供 barrett/srkt/hoffer_q/haigis 四个公式复用。
-所有长度单位 mm，屈光度单位 D，聚散度以 1336 表示 1.336*1000。
+本模块只放与具体公式无关的逻辑：有限数校验、K 折射率折算、AL/K 硬边界、
+舒适域评估、0.5 D 取整、候选表与统一结果容器。各公式的 ELP、目标屈光度
+折算和术后屈光反解由公式模块自己实现，不放在这里。
 """
 
 from __future__ import annotations
@@ -9,7 +10,7 @@ from __future__ import annotations
 import math
 
 # ---------------------------------------------------------------------------
-# 光学常数
+# 通用光学/输入常数
 # ---------------------------------------------------------------------------
 
 N_AQUEOUS = 1.336
@@ -31,6 +32,20 @@ AL_COMFORT_MAX = 26.0
 K_COMFORT_MIN = 38.0
 K_COMFORT_MAX = 48.0
 
+# 其他输入的物理合理范围（用于 API 边界校验）。
+ACD_MIN = 0.5
+ACD_MAX = 8.0
+LT_MIN = 0.0
+LT_MAX = 15.0
+WTW_MIN = 5.0
+WTW_MAX = 25.0
+TARGET_MIN = -30.0
+TARGET_MAX = 30.0
+A_CONSTANT_MIN = 112.0
+A_CONSTANT_MAX = 125.0
+STEP_MIN = 0.1
+STEP_MAX = 2.0
+
 # IOL 度数表的显示范围（覆盖常见的负度数/超高度数）。
 IOL_TABLE_MIN = -10.0
 IOL_TABLE_MAX = 45.0
@@ -49,24 +64,53 @@ def as_float(value, name):
     return result
 
 
-def normalize_k_to_reference(k, k_index=K_INDEX_REF):
-    """把任意角膜曲率计折射率下的 K 折算到 1.3375 基准。"""
-    k_value = as_float(k, "K")
-    index = as_float(k_index, "k_index")
-    if abs(index - K_INDEX_REF) < 1e-9:
-        return k_value
-    if abs(index - K_INDEX_ALT) < 1e-9:
-        return k_value * (K_INDEX_REF - 1.0) / (K_INDEX_ALT - 1.0)
+def parse_optional_float(value, name, default=None):
+    """解析可选数值：None/空字符串返回 default，其他交给 as_float。"""
+    if value is None:
+        return default
+    if isinstance(value, str) and not value.strip():
+        return default
+    return as_float(value, name)
+
+
+def parse_a_constant(value, default=119.30):
+    """解析并校验 A 常数。"""
+    parsed = parse_optional_float(value, "a_constant", default)
+    if not A_CONSTANT_MIN <= parsed <= A_CONSTANT_MAX:
+        raise ValueError(
+            f"a_constant={parsed:.2f} 超出合理范围 "
+            f"{A_CONSTANT_MIN:.0f}-{A_CONSTANT_MAX:.0f}"
+        )
+    return round(parsed, 2)
+
+
+def parse_step(value, default=0.5):
+    """解析候选表步长。"""
+    parsed = parse_optional_float(value, "step", default)
+    if not STEP_MIN <= parsed <= STEP_MAX:
+        raise ValueError(
+            f"step={parsed:.2f} 超出合理范围 {STEP_MIN:.1f}-{STEP_MAX:.1f} D"
+        )
+    return parsed
+
+
+def normalize_k_index(value):
+    """校验角膜曲率计折射率，只接受 1.3375 或 1.332。"""
+    parsed = parse_optional_float(value, "k_index", K_INDEX_REF)
+    if abs(parsed - K_INDEX_REF) < 1e-9:
+        return K_INDEX_REF
+    if abs(parsed - K_INDEX_ALT) < 1e-9:
+        return K_INDEX_ALT
     raise ValueError("k_index 只支持 1.3375 或 1.332")
 
 
-def corneal_target(target, vertex=SPECTACLE_VERTEX_M):
-    """把眼镜平面的目标屈光度折算到角膜平面。"""
-    target_value = as_float(target, "target_refraction")
-    denominator = 1.0 - vertex * target_value
-    if denominator <= 1e-6:
-        raise ValueError("target_refraction 过大，无法折算到角膜平面")
-    return target_value / denominator
+def normalize_k_to_reference(k, k_index=K_INDEX_REF):
+    """把任意角膜曲率计折射率下的 K 折算到 1.3375 基准。"""
+    k_value = as_float(k, "K")
+    index = normalize_k_index(k_index)
+    if abs(index - K_INDEX_REF) < 1e-9:
+        return k_value
+    return k_value * (K_INDEX_REF - 1.0) / (K_INDEX_ALT - 1.0)
 
 
 def validate_eye(al, k):
@@ -83,6 +127,36 @@ def validate_eye(al, k):
             f"K={k_value:.2f} D 超出可计算范围 {K_HARD_MIN:.0f}-{K_HARD_MAX:.0f} D"
         )
     return al_value, k_value
+
+
+def validate_optional_measurements(acd=None, lt=None, wtw=None, target=None):
+    """校验可选术前测量值与目标屈光度的物理范围。
+
+    缺省值不校验；返回归一化后的浮点值或 None。
+    """
+    acd_value = parse_optional_float(acd, "ACD")
+    lt_value = parse_optional_float(lt, "LenThickness")
+    wtw_value = parse_optional_float(wtw, "WTW")
+    target_value = parse_optional_float(target, "Refraction", 0.0)
+
+    if acd_value is not None and not ACD_MIN <= acd_value <= ACD_MAX:
+        raise ValueError(
+            f"ACD={acd_value:.2f} mm 超出合理范围 {ACD_MIN:.1f}-{ACD_MAX:.1f} mm"
+        )
+    if lt_value is not None and not LT_MIN <= lt_value <= LT_MAX:
+        raise ValueError(
+            f"LenThickness={lt_value:.2f} mm 超出合理范围 {LT_MIN:.1f}-{LT_MAX:.1f} mm"
+        )
+    if wtw_value is not None and not WTW_MIN <= wtw_value <= WTW_MAX:
+        raise ValueError(
+            f"WTW={wtw_value:.2f} mm 超出合理范围 {WTW_MIN:.1f}-{WTW_MAX:.1f} mm"
+        )
+    if not TARGET_MIN <= target_value <= TARGET_MAX:
+        raise ValueError(
+            f"Refraction={target_value:.2f} D 超出合理范围 "
+            f"{TARGET_MIN:.0f}-{TARGET_MAX:.0f} D"
+        )
+    return acd_value, lt_value, wtw_value, target_value
 
 
 def assess_domain(al, k):
@@ -167,7 +241,8 @@ def build_table(
         rows.append(
             {
                 "iol_power": format_power(power),
-                "optic": "Biconvex",
+                # 本地公式不知道具体晶体设计；不要伪装成 Biconvex。
+                "optic": None,
                 "refraction": f"{refraction:.2f}",
                 "recommended": False,
             }
@@ -181,29 +256,6 @@ def build_table(
     )
     rows[best_index]["recommended"] = True
     return rows
-
-
-def invert_vergence_target(al, elp, k, iol_power, vertex=SPECTACLE_VERTEX_M):
-    """由 P = 1336/(AL-ELP) - 1336/(1336/K' - ELP) 反解眼镜平面屈光度。
-
-    反解步骤：先由 P 求出角膜平面的等效 K'，再由顶点距离公式还原眼镜
-    平面的屈光度。无法反解（发散或超出物理范围）时返回 nan。
-    """
-    al_value = as_float(al, "AL")
-    elp_value = as_float(elp, "ELP")
-    k_value = as_float(k, "K")
-    power_value = as_float(iol_power, "iol_power")
-    if al_value - elp_value <= 1e-6:
-        return float("nan")
-    vergence_after_iol = VERGENCE_SCALE / (al_value - elp_value) - power_value
-    if vergence_after_iol <= 0:
-        return float("nan")
-    k_target = VERGENCE_SCALE / (VERGENCE_SCALE / vergence_after_iol + elp_value)
-    corneal_refraction = k_target - k_value
-    denominator = 1.0 + vertex * corneal_refraction
-    if denominator <= 1e-6:
-        return float("nan")
-    return corneal_refraction / denominator
 
 
 def build_formula_result(
@@ -254,10 +306,14 @@ def build_formula_result(
 
 
 __all__ = [
+    "ACD_MAX",
+    "ACD_MIN",
     "AL_COMFORT_MAX",
     "AL_COMFORT_MIN",
     "AL_HARD_MAX",
     "AL_HARD_MIN",
+    "A_CONSTANT_MAX",
+    "A_CONSTANT_MIN",
     "IOL_TABLE_MAX",
     "IOL_TABLE_MIN",
     "K_COMFORT_MAX",
@@ -266,17 +322,28 @@ __all__ = [
     "K_HARD_MIN",
     "K_INDEX_ALT",
     "K_INDEX_REF",
+    "LT_MAX",
+    "LT_MIN",
     "N_AQUEOUS",
     "SPECTACLE_VERTEX_M",
+    "STEP_MAX",
+    "STEP_MIN",
+    "TARGET_MAX",
+    "TARGET_MIN",
     "VERGENCE_SCALE",
+    "WTW_MAX",
+    "WTW_MIN",
     "as_float",
     "assess_domain",
     "build_formula_result",
     "build_table",
-    "corneal_target",
     "format_power",
-    "invert_vergence_target",
+    "normalize_k_index",
     "normalize_k_to_reference",
+    "parse_a_constant",
+    "parse_optional_float",
+    "parse_step",
     "round_to_step",
     "validate_eye",
+    "validate_optional_measurements",
 ]

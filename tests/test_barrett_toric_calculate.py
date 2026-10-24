@@ -13,8 +13,9 @@ if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
 
-barrett_toric_calculate = importlib.import_module("barrett_toric_calculate")
+barrett_toric_calculate = importlib.import_module("formula.barrett_toric")
 api = importlib.import_module("api")
+formula = importlib.import_module("formula")
 docs = importlib.import_module("docs")
 webui = importlib.import_module("webui")
 
@@ -350,11 +351,11 @@ async def test_barrett_toric_api_handler_uses_independent_calculator(monkeypatch
     handler = api.APIHandler(SimpleNamespace())
     captured = {}
 
-    async def fake_calculate(**kwargs):
-        captured.update(kwargs)
+    async def fake_calculate(request):
+        captured["request"] = request
         return {"right_eye": {"axis_image": {"source_url": "image"}}}
 
-    monkeypatch.setattr(api, "calculate_barrett_toric_iol", fake_calculate)
+    monkeypatch.setattr(api, "calculate_toric", fake_calculate)
     result, status_code = await handler._handle_barrett_toric_calculate(
         {
             "right_eye": sample_eye(),
@@ -366,8 +367,8 @@ async def test_barrett_toric_api_handler_uses_independent_calculator(monkeypatch
 
     assert status_code == 200
     assert result["success"] is True
-    assert captured["cylinder_mode"] == "+ve"
-    assert captured["k_index"] == 1.332
+    assert captured["request"].cylinder_mode == "+ve"
+    assert captured["request"].k_index == 1.332
 
 
 def test_barrett_toric_endpoint_is_documented_and_rendered():

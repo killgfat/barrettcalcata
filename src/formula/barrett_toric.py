@@ -2,7 +2,7 @@
 
 The public Barrett Toric calculator is an ASP.NET Web Forms application.  The
 ordinary Universal II calculator has a separate implementation in
-``barrett_calculate.py``; this module deliberately keeps the toric request/response
+``barrett_online.py``; this module deliberately keeps the toric request/response
 flow isolated so changes to either upstream form do not leak into the other
 calculator.
 """
@@ -17,7 +17,7 @@ from urllib.parse import quote
 import requests
 from bs4 import BeautifulSoup
 
-from barrett_config import (
+from .config import (
     DEFAULT_K_INDEX,
     normalize_k_index,
     to_barrett_k_index_value,
@@ -769,7 +769,7 @@ async def calculate_barrett_toric_iol(
 ) -> dict[str, Any]:
     """Calculate Barrett Universal II Toric power and alignment.
 
-    The function intentionally mirrors :func:`barrett_calculate.calculate_barrett_iol` while
+    The function intentionally mirrors :func:`barrett_online.calculate_barrett_iol` while
     using the separate Toric calculator URL and its meridian-specific fields.
     """
     if not right_eye_params and not left_eye_params:
@@ -958,7 +958,7 @@ async def calculate_barrett_toric_iol(
         if response is not None:
             try:
                 detail = (response.text or "").strip()[:240]
-            except Exception:
+            except Exception:  # noqa: BLE001 - 仅用于读取上游错误正文
                 detail = ""
         suffix = f" ({detail})" if detail else ""
         raise RuntimeError(f"请求 Barrett Toric 官方计算器失败: {exc}{suffix}") from exc

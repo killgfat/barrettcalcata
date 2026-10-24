@@ -18,11 +18,10 @@ from __future__ import annotations
 import math
 
 from .common import (
+    SPECTACLE_VERTEX_M,
     VERGENCE_SCALE,
     as_float,
     build_formula_result,
-    corneal_target,
-    invert_vergence_target,
     normalize_k_to_reference,
     validate_eye,
 )
@@ -49,6 +48,34 @@ PACD_INTERCEPT = -63.896
 ELP_OFFSET = 0.05  # Hoffer Q 在 ACD 之上追加的晶体位置偏移（mm）
 AL_CLAMP_MIN = 18.5
 AL_CLAMP_MAX = 31.0
+
+
+def _corneal_target(target, vertex=SPECTACLE_VERTEX_M):
+    """把眼镜平面目标屈光度折算到角膜平面。"""
+    target_value = as_float(target, "target_refraction")
+    denominator = 1.0 - vertex * target_value
+    if denominator <= 1e-6:
+        raise ValueError("target_refraction 过大，无法折算到角膜平面")
+    return target_value / denominator
+
+
+def _invert_vergence_target(al, elp, k, iol_power, vertex=SPECTACLE_VERTEX_M):
+    """由 Hoffer Q 的聚散度式反解眼镜平面屈光度。"""
+    al_value = as_float(al, "AL")
+    elp_value = as_float(elp, "ELP")
+    k_value = as_float(k, "K")
+    power_value = as_float(iol_power, "iol_power")
+    if al_value - elp_value <= 1e-6:
+        return float("nan")
+    vergence_after_iol = VERGENCE_SCALE / (al_value - elp_value) - power_value
+    if vergence_after_iol <= 0:
+        return float("nan")
+    k_target = VERGENCE_SCALE / (VERGENCE_SCALE / vergence_after_iol + elp_value)
+    corneal_refraction = k_target - k_value
+    denominator = 1.0 + vertex * corneal_refraction
+    if denominator <= 1e-6:
+        return float("nan")
+    return corneal_refraction / denominator
 
 
 def _pacd(a_constant):
@@ -98,7 +125,7 @@ def refraction_for_power(
     k_ref = normalize_k_to_reference(k_value, k_index)
     a_value = as_float(a_constant, "a_constant")
     elp = _acd(al_value, k_ref, a_value) + ELP_OFFSET
-    return invert_vergence_target(
+    return _invert_vergence_target(
         al_value, elp, k_ref, as_float(iol_power, "iol_power")
     )
 
@@ -130,12 +157,12 @@ def calculate(
     exact_power = _power(
         al_value,
         elp,
-        k_ref + corneal_target(target_value),
+        k_ref + _corneal_target(target_value),
     )
 
     def refraction_at(power):
         """返回该 IOL 度数对应的预测屈光度。"""
-        return invert_vergence_target(al_value, elp, k_ref, power)
+        return _invert_vergence_target(al_value, elp, k_ref, power)
 
     return build_formula_result(
         al=al_value,

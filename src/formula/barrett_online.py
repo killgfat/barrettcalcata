@@ -3,11 +3,15 @@ import re
 import requests
 from bs4 import BeautifulSoup
 
-from barrett_config import (
+from .config import (
     DEFAULT_K_INDEX,
     normalize_k_index,
     to_barrett_k_index_value,
 )
+
+
+class BarrettOnlineError(RuntimeError):
+    """官网普通 Barrett 计算失败。"""
 
 
 def parse_iol_results(html_content):
@@ -507,10 +511,11 @@ async def calculate_barrett_iol(
         return parsed_result
 
     except requests.exceptions.RequestException as e:
-        raise Exception(f"请求错误: {e}")
+        raise BarrettOnlineError(f"请求错误: {e}") from e
     except Exception as e:
-        raise Exception(f"其他错误: {e}")
+        raise BarrettOnlineError(f"其他错误: {e}") from e
 
 
 def get_hello_message():
     return "Hello World!"
+

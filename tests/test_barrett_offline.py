@@ -14,7 +14,7 @@ SRC_DIR = PROJECT_ROOT / "src"
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
-offline = importlib.import_module("barrett_offline")
+offline = importlib.import_module("formula.barrett")
 
 
 def test_a_constant_to_lens_factor_matches_published_pairs():
