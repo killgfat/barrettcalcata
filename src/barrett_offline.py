@@ -633,7 +633,25 @@ def solve_iol_power(
         wtw=wtw,
         use_surgeon_inputs=use_surgeon_inputs,
     )
-    rounded_power = _round_to_step(exact_power, step)
+    table = build_iol_table(
+        al_value,
+        k_value,
+        target=target,
+        lf=lf,
+        a_constant=a_constant,
+        k_index=k_index,
+        step=step,
+        span=span,
+        acd=acd,
+        lt=lt,
+        wtw=wtw,
+        use_surgeon_inputs=use_surgeon_inputs,
+    )
+    recommended = next((row for row in table if row["recommended"]), None)
+    if recommended is not None:
+        rounded_power = float(recommended["iol_power"])
+    else:
+        rounded_power = _round_to_step(exact_power, step)
     if rounded_power < IOL_TABLE_MIN or rounded_power > IOL_TABLE_MAX:
         warnings.append(
             f"推荐度数 {rounded_power:.1f} D 超出表格范围 "
@@ -674,20 +692,7 @@ def solve_iol_power(
         "warnings": warnings,
         "model": MODEL_ID,
         "model_note": MODEL_NOTE,
-        "iol_options": build_iol_table(
-            al_value,
-            k_value,
-            target=target,
-            lf=lf,
-            a_constant=a_constant,
-            k_index=k_index,
-            step=step,
-            span=span,
-            acd=acd,
-            lt=lt,
-            wtw=wtw,
-            use_surgeon_inputs=use_surgeon_inputs,
-        ),
+        "iol_options": table,
     }
 
 

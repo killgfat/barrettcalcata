@@ -71,6 +71,14 @@ def test_one_dioptre_step_mode():
         assert float(option["iol_power"]) % 1.0 == 0
 
 
+def test_solve_power_matches_table_recommendation():
+    for target in (-2.0, 0.0, 1.5):
+        solved = offline.solve_iol_power(24.2, 45.1, target=target)
+        recommended = [row for row in solved["iol_options"] if row["recommended"]]
+        assert recommended
+        assert float(recommended[0]["iol_power"]) == pytest.approx(solved["iol_power"])
+
+
 def test_iol_table_has_one_recommendation_and_half_dioptre_steps():
     table = offline.build_iol_table(23.5, 44.0, target=0.0)
     assert len(table) == 9
