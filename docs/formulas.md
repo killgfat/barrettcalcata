@@ -41,8 +41,9 @@ Toric 使用独立的 barrett_ii_toric 和 POST /api/calculate-toric，需要额
 
 1. Gaussian 聚散度核心：
 
-   ``P = 1336/(AL-ELP) - 1336/(1336/K'-ELP)
-   ``
+   ```text
+   P = 1336/(AL-ELP) - 1336/(1336/K'-ELP)
+   ```
 
    K' 包含按 12 mm 顶点距离折算的目标屈光度。
 
@@ -113,8 +114,9 @@ A 常数与 Lens Factor 的线性换算来自公开厂商常数对，同样不�
 
 采用公开 Hoffer Q 及 errata 的算法：
 
-``pACD = 0.58357 × A - 63.896
-``
+```text
+pACD = 0.58357 × A - 63.896
+```
 
 随后根据 AL 和 K 做 Q 修正，并在光学计算中使用 ACD+0.05 mm。
 实现保持以下规则：
@@ -133,8 +135,9 @@ A 常数与 Lens Factor 的线性换算来自公开厂商常数对，同样不�
 
 ELP 由三常数公式预测：
 
-``d = a0 + a1×ACD + a2×AL
-``
+```text
+d = a0 + a1×ACD + a2×AL
+```
 
 光学部分使用 Haigis 自己的角膜折射率 nC=1.3315。实现先根据原始输入
 K-index 恢复角膜半径，再计算 Haigis 所需的角膜屈光度。
