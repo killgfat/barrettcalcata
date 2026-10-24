@@ -15,12 +15,11 @@
 
     python scripts/calibrate_offline.py
 
-- 运行时间：2026-10-24 21:41:16
+- 运行时间：2026-10-24 21:41:40
 - Python：3.12.3 (Linux-7.0.12-1-pve-x86_64-with-glibc2.39)
 - numpy：2.4.2
-- git commit：9ddd704453ae20954a7df19ba06aac7d0a2278b3
-- 运行前工作区状态：M src/barrett_offline.py
- M tests/test_barrett_offline.py
+- git commit：7775f429e5fee65d09028566bea6b2d73f0159a3
+- 运行前工作区状态：clean
 - 数据目录：/root/workspace/barrettcalcata/data/barrett-uii-data
 - scans.csv SHA-256：f36d6ec6c563945c11a59cf1f632d9491bfd05c4fd5074eda526173507e59207
 - grids.npz SHA-256：5736107cb3de1abb2fd92f4cadc2975eeddbf09c8e480e1b67a9396103a84354
