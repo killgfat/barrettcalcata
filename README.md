@@ -45,10 +45,64 @@
 
 ### 模块命名
 
-- `src/barrett_calculate.py`：Barrett Universal II 普通晶体计算
+- `src/barrett_calculate.py`：Barrett Universal II 普通晶体计算（官网在线路径）
+- `src/barrett_offline.py`：Barrett Universal II 离线近似计算核心（零网络）
 - `src/barrett_toric_calculate.py`：Barrett Universal II Toric 散光晶体计算与轴位图数据
 - `src/barrett_iol_models.py`：Barrett 晶体型号与常数同步
 - `src/barrett_config.py`：普通和散光计算共用的 K-index 配置
+- `scripts/calibrate_offline.py`：一次性离线校准脚本（生成 docs/calibration_report.md）
+
+## 离线模式
+
+`POST /api/calculate` 现在支持 `mode` 开关：
+
+- `mode = "offline"`（默认）：使用 `src/barrett_offline.py` 本地计算，零网络调用。
+  输入仍是 `right_eye` / `left_eye` / `a_constant` / `k_index`，返回结构与在线模式兼容
+  （`iol_options` 可直接被 Web UI 使用），并额外返回 `mode`、`model`、
+  `confidence`、`warnings`、`elp` 等字段。
+- `mode = "online"`：显式走原有的 Barrett 官网路径，行为与返回结构保持不变。
+
+示例：
+
+```json
+{
+  "right_eye": {"AL": 23.5, "K1": 43.5, "K2": 44.0, "ACD": 3.2, "Refraction": 0},
+  "a_constant": 119.3,
+  "mode": "offline"
+}
+```
+
+### 重要限制（请务必阅读）
+
+1. 官方 Barrett Universal II 的 ELP 预测使用**未公开**的三阶多项式回归和厚透镜
+   光线追迹；官网计算器不对应任何可公开复刻的单页公式。
+2. 本仓库的离线实现 = **Gaussian 聚散度核心**（Barrett/Fyodorov 理论公式）
+   + **由公开 CC-BY-4.0 网格反演的 ELP 近似式**。它**不是**官方公式的逐系数复刻，
+   也不等价于官网结果。
+3. 任务书中引用的 2021 年 Clin Exp Ophthalmol 论文在 PubMed / Crossref / Wiley
+   目录中均无法检索到（检索记录见校准报告第 3 节），因此代码与文档不声称按该论文
+   实现。真实可考的 Barrett 理论公式文献是 1993 年 JCRS 论文（PMID 8271166）。
+4. 校准报告：[`docs/calibration_report.md`](docs/calibration_report.md)
+   （逐点偏差、AL×K 分桶、超包络样本、留一基线验证）。
+   原始对数数据：`docs/calibration_grid.csv`、`docs/calibration_outliers.csv`。
+5. 适用域：`AL 22-26 mm`、`K 38-48 D`。超出时仍会计算，但结果的
+   `confidence` 为 `LOW_CONFIDENCE` 并给出 `warnings`；短眼/长眼/极端 K
+   建议显式使用 `mode="online"` 复核。
+6. 纯 ALK（只给 AL+K）与官方五参数全量版的差异明显大于五参数离线模式；
+   报告中的分桶表给出了具体包络。临床决策前必须人工复核。
+
+### 重新生成校准报告
+
+```bash
+# 需要 numpy（仅校准脚本使用；运行时模块只用标准库）
+python scripts/calibrate_offline.py
+# 不联网时复用 ./data/barrett-uii-data
+python scripts/calibrate_offline.py --no-download
+```
+
+数据通过 `ghfast.top` 镜像拉取到 `./data/`（该目录不提交）。脚本会真实读取
+数据、真实计算偏差，并在 stdout 打印
+`>>> OFFLINE BUII DONE maxΔ=... p95=... n=...` 哨兵。
 
 ## 环境变量
 

@@ -32,6 +32,7 @@ async def test_barrett_calculate_defaults_null_a_constant(monkeypatch):
         {
             "right_eye": {"AL": 23.5, "K1": 43.5, "K2": 44.0},
             "a_constant": None,
+            "mode": "online",
         }
     )
 
@@ -55,6 +56,7 @@ async def test_barrett_calculate_rounds_a_constant_and_acd_to_two_decimals(monke
         {
             "right_eye": {"AL": 23.5, "K1": 43.5, "K2": 44.0, "ACD": 2.456},
             "a_constant": 119.346,
+            "mode": "online",
         }
     )
 
@@ -79,6 +81,7 @@ async def test_barrett_calculate_normalizes_k_index(monkeypatch):
         {
             "right_eye": {"AL": 23.5, "K1": 43.5, "K2": 44.0},
             "k_index": "1.3375",
+            "mode": "online",
         }
     )
 
@@ -95,6 +98,7 @@ async def test_barrett_calculate_rejects_unsupported_k_index():
         {
             "right_eye": {"AL": 23.5, "K1": 43.5, "K2": 44.0},
             "k_index": 1.34,
+            "mode": "online",
         }
     )
 
@@ -110,12 +114,95 @@ async def test_barrett_calculate_rejects_null_required_eye_value():
     result, status_code = await handler._handle_barrett_calculate(
         {
             "right_eye": {"AL": None, "K1": 43.5, "K2": 44.0},
+            "mode": "online",
         }
     )
 
     assert status_code == 400
     assert result["error"] == "Bad Request"
     assert "右眼AL" in result["message"]
+
+
+
+@pytest.mark.asyncio
+async def test_barrett_calculate_defaults_to_offline(monkeypatch):
+    handler = api.APIHandler(SimpleNamespace())
+
+    async def fail_online(**kwargs):
+        raise AssertionError("offline 模式不应调用官网")
+
+    monkeypatch.setattr(api, "calculate_barrett_iol", fail_online)
+
+    result, status_code = await handler._handle_barrett_calculate(
+        {
+            "right_eye": {
+                "AL": 23.5,
+                "K1": 43.5,
+                "K2": 44.0,
+                "ACD": 3.2,
+                "Refraction": 0,
+                "LenThickness": "4.6",
+                "WTW": "11.9",
+            },
+            "a_constant": 118.7,
+        }
+    )
+
+    assert status_code == 200
+    data = result["data"]
+    assert data["mode"] == "offline"
+    assert data["model"].startswith("BUII-ALK-offline")
+    assert data["right_eye"]["iol_options"]
+    assert data["right_eye"]["confidence"] in ("OK", "LOW_CONFIDENCE")
+    assert data["left_eye"] is None
+
+
+@pytest.mark.asyncio
+async def test_barrett_calculate_offline_marks_low_confidence():
+    handler = api.APIHandler(SimpleNamespace())
+
+    result, status_code = await handler._handle_barrett_calculate(
+        {
+            "right_eye": {"AL": 21.0, "K1": 43.0, "K2": 44.0},
+            "mode": "offline",
+        }
+    )
+
+    assert status_code == 200
+    eye = result["data"]["right_eye"]
+    assert eye["confidence"] == "LOW_CONFIDENCE"
+    assert any("AL=" in warning for warning in eye["warnings"])
+
+
+@pytest.mark.asyncio
+async def test_barrett_calculate_rejects_unknown_mode():
+    handler = api.APIHandler(SimpleNamespace())
+
+    result, status_code = await handler._handle_barrett_calculate(
+        {
+            "right_eye": {"AL": 23.5, "K1": 43.5, "K2": 44.0},
+            "mode": "bogus",
+        }
+    )
+
+    assert status_code == 400
+    assert result["error"] == "Bad Request"
+    assert "mode" in result["message"]
+
+
+@pytest.mark.asyncio
+async def test_barrett_calculate_offline_rejects_out_of_range_al():
+    handler = api.APIHandler(SimpleNamespace())
+
+    result, status_code = await handler._handle_barrett_calculate(
+        {
+            "right_eye": {"AL": 9.0, "K1": 43.5, "K2": 44.0},
+            "mode": "offline",
+        }
+    )
+
+    assert status_code == 400
+    assert "AL" in result["message"]
 
 
 def test_web_ui_uses_supported_worker_endpoints():

@@ -3,11 +3,17 @@ API模块 - 处理IOL计算器的API接口
 """
 
 import json
+import math
 
 from barrett_config import DEFAULT_K_INDEX as DEFAULT_BARRETT_K_INDEX
 from barrett_config import normalize_k_index
 from barrett_calculate import calculate_barrett_iol
 from barrett_iol_models import fetch_iol_model_list, fetch_model_a_constant
+from barrett_offline import (
+    MODEL_ID,
+    MODEL_NOTE,
+    solve_iol_power as solve_offline_iol_power,
+)
 from barrett_toric_calculate import calculate_barrett_toric_iol
 from worker_ai import WorkerAI
 
@@ -17,6 +23,9 @@ class APIHandler:
     DEFAULT_ACD = 3.00
     DEFAULT_REFRACTION = 0.0
     DEFAULT_K_INDEX = DEFAULT_BARRETT_K_INDEX
+    # 正常眼默认走离线；online 必须显式指定。
+    DEFAULT_CALCULATION_MODE = "offline"
+    SUPPORTED_MODES = ("offline", "online")
 
     def __init__(self, env):
         self.env = env
@@ -68,6 +77,19 @@ class APIHandler:
     def _normalize_k_index(self, value):
         """标准化角膜K-index。"""
         return normalize_k_index(value)
+
+    def _normalize_mode(self, value):
+        """标准化计算模式：offline（默认）或 online。"""
+        if value is None:
+            return self.DEFAULT_CALCULATION_MODE
+        if not isinstance(value, str):
+            raise ValueError("mode 必须是 offline 或 online")
+        mode = value.strip().lower()
+        if not mode:
+            return self.DEFAULT_CALCULATION_MODE
+        if mode not in self.SUPPORTED_MODES:
+            raise ValueError("mode 只支持 offline 或 online")
+        return mode
 
     def _normalize_request_eye_params(self, eye_params, eye_name):
         """标准化用户提交的眼部参数。"""
@@ -323,8 +345,70 @@ class APIHandler:
                 "message": f"图片处理过程中发生错误: {str(e)}",
             }, 500
 
+    def _calculate_offline_eye(self, params, a_constant, k_index):
+        """用离线模块计算单眼，返回与在线结果兼容的 iol_options。"""
+        k_mean = (params["K1"] + params["K2"]) / 2.0
+        target = params.get("Refraction")
+        if target is None:
+            target = self.DEFAULT_REFRACTION
+        lt = self._normalize_optional_float(params.get("LenThickness"))
+        wtw = self._normalize_optional_float(params.get("WTW"))
+        solved = solve_offline_iol_power(
+            params["AL"],
+            k_mean,
+            target=target,
+            a_constant=a_constant,
+            k_index=k_index,
+            acd=params.get("ACD"),
+            lt=lt,
+            wtw=wtw,
+        )
+        predicted = solved["predicted_refraction"]
+        return {
+            "biometry": (
+                f"AL {params['AL']:.2f} mm; "
+                f"K1 {params['K1']:.2f} D; K2 {params['K2']:.2f} D; "
+                f"Kmean {k_mean:.2f} D"
+            ),
+            "prediction": "offline",
+            "constants": (
+                f"A={a_constant:.2f}; LF={solved['lens_factor']:.2f}; "
+                f"K index={k_index}"
+            ),
+            "iol_options": solved["iol_options"],
+            "recommended_power": solved["iol_power_text"],
+            "predicted_refraction": (
+                round(predicted, 2) if math.isfinite(predicted) else None
+            ),
+            "elp": round(solved["elp"], 2),
+            "confidence": solved["confidence"],
+            "warnings": solved["warnings"],
+        }
+
+    def _calculate_offline_result(
+        self, right_eye_params, left_eye_params, a_constant, k_index
+    ):
+        """组装离线模式的双眼结果。"""
+        result = {
+            "mode": "offline",
+            "model": MODEL_ID,
+            "model_note": MODEL_NOTE,
+            "calibration_report": "docs/calibration_report.md",
+            "right_eye": None,
+            "left_eye": None,
+        }
+        if right_eye_params:
+            result["right_eye"] = self._calculate_offline_eye(
+                right_eye_params, a_constant, k_index
+            )
+        if left_eye_params:
+            result["left_eye"] = self._calculate_offline_eye(
+                left_eye_params, a_constant, k_index
+            )
+        return result
+
     async def _handle_barrett_calculate(self, body):
-        """处理IOL计算请求"""
+        """处理IOL计算请求（默认 offline，可显式指定 online）。"""
         try:
             # 验证必需的参数
             right_eye_params = self._normalize_request_eye_params(
@@ -337,6 +421,7 @@ class APIHandler:
             k_index = self._normalize_k_index(body.get("k_index"))
             patient_name = body.get("patient_name")
             iol_model = body.get("iol_model")
+            mode = self._normalize_mode(body.get("mode"))
 
             # 验证至少提供了一只眼睛的参数
             if not right_eye_params and not left_eye_params:
@@ -345,26 +430,43 @@ class APIHandler:
                     "message": "至少需要提供右眼或左眼参数",
                 }, 400
 
-            # 调用计算函数
-            result = await calculate_barrett_iol(
-                right_eye_params=right_eye_params,
-                left_eye_params=left_eye_params,
-                a_constant=a_constant,
-                patient_name=patient_name,
-                iol_model=iol_model,
-                k_index=k_index,
-            )
+            # online 模式保持原有官网调用行为不变。
+            if mode == "online":
+                result = await calculate_barrett_iol(
+                    right_eye_params=right_eye_params,
+                    left_eye_params=left_eye_params,
+                    a_constant=a_constant,
+                    patient_name=patient_name,
+                    iol_model=iol_model,
+                    k_index=k_index,
+                )
+                return {
+                    "success": True,
+                    "data": result,
+                    "message": "IOL计算完成",
+                }, 200
 
-            # 返回成功结果
-            return {"success": True, "data": result, "message": "IOL计算完成"}, 200
+            # offline 模式：本机聚散度核心 + ELP 近似式，零网络调用。
+            result = self._calculate_offline_result(
+                right_eye_params, left_eye_params, a_constant, k_index
+            )
+            return {
+                "success": True,
+                "data": result,
+                "message": "IOL计算完成（离线近似模式）",
+            }, 200
 
         except ValueError as e:
             return {"error": "Bad Request", "message": str(e)}, 400
 
         except Exception as e:
+            print(f"处理IOL计算请求时发生错误: {str(e)}")
+            import traceback
+
+            print(f"错误堆栈: {traceback.format_exc()}")
             return {
                 "error": "Internal Server Error",
-                "message": f"计算过程中发生错误: {str(e)}",
+                "message": f"处理过程中发生错误: {str(e)}",
             }, 500
 
     async def _handle_barrett_toric_calculate(self, body):

@@ -58,7 +58,7 @@ def get_openapi_spec():
             "/api/calculate": {
                 "post": {
                     "summary": "执行IOL计算",
-                    "description": "提交眼睛参数JSON，基于Barrett Universal II公式计算人工晶体度数。至少提供右眼或左眼其中一组参数。k_index使用真实角膜等效折射率表示，发送给Barrett站点时会转换为其表单值。",
+                    "description": "提交眼睛参数JSON，计算人工晶体度数。默认 mode=offline：使用本地 Gaussian 聚散度核心 + 公开网格反演的 ELP 近似式，零网络调用，结果带有 confidence/model 字段；mode=online 时调用 Barrett 官网（原有行为）。至少提供右眼或左眼其中一组参数。k_index使用真实角膜等效折射率表示。",
                     "requestBody": {
                         "required": True,
                         "content": {
@@ -178,6 +178,13 @@ def get_openapi_spec():
                                             "description": "角膜等效折射率。1.3375会转换为Barrett表单值337.5，1.332会转换为332。",
                                             "example": 1.3375,
                                         },
+                                        "mode": {
+                                            "type": "string",
+                                            "enum": ["offline", "online"],
+                                            "default": "offline",
+                                            "description": "计算模式。offline（默认）使用本地近似公式，零网络调用；online 调用 Barrett 官网，保持原有返回结构。离线结果不是官方 BUII 的等价复刻，详见 docs/calibration_report.md。",
+                                            "example": "offline",
+                                        },
                                     },
                                 },
                                 "example": {
@@ -197,6 +204,7 @@ def get_openapi_spec():
                                     },
                                     "a_constant": 119.3,
                                     "k_index": 1.3375,
+                                    "mode": "offline",
                                     "patient_name": "张三",
                                 },
                             }
@@ -210,6 +218,9 @@ def get_openapi_spec():
                                     "example": {
                                         "success": True,
                                         "data": {
+                                            "mode": "offline",
+                                            "model": "BUII-ALK-offline-surrogate/1.0",
+                                            "calibration_report": "docs/calibration_report.md",
                                             "right_eye": {
                                                 "iol_options": [
                                                     {
