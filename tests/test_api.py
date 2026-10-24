@@ -205,6 +205,113 @@ async def test_barrett_calculate_offline_rejects_out_of_range_al():
     assert "AL" in result["message"]
 
 
+@pytest.mark.parametrize(
+    ("formula", "expected_label"),
+    [
+        ("barrett", "Barrett Universal II"),
+        ("srkt", "SRK/T"),
+        ("hoffer_q", "Hoffer Q"),
+        ("haigis", "Haigis"),
+    ],
+)
+@pytest.mark.asyncio
+async def test_barrett_calculate_dispatches_formula(formula, expected_label):
+    handler = api.APIHandler(SimpleNamespace())
+
+    result, status_code = await handler._handle_barrett_calculate(
+        {
+            "right_eye": {"AL": 23.5, "K1": 43.5, "K2": 44.0, "ACD": 3.2},
+            "formula": formula,
+        }
+    )
+
+    assert status_code == 200
+    data = result["data"]
+    assert data["formula"] == formula
+    assert data["formula_label"] == expected_label
+    assert data["mode"] == "offline"
+    assert data["right_eye"]["iol_options"]
+    assert data["right_eye"]["constants"]
+    assert data["right_eye"]["prediction"] == "offline"
+
+
+@pytest.mark.asyncio
+async def test_barrett_calculate_rejects_unknown_formula():
+    handler = api.APIHandler(SimpleNamespace())
+
+    result, status_code = await handler._handle_barrett_calculate(
+        {
+            "right_eye": {"AL": 23.5, "K1": 43.5, "K2": 44.0},
+            "formula": "holladay1",
+        }
+    )
+
+    assert status_code == 400
+    assert result["error"] == "Bad Request"
+    assert "formula" in result["message"]
+
+
+@pytest.mark.asyncio
+async def test_barrett_calculate_rejects_online_for_non_barrett_formula(monkeypatch):
+    handler = api.APIHandler(SimpleNamespace())
+
+    async def fail_online(**kwargs):
+        raise AssertionError("非 Barrett 公式不应调用官网")
+
+    monkeypatch.setattr(api, "calculate_barrett_iol", fail_online)
+
+    result, status_code = await handler._handle_barrett_calculate(
+        {
+            "right_eye": {"AL": 23.5, "K1": 43.5, "K2": 44.0},
+            "formula": "srkt",
+            "mode": "online",
+        }
+    )
+
+    assert status_code == 400
+    assert result["error"] == "Bad Request"
+    assert "Barrett" in result["message"]
+
+
+@pytest.mark.asyncio
+async def test_barrett_calculate_defaults_to_barrett_formula_offline():
+    handler = api.APIHandler(SimpleNamespace())
+
+    result, status_code = await handler._handle_barrett_calculate(
+        {"right_eye": {"AL": 23.5, "K1": 43.5, "K2": 44.0}}
+    )
+
+    assert status_code == 200
+    data = result["data"]
+    assert data["formula"] == "barrett"
+    assert data["formula_label"] == "Barrett Universal II"
+    assert data["mode"] == "offline"
+
+
+@pytest.mark.asyncio
+async def test_barrett_calculate_online_reports_formula(monkeypatch):
+    handler = api.APIHandler(SimpleNamespace())
+
+    async def fake_calculate(**kwargs):
+        return {"right_eye": {"iol_options": []}}
+
+    monkeypatch.setattr(api, "calculate_barrett_iol", fake_calculate)
+
+    result, status_code = await handler._handle_barrett_calculate(
+        {
+            "right_eye": {"AL": 23.5, "K1": 43.5, "K2": 44.0},
+            "mode": "online",
+        }
+    )
+
+    assert status_code == 200
+    data = result["data"]
+    assert data["formula"] == "barrett"
+    assert data["formula_label"] == "Barrett Universal II"
+    assert data["mode"] == "online"
+    assert data["right_eye"] == {"iol_options": []}
+
+
 def test_web_ui_uses_supported_worker_endpoints():
     page = webui.get_webui_page()
 

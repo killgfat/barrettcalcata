@@ -54,13 +54,23 @@
 
 ## 离线模式
 
-`POST /api/calculate` 现在支持 `mode` 开关：
+Web UI 顶部的「公式」选择器可在 **Barrett Universal II / Hoffer Q / SRK/T /
+Haigis** 之间切换；选中 Barrett 时还会出现「执行方式」开关（在线 / 本地，默认
+本地），其余三个公式一律本地计算，不提供在线选项。散光（Toric）模式仍由独立的
+Barrett 官网接口计算，不受公式选择影响。
 
-- `mode = "offline"`（默认）：使用 `src/barrett_offline.py` 本地计算，零网络调用。
+`POST /api/calculate` 通过 `formula` 与 `mode` 两个参数表达同样的选择：
+
+- `mode = "offline"`（默认）：本地计算，零网络调用；Barrett 走
+  `src/barrett_offline.py` 的近似核心，其余公式走 `src/formulas/`。
   输入仍是 `right_eye` / `left_eye` / `a_constant` / `k_index`，返回结构与在线模式兼容
-  （`iol_options` 可直接被 Web UI 使用），并额外返回 `mode`、`model`、
-  `confidence`、`warnings`、`elp` 等字段。
-- `mode = "online"`：显式走原有的 Barrett 官网路径，行为与返回结构保持不变。
+  （`iol_options` 可直接被 Web UI 使用），并额外返回 `formula`、`formula_label`、
+  `mode`、`model`、`confidence`、`warnings`、`elp` 等字段。
+- `mode = "online"`：显式走原有的 Barrett 官网路径，行为与返回结构保持不变；
+  该选项只对 `formula = "barrett"` 有效，其他公式传 `online` 会被拒绝。
+- `formula = "barrett" | "hoffer_q" | "srkt" | "haigis"`（默认 `barrett`）：
+  选择本地公式实现，详见下文「本地公式实现与引用」。响应 `data` 中新增
+  `formula`、`formula_label`、`mode`，每只眼的 `iol_options` 结构保持不变。
 
 示例：
 
@@ -68,6 +78,7 @@
 {
   "right_eye": {"AL": 23.5, "K1": 43.5, "K2": 44.0, "ACD": 3.2, "Refraction": 0},
   "a_constant": 119.3,
+  "formula": "barrett",
   "mode": "offline"
 }
 ```
@@ -79,6 +90,10 @@
 2. 本仓库的离线实现 = **Gaussian 聚散度核心**（Barrett/Fyodorov 理论公式）
    + **由公开 CC-BY-4.0 网格反演的 ELP 近似式**。它**不是**官方公式的逐系数复刻，
    也不等价于官网结果。
+   `ekrbye/barrett-uii-data` 只提供官方在线计算器的输入与输出样本，**不直接提供
+   官方 ELP 或其预测系数**。本项目的 ELP 是在当前聚散度/薄透镜模型下，由这些
+   样本反演得到的**等效 ELP**，再经回归拟合形成固定近似式；不能将其解释为
+   官方 Barrett Universal II 内部使用的 ELP。
 3. 任务书中引用的 2021 年 Clin Exp Ophthalmol 论文在 PubMed / Crossref / Wiley
    目录中均无法检索到（检索记录见校准报告第 3 节），因此代码与文档不声称按该论文
    实现。真实可考的 Barrett 理论公式文献是 1993 年 JCRS 论文（PMID 8271166）。
@@ -105,6 +120,78 @@ python scripts/calibrate_offline.py --no-download
 数据通过 `ghfast.top` 镜像拉取到 `./data/`（该目录不提交）。脚本会真实读取
 数据、真实计算偏差，并在 stdout 打印
 `>>> OFFLINE BUII DONE maxΔ=... p95=... n=...` 哨兵。
+
+## 本地公式实现与引用
+
+Web UI 的「公式」选择器与 `POST /api/calculate` 的 `formula` 参数共用同一套
+本地实现（`src/formulas/`）。四个公式的执行方式如下：
+
+| formula | 展示名 | 执行方式 | 实现位置 |
+|---------|--------|----------|----------|
+| `barrett` | Barrett Universal II | 本地（默认）/ 官网在线 | `src/formulas/barrett.py`（本地） / `src/barrett_calculate.py`（在线） |
+| `hoffer_q` | Hoffer Q | 仅本地 | `src/formulas/hoffer_q.py` |
+| `srkt` | SRK/T | 仅本地 | `src/formulas/srkt.py` |
+| `haigis` | Haigis | 仅本地 | `src/formulas/haigis.py` |
+
+### 1. Barrett Universal II
+
+官方 Barrett Universal II 的 ELP 预测（三阶多项式 + 厚透镜光线追迹）从未公开，
+官网计算器无法逐系数复刻。本实现的本地路径 = **Gaussian 聚散度核心**
+（Barrett/Fyodorov 理论公式）+ **由公开 CC-BY-4.0 网格反演的 ELP 近似式**，
+属于本地近似，不是官方公式复刻，也不等价于官网结果。可考的 Barrett 文献：
+
+- Barrett GD. Intraocular lens calculation formulas for new intraocular lens
+  implants. J Cataract Refract Surg. 1987;13(4):389-396.
+- Barrett GD. An improved universal theoretical formula for intraocular lens
+  power prediction. J Cataract Refract Surg. 1993;19(6):713-720. PMID 8271166.
+- Barrett GD. Barrett Formulas: Strategies to Improve IOL Power Prediction.
+  In: Intraocular Lens Calculations. Springer; 2024:577-592.
+  doi:10.1007/978-3-031-50666-6_37.
+
+需要特别说明：任务书中提到的 2021 年 Clin Exp Ophthalmol 49(7):660-670 在
+PubMed / Crossref / Wiley 目录中均**无法检索**，因此代码与文档不声称按该文实现；
+校准数据、逐点偏差与检索记录见
+[`docs/calibration_report.md`](docs/calibration_report.md)。
+
+### 2. SRK/T
+
+- Retzlaff JA, Sanders DR, Kraff MC. Development of the SRK/T intraocular lens
+  implant power calculation formula. J Cataract Refract Surg.
+  1990;16(3):333-340.
+
+本地实现按公开 SRK/T 计算：用 A-constant 推导术后前房深度（`0.62467*A -
+68.747`，另加角膜穹隆高度与视网膜厚度修正），**WTW 不参与**计算；目标屈光度
+通过 `K' = K + Rx / (1 - 0.012*Rx)` 折算到角膜平面后进入公式，即目标屈光度项
+会改变推荐度数，而不是只在多项式上做微调。
+
+### 3. Hoffer Q
+
+- Hoffer KJ. The Hoffer Q formula: a comparison of theoretic and regression
+  formulas. J Cataract Refract Surg. 1993;19(6):700-712.
+  Errata: 1994;20(6):677；2007;33(2):193.
+
+基准前房深度由 A 常数换算：`pACD = 0.58357*A - 63.896`，再按眼轴与角膜屈光度
+做前房深度修正；目标屈光度同样折算到角膜平面。
+
+### 4. Haigis
+
+- Haigis W, Lege B, Miller N, Schneider B. Comparison of immersion ultrasound
+  biometry and partial coherence interferometry for intraocular lens
+  calculation according to Haigis. Graefes Arch Clin Exp Ophthalmol.
+  2000;238(9):765-773.
+
+三常数形式 `d = a0 + a1*ACD + a2*AL`，其中 `a1 = 0.4`、`a2 = 0.1` 为经典取值，
+`a0` 由 A 常数换算（`a0 = 0.62467*A - 72.434`）**只是近似起点**，不是个体化
+优化结果。要获得可比的准确性，应提供术前实测 ACD，并用自有数据做最小二乘拟合
+优化三常数。
+
+### 5. 统一免责声明
+
+- 本地公式仅用于**估算与横向对照**，不替代官方计算器、厂家常数或临床判断。
+- 适用域为 `AL 22-26 mm`、`K 38-48 D`；超出时仍返回结果，但 `confidence`
+  为 `LOW_CONFIDENCE` 并附带 `warnings`，必须人工复核。
+- 硬边界 `AL 12-38 mm`、`K 30-60 D` 之外直接报错；散光（Toric）计算固定走
+  Barrett 官网接口，与本地公式无关。
 
 ## 环境变量
 

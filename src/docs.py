@@ -58,7 +58,7 @@ def get_openapi_spec():
             "/api/calculate": {
                 "post": {
                     "summary": "执行IOL计算",
-                    "description": "提交眼睛参数JSON，计算人工晶体度数。默认 mode=offline：使用本地 Gaussian 聚散度核心 + 公开网格反演的 ELP 近似式，零网络调用，结果带有 confidence/model 字段；mode=online 时调用 Barrett 官网（原有行为）。至少提供右眼或左眼其中一组参数。k_index使用真实角膜等效折射率表示。",
+                    "description": "提交眼睛参数JSON，计算人工晶体度数。formula 选择计算公式（默认 barrett）。mode=offline（默认）时全部公式都使用本地实现，零网络调用，结果带有 confidence/model 字段；mode=online 仅 Barrett 支持，调用 Barrett 官网（原有行为）。至少提供右眼或左眼其中一组参数。k_index使用真实角膜等效折射率表示。",
                     "requestBody": {
                         "required": True,
                         "content": {
@@ -182,8 +182,20 @@ def get_openapi_spec():
                                             "type": "string",
                                             "enum": ["offline", "online"],
                                             "default": "offline",
-                                            "description": "计算模式。offline（默认）使用本地近似公式，零网络调用；online 调用 Barrett 官网，保持原有返回结构。离线结果不是官方 BUII 的等价复刻，详见 docs/calibration_report.md。",
+                                            "description": "计算模式。offline（默认）使用本地公式实现，零网络调用；online 仅 Barrett 支持，调用 Barrett 官网并保持原有返回结构。离线结果不是官方 BUII 的等价复刻，详见 docs/calibration_report.md。",
                                             "example": "offline",
+                                        },
+                                        "formula": {
+                                            "type": "string",
+                                            "enum": [
+                                                "barrett",
+                                                "srkt",
+                                                "hoffer_q",
+                                                "haigis",
+                                            ],
+                                            "default": "barrett",
+                                            "description": "计算公式。barrett 支持 offline/online；srkt、hoffer_q、haigis 只支持 offline（本地实现）。",
+                                            "example": "barrett",
                                         },
                                     },
                                 },
@@ -205,6 +217,7 @@ def get_openapi_spec():
                                     "a_constant": 119.3,
                                     "k_index": 1.3375,
                                     "mode": "offline",
+                                    "formula": "barrett",
                                     "patient_name": "张三",
                                 },
                             }
@@ -218,6 +231,8 @@ def get_openapi_spec():
                                     "example": {
                                         "success": True,
                                         "data": {
+                                            "formula": "barrett",
+                                            "formula_label": "Barrett Universal II",
                                             "mode": "offline",
                                             "model": "BUII-ALK-offline-surrogate/1.0",
                                             "calibration_report": "docs/calibration_report.md",

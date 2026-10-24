@@ -9,12 +9,8 @@ from barrett_config import DEFAULT_K_INDEX as DEFAULT_BARRETT_K_INDEX
 from barrett_config import normalize_k_index
 from barrett_calculate import calculate_barrett_iol
 from barrett_iol_models import fetch_iol_model_list, fetch_model_a_constant
-from barrett_offline import (
-    MODEL_ID,
-    MODEL_NOTE,
-    solve_iol_power as solve_offline_iol_power,
-)
 from barrett_toric_calculate import calculate_barrett_toric_iol
+from formulas import calculate_formula, get_formula_label, normalize_formula
 from worker_ai import WorkerAI
 
 
@@ -345,15 +341,20 @@ class APIHandler:
                 "message": f"图片处理过程中发生错误: {str(e)}",
             }, 500
 
-    def _calculate_offline_eye(self, params, a_constant, k_index):
-        """用离线模块计算单眼，返回与在线结果兼容的 iol_options。"""
+    def _calculate_offline_eye(self, params, a_constant, k_index, formula):
+        """用本地公式包计算单眼。
+
+        返回 (眼睛结果, 公式原始结果)：眼睛结果用于组装响应，公式原始结果
+        提供 model/model_note 等顶层字段。
+        """
         k_mean = (params["K1"] + params["K2"]) / 2.0
         target = params.get("Refraction")
         if target is None:
             target = self.DEFAULT_REFRACTION
         lt = self._normalize_optional_float(params.get("LenThickness"))
         wtw = self._normalize_optional_float(params.get("WTW"))
-        solved = solve_offline_iol_power(
+        solved = calculate_formula(
+            formula,
             params["AL"],
             k_mean,
             target=target,
@@ -364,17 +365,14 @@ class APIHandler:
             wtw=wtw,
         )
         predicted = solved["predicted_refraction"]
-        return {
+        eye_result = {
             "biometry": (
                 f"AL {params['AL']:.2f} mm; "
                 f"K1 {params['K1']:.2f} D; K2 {params['K2']:.2f} D; "
                 f"Kmean {k_mean:.2f} D"
             ),
             "prediction": "offline",
-            "constants": (
-                f"A={a_constant:.2f}; LF={solved['lens_factor']:.2f}; "
-                f"K index={k_index}"
-            ),
+            "constants": solved["constants_text"],
             "iol_options": solved["iol_options"],
             "recommended_power": solved["iol_power_text"],
             "predicted_refraction": (
@@ -385,27 +383,39 @@ class APIHandler:
             "low_confidence": solved["low_confidence"],
             "warnings": solved["warnings"],
         }
+        return eye_result, solved
 
     def _calculate_offline_result(
-        self, right_eye_params, left_eye_params, a_constant, k_index
+        self,
+        right_eye_params,
+        left_eye_params,
+        a_constant,
+        k_index,
+        formula="barrett",
     ):
         """组装离线模式的双眼结果。"""
+        eyes = {}
+        solved_eyes = {}
+        for eye_name, eye_params in (
+            ("right_eye", right_eye_params),
+            ("left_eye", left_eye_params),
+        ):
+            if eye_params:
+                eyes[eye_name], solved_eyes[eye_name] = self._calculate_offline_eye(
+                    eye_params, a_constant, k_index, formula
+                )
+        reference = next(iter(solved_eyes.values()))
         result = {
+            "formula": formula,
+            "formula_label": get_formula_label(formula),
             "mode": "offline",
-            "model": MODEL_ID,
-            "model_note": MODEL_NOTE,
-            "calibration_report": "docs/calibration_report.md",
-            "right_eye": None,
-            "left_eye": None,
+            "model": reference["model"],
+            "model_note": reference["model_note"],
+            "right_eye": eyes.get("right_eye"),
+            "left_eye": eyes.get("left_eye"),
         }
-        if right_eye_params:
-            result["right_eye"] = self._calculate_offline_eye(
-                right_eye_params, a_constant, k_index
-            )
-        if left_eye_params:
-            result["left_eye"] = self._calculate_offline_eye(
-                left_eye_params, a_constant, k_index
-            )
+        if formula == "barrett":
+            result["calibration_report"] = "docs/calibration_report.md"
         return result
 
     async def _handle_barrett_calculate(self, body):
@@ -422,6 +432,7 @@ class APIHandler:
             k_index = self._normalize_k_index(body.get("k_index"))
             patient_name = body.get("patient_name")
             iol_model = body.get("iol_model")
+            formula = normalize_formula(body.get("formula"))
             mode = self._normalize_mode(body.get("mode"))
 
             # 验证至少提供了一只眼睛的参数
@@ -429,6 +440,13 @@ class APIHandler:
                 return {
                     "error": "Bad Request",
                     "message": "至少需要提供右眼或左眼参数",
+                }, 400
+
+            # 官网只有 Barrett 计算器，其他公式只能走本地实现。
+            if mode == "online" and formula != "barrett":
+                return {
+                    "error": "Bad Request",
+                    "message": "只有 Barrett 支持 online 模式",
                 }, 400
 
             # online 模式保持原有官网调用行为不变。
@@ -443,13 +461,18 @@ class APIHandler:
                 )
                 return {
                     "success": True,
-                    "data": result,
+                    "data": {
+                        **result,
+                        "formula": formula,
+                        "formula_label": get_formula_label(formula),
+                        "mode": mode,
+                    },
                     "message": "IOL计算完成",
                 }, 200
 
-            # offline 模式：本机聚散度核心 + ELP 近似式，零网络调用。
+            # offline 模式：本地公式包计算，零网络调用。
             result = self._calculate_offline_result(
-                right_eye_params, left_eye_params, a_constant, k_index
+                right_eye_params, left_eye_params, a_constant, k_index, formula
             )
             return {
                 "success": True,

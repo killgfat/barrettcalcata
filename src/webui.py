@@ -22,7 +22,15 @@ INDEX_PAGE = """
         .github-icon { width: 28px; height: 28px; fill: white; }
         .main-content { padding: 30px; }
         .mode-switch-band { padding: 16px 30px 0; background: white; }
-        .mode-switch { display: flex; gap: 4px; max-width: 420px; margin: 0 auto; padding: 4px; border: 1px solid #cbd5e1; border-radius: 8px; background: #f1f5f9; }
+        .mode-switch-band-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 12px; }
+        .mode-switch { display: flex; gap: 4px; flex: 1 1 320px; max-width: 420px; padding: 4px; border: 1px solid #cbd5e1; border-radius: 8px; background: #f1f5f9; }
+        .formula-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+        .formula-field { display: flex; align-items: center; gap: 6px; }
+        .formula-field label { font-weight: bold; color: #475569; font-size: 14px; white-space: nowrap; }
+        .formula-field select { padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; background: #fff; color: #0f172a; }
+        .formula-field select:focus { outline: none; border-color: #007bff; box-shadow: 0 0 5px rgba(0,123,255,0.3); }
+        .mode-switch-hint { max-width: 720px; margin: 8px auto 0; text-align: center; }
+        .formula-summary { margin-bottom: 15px; padding: 10px 14px; border: 1px solid #cbd5e1; border-radius: 8px; background: #f1f5f9; color: #0f172a; font-size: 0.95em; }
         .mode-button { flex: 1; min-height: 44px; border: 0; border-radius: 6px; background: transparent; color: #475569; font-size: 15px; font-weight: bold; cursor: pointer; transition: background 0.2s, color 0.2s, box-shadow 0.2s; }
         .mode-button:hover { color: #0f172a; }
         .mode-button.active { background: white; color: #0f766e; box-shadow: 0 1px 4px rgba(15, 23, 42, 0.14); }
@@ -120,10 +128,31 @@ INDEX_PAGE = """
         </div>
 
         <div class="mode-switch-band" aria-label="计算模式">
-            <div class="mode-switch" role="group">
-                <button type="button" class="mode-button active" id="sphericalModeButton" aria-pressed="true">非散光</button>
-                <button type="button" class="mode-button" id="toricModeButton" aria-pressed="false">散光</button>
+            <div class="mode-switch-band-row">
+                <div class="mode-switch" role="group">
+                    <button type="button" class="mode-button active" id="sphericalModeButton" aria-pressed="true">非散光</button>
+                    <button type="button" class="mode-button" id="toricModeButton" aria-pressed="false">散光</button>
+                </div>
+                <div class="formula-controls" id="formulaControls">
+                    <div class="formula-field">
+                        <label for="formulaSelect">公式</label>
+                        <select id="formulaSelect">
+                            <option value="barrett" selected>Barrett Universal II</option>
+                            <option value="hoffer_q">Hoffer Q</option>
+                            <option value="srkt">SRK/T</option>
+                            <option value="haigis">Haigis</option>
+                        </select>
+                    </div>
+                    <div class="formula-field" id="executionModeField">
+                        <label for="executionModeSelect">执行方式</label>
+                        <select id="executionModeSelect">
+                            <option value="offline" selected>本地</option>
+                            <option value="online">在线</option>
+                        </select>
+                    </div>
+                </div>
             </div>
+            <div id="executionModeHint" class="param-hint mode-switch-hint"></div>
         </div>
 
         <div class="main-content">
@@ -992,10 +1021,17 @@ INDEX_PAGE = """
                     formData.left_eye = leftEyeData;
                 }
 
+                const formula = document.getElementById('formulaSelect').value;
+                const executionMode = resolveExecutionMode();
+
                 const response = await fetch('/api/calculate', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({...formData, mode: 'calculate'})
+                    body: JSON.stringify({
+                        ...formData,
+                        formula: formula,
+                        mode: executionMode
+                    })
                 });
 
                 const result = await response.json();
@@ -1025,6 +1061,34 @@ INDEX_PAGE = """
         const toricSection = document.getElementById('toricSection');
         const resultsSection = document.getElementById('resultsSection');
         const toricResultsSection = document.getElementById('toricResultsSection');
+        const formulaControls = document.getElementById('formulaControls');
+        const formulaSelect = document.getElementById('formulaSelect');
+        const executionModeField = document.getElementById('executionModeField');
+        const executionModeSelect = document.getElementById('executionModeSelect');
+        const executionModeHint = document.getElementById('executionModeHint');
+
+        // Barrett 支持在线/本地，其他公式固定本地执行
+        const EXECUTION_MODE_HINTS = {
+            online: '在线调用 Barrett 官网，不保证稳定性',
+            offline: '本地近似实现（Gaussian 聚散度 + 公开校准网格，非官方公式复刻），不保证准确性'
+        };
+        const LOCAL_FORMULA_HINT = '本地实现，基于公开发表公式；不保证准确性';
+
+        function resolveExecutionMode() {
+            const formula = formulaSelect.value;
+            if (formula !== 'barrett') {
+                return 'offline';
+            }
+            return executionModeSelect.value === 'online' ? 'online' : 'offline';
+        }
+
+        function syncFormulaControls() {
+            const isBarrett = formulaSelect.value === 'barrett';
+            executionModeField.hidden = !isBarrett;
+            executionModeHint.textContent = isBarrett
+                ? EXECUTION_MODE_HINTS[resolveExecutionMode()]
+                : LOCAL_FORMULA_HINT;
+        }
 
         function setCalculationMode(mode) {
             const isToric = mode === 'toric';
@@ -1038,16 +1102,21 @@ INDEX_PAGE = """
             toricSection.hidden = !isToric;
             resultsSection.hidden = isToric;
             toricResultsSection.hidden = !isToric;
+            formulaControls.hidden = isToric;
+            executionModeHint.hidden = isToric;
 
             if (isToric) {
                 validateToricForm();
             } else {
+                syncFormulaControls();
                 validateForm();
             }
         }
 
         sphericalModeButton.addEventListener('click', () => setCalculationMode('spherical'));
         toricModeButton.addEventListener('click', () => setCalculationMode('toric'));
+        formulaSelect.addEventListener('change', syncFormulaControls);
+        executionModeSelect.addEventListener('change', syncFormulaControls);
         setCalculationMode('spherical');
 
         function toricEyeFieldIds(eye) {
@@ -1220,6 +1289,15 @@ INDEX_PAGE = """
                 '</div></div>';
         }
 
+        function createFormulaSummary(data) {
+            const formulaLabel = data && data.formula_label ? data.formula_label : 'Barrett Universal II';
+            const modeLabel = data && data.mode === 'online' ? '在线' : '本地';
+            const summary = document.createElement('div');
+            summary.className = 'formula-summary';
+            summary.textContent = '公式：' + formulaLabel + '（' + modeLabel + '）';
+            return summary;
+        }
+
         function displayResults(data) {
             const resultsContent = document.getElementById('resultsContent');
             resultsContent.innerHTML = '';
@@ -1243,6 +1321,7 @@ INDEX_PAGE = """
             }
 
             if (hasValidData) {
+                resultsContent.insertBefore(createFormulaSummary(data), resultsContent.firstChild);
                 document.getElementById('resultsSection').classList.add('show');
             } else {
                 // 如果没有有效数据，显示提示信息
