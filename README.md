@@ -86,19 +86,8 @@ https://barrettcalcata.killgfat.com
       }
     }
 
-旧 formula + mode 字段仍保留兼容；同时提供时以 model 为准。
+同时提供 formula/mode 与 model 时，以 model 为准。
 完整请求、响应和 Toric 示例见 /docs 或 /openapi.json。
-
-### ACD 缺失
-
-API 不再对所有公式统一填入 ACD=3.00：
-
-- Barrett 本地仅使用实际提供的参数，并提示缺失项；
-- SRK/T、Hoffer Q 根据各自算法推导晶体位置，不需要实测 ACD；
-- Haigis 缺省为 3.20 mm，同时标记 ACD_defaulted 和低置信度；
-- Barrett 在线沿用官网适配器的 3.00 mm 默认值，并在结果中标记。
-
-默认值不是患者实测值。Haigis 应优先提供真实 ACD 和晶体专属三常数。
 
 ## 主要端点
 
@@ -144,7 +133,7 @@ Barrett Offline 的开发期校准和验证使用
 详见 [公式实现说明](docs/formulas.md) 和
 [Barrett 离线校准报告](docs/calibration_report.md)。
 
-重新生成校准报告：
+生成校准报告：
 
     # 仅开发期校准需要 numpy
     python scripts/calibrate_offline.py

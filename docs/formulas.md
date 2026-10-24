@@ -16,19 +16,19 @@ src/formula/formula.py 负责计算模型解析、能力检查、单双眼编排
 | hoffer_q | Hoffer Q | AL、K、A 常数/pACD | 本地，零网络 |
 | haigis | Haigis | AL、K、ACD、a0/a1/a2 | 本地，零网络 |
 
-统一接口不表示各公式使用同一个光学核心：
+各公式使用各自的光学核心：
 
 - SRK/T 与 Hoffer Q 不使用术前实测 ACD、LT、WTW；
 - Haigis 使用实测 ACD，不使用 LT、WTW；
-- Haigis 光学部分使用自己的 nC=1.3315，不能直接代入 K(1.3375)；
-- 目标屈光度不得改变由术前生物测量预测的 ELP；
-- 不通过 Barrett 的结果拟合或修正其他公开公式。
+- Haigis 光学部分使用自己的 nC=1.3315；
+- ELP 由术前生物测量决定，与目标屈光度无关；
+- 各公式独立实现，不通过 Barrett 的结果拟合或修正其他公开公式。
 
 ## 2. Barrett Universal II
 
 ### 2.1 在线模式
 
-barrett_ii 调用 Barrett 官方在线计算器，保留官网表单、会话和结果解析逻辑。
+barrett_ii 调用 Barrett 官方在线计算器，通过官网表单、会话和结果解析获取结果。
 它不是本地公式，官网可用性及返回结构变化会影响该路径。
 
 Toric 使用独立的 barrett_ii_toric 和 POST /api/calculate-toric，需要额外的
@@ -71,8 +71,7 @@ A 常数与 Lens Factor 的线性换算来自公开厂商常数对，同样不�
 - **Worker 运行时不访问该仓库，不读取数据文件，也不需要 numpy。**
 
 校准脚本为 scripts/calibrate_offline.py，详细方法、系数和偏差见
-[校准报告](calibration_report.md)。数据保存在开发机未跟踪的 data/ 目录，
-不进入部署包。
+[校准报告](calibration_report.md)。数据不随项目发布，也不进入部署包。
 
 ### 2.4 已有数值验证的含义
 
@@ -127,7 +126,7 @@ pACD = 0.58357 × A - 63.896
 - 目标屈光度在光学部分处理，不改变患者 ELP。
 
 术前实测 ACD 不等于 pACD；标准 Hoffer Q 不使用实测 ACD、LT、WTW。
-当前接口由 A 常数推导 pACD，结果不应自动视为与任意设备晶体库的优化常数一致。
+接口由 A 常数推导 pACD，结果不应自动视为与任意设备晶体库的优化常数一致。
 
 ## 5. Haigis
 
@@ -145,7 +144,7 @@ K-index 恢复角膜半径，再计算 Haigis 所需的角膜屈光度。
 常数有两种来源：
 
 1. **显式三常数**：请求传入 haigis_constants: {a0,a1,a2}，优先使用，
-   此时不再从 A 常数推导 a0。应与 IOL Master 或晶体库中的具体晶体常数一致。
+   此时直接使用传入的三常数，不从 A 常数推导 a0。应与 IOL Master 或晶体库中的具体晶体常数一致。
 2. **标准近似起点**：固定 a1=0.4、a2=0.1，并由
    a0=0.62467×A−72.434 推导 a0。该结果不是个体化优化常数，
    与设备使用的晶体专属常数可能明显不同，结果会给出警告并降低置信度。

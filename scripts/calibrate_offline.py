@@ -412,7 +412,7 @@ def format_metrics(name, item, note=""):
 
 
 # ---------------------------------------------------------------------------
-# 拟合诊断（不改变交付常量）
+# 拟合诊断（不改变实际计算使用的常量）
 # ---------------------------------------------------------------------------
 
 
@@ -702,9 +702,11 @@ def main():
         "所有数字来自真实对数，未手工填写。\n"
     )
     report.append("## 0. 结论摘要\n")
-    report.append("- 官方 BUII 的 ELP 模型未公开；任务书引用的 2021 年论文无法检索到。")
     report.append(
-        "- 因此本仓库交付的是 Gaussian 聚散度核心 + 公开网格反演的 ELP "
+        "- 官方 BUII 的 ELP 模型未公开；一篇曾引用的 2021 年论文无法在文献目录中检索到。"
+    )
+    report.append(
+        "- 因此本模块实现的是 Gaussian 聚散度核心 + 公开网格反演的 ELP "
         "近似式，不是官方公式的逐系数复刻。"
     )
     report.append(
@@ -723,9 +725,9 @@ def main():
         "之间的差异量级，不是 ALK 简化版与官方全量版之间的差异。"
     )
     report.append(
-        "- 按题面合格线（mean 约 0.03 D、SD 0.12-0.18 D）衡量：纯 ALK 版 "
+        "- 以 mean≈0.03 D、SD 0.12-0.18 D 为参考基准衡量：纯 ALK 版 "
         "SD={:.3f} D，不达标；五参数近似版 mean={:+.3f} D、SD={:.3f} D，"
-        "落在量级内，但它依赖 ACD/LT/WTW，不是题面要求的纯 ALK 版。".format(
+        "落在量级内，但它依赖 ACD/LT/WTW，并非纯 ALK 版。".format(
             m_alk_holdout["sd"],
             m_full_holdout["mean"],
             m_full_holdout["sd"],
@@ -777,8 +779,8 @@ def main():
     report.append("")
 
     report.append("## 3. 公式出处审计（重要）\n")
-    report.append("### 3.1 任务书引用的论文\n")
-    report.append("2026-10-24 实测检索结果：")
+    report.append("### 3.1 关于 2021 年论文的检索\n")
+    report.append("检索结果：")
     report.append(
         "- PubMed Clin Exp Ophthalmol[Journal] AND 2021[pdat] AND 49[volume] "
         "AND 7[issue] 返回 18 条，660-670 页分别被 652-663（nAMD 综述）和 "
@@ -793,22 +795,21 @@ def main():
         "（PMID 8271166, doi:10.1016/S0886-3350(13)80339-2），"
         "其全文在 LWW/Europe PMC 均为付费/无全文。"
     )
-    report.append("- 结论：不能声称按该 2021 论文实现；报告与代码均按此如实标注。\n")
+    report.append("- 结论：本项目不声称按该 2021 论文实现。\n")
     report.append("### 3.2 社区参考实现\n")
     report.append(
         "- Wingman4l7/catcalc 的 Barrett_Universal_II_Formula.py 是 "
         "Selenium 填表脚本，没有公式系数；无法用于数值对数。"
     )
     report.append(
-        "- wcgBarrett 在 GitHub API（用户 404）和 PyPI（404）均不存在；"
-        "任务书所述仓库无法验证。"
+        "- wcgBarrett 在 GitHub API（用户 404）和 PyPI（404）均不存在；该仓库无法验证。"
     )
     report.append(
         "- 官方 BUII 的 ELP 是未公开的三阶多项式回归；Barrett 2024 章节明确"
         "写明最简实现约 750 行、完整版约 3000 行，因此不存在可公开复刻的"
         "单页公式。\n"
     )
-    report.append("### 3.3 本模块真正实现的内容\n")
+    report.append("### 3.3 本模块实现的内容\n")
     report.append(
         "- 聚散度核心：P = 1336/(AL-ELP) - 1336/(1336/K' - ELP)，"
         "K' 为目标屈光度经 12 mm 顶点距离折算后的角膜平面屈光度。"
@@ -915,7 +916,7 @@ def main():
     report.append("## 8. 留一基线交叉验证（泛化诊断）\n")
     report.append(
         "每次留出一个 baseline 的全部扫描点，重新拟合 ELP 系数后在留出点上"
-        "评估。该诊断的系数不是交付常量，仅用于估计泛化误差。\n"
+        "评估。该诊断的系数不用于实际计算，仅用于估计泛化误差。\n"
     )
     report.append(
         "| 模型 | baseline | n | mean Δ | median absΔ | p95 absΔ | max absΔ |"
@@ -931,7 +932,7 @@ def main():
     report.append("")
 
     report.append("## 9. 三方对数说明\n")
-    report.append("任务书要求与 catcalc / wcgBarrett 做三方对数，但：")
+    report.append("关于 catcalc / wcgBarrett 的三方对数：")
     report.append("1. catcalc 没有 BUII 公式（只有 Selenium 填表）；")
     report.append("2. wcgBarrett 在 GitHub/PyPI 不存在；")
     report.append("3. 官方 BUII 不公开 ELP 系数。")
@@ -957,7 +958,7 @@ def main():
         "官方厚透镜主平面迭代；短眼/长眼和高低 K 端的偏差更大。"
     )
     report.append(
-        "2b. 按题面合格线，纯 ALK 版不达标（SD={:.3f} D > 0.18 D）；"
+        "2b. 以 SD 0.18 D 为参考，纯 ALK 版不达标（SD={:.3f} D）；"
         "五参数近似版达标（SD={:.3f} D），但必须提供 ACD/LT/WTW。".format(
             m_alk_holdout["sd"], m_full_holdout["sd"]
         )
@@ -972,8 +973,8 @@ def main():
     )
     report.append(
         "4. 如果拿到官方系数或论文全文，只需替换 ELP 常量并在同一脚本上"
-        "重跑，即可得到真正的包络报告；当前版本的正确定位是"
-        "默认离线近似 + online 显式降级/对照。"
+        "重跑，即可得到更新的包络报告；本实现的定位是"
+        "默认离线近似 + online 显式对照。"
     )
     report.append("")
 
