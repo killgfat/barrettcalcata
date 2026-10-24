@@ -40,6 +40,8 @@ python_modules/
 .venv-workers/
 venv/
 __pycache__/
+# 校准数据（由 scripts/calibrate_offline.py 下载，不提交）
+data/
 *.py[cod]
 *$py.class
 .Python

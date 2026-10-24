@@ -12,8 +12,14 @@ dependencies = [
     "httpx>=0.27.0",
 ]
 
+[project.optional-dependencies]
+# 仅 scripts/calibrate_offline.py 需要；运行时模块只用标准库。
+calibration = ["numpy>=1.26"]
+
 [dependency-groups]
 dev = [
     "workers-py",
-    "workers-runtime-sdk"
+    "workers-runtime-sdk",
+    "pytest",
+    "pytest-asyncio"
 ]
