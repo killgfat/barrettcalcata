@@ -382,6 +382,7 @@ class APIHandler:
             ),
             "elp": round(solved["elp"], 2),
             "confidence": solved["confidence"],
+            "low_confidence": solved["low_confidence"],
             "warnings": solved["warnings"],
         }
 

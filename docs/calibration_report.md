@@ -12,22 +12,15 @@
 
 ## 1. 运行命令与环境
 
-    python scripts/calibrate_offline.py --refit
+    python scripts/calibrate_offline.py
 
-- 运行时间：2026-10-24 21:36:20
+- 运行时间：2026-10-24 21:38:30
 - Python：3.12.3 (Linux-7.0.12-1-pve-x86_64-with-glibc2.39)
 - numpy：2.4.2
-- git commit：8148df27565273acd2ad33af9376f42d0bb46e3a
-- 运行前工作区状态：M .gitignore
- M README.md
- M pyproject.toml
- M src/api.py
- M src/docs.py
- M tests/test_api.py
-?? docs/
-?? scripts/
-?? src/barrett_offline.py
-?? tests/test_barrett_offline.py
+- git commit：9c45c9629cc866aac297bf7b0f443326dce07445
+- 运行前工作区状态：M src/api.py
+ M src/barrett_offline.py
+ M tests/test_barrett_offline.py
 - 数据目录：/root/workspace/barrettcalcata/data/barrett-uii-data
 - scans.csv SHA-256：f36d6ec6c563945c11a59cf1f632d9491bfd05c4fd5074eda526173507e59207
 - grids.npz SHA-256：5736107cb3de1abb2fd92f4cadc2975eeddbf09c8e480e1b67a9396103a84354
@@ -79,8 +72,6 @@
 | ELP_C_WTW | -0.028200 | WTW 线性项 |
 | LF_SLOPE | 0.518667 | A -> LF 斜率 |
 | LF_INTERCEPT | -59.836800 | A -> LF 截距 |
-
-重拟合诊断：重拟合（偶数行）ALK 二次项: 5.481512, 0.384027, 0.131907, 0.041244, 0.045497, 0.004143; 附加项: 0.274984, 0.207436, -0.028200
 
 ## 5. 偏差指标（Δ = 离线 - 官方，D）
 

@@ -94,7 +94,11 @@ def test_input_domain_flags_low_confidence():
 
     long_eye = offline.solve_iol_power(27.0, 43.0)
     assert long_eye["confidence"] == "LOW_CONFIDENCE"
+    assert long_eye["low_confidence"] is True
     assert long_eye["warnings"]
+
+    normal_eye = offline.solve_iol_power(23.5, 44.0)
+    assert normal_eye["low_confidence"] is False
 
 
 @pytest.mark.parametrize(

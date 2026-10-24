@@ -670,6 +670,7 @@ def solve_iol_power(
             else lens_factor_to_a_constant(lens_factor)
         ),
         "confidence": domain["confidence"],
+        "low_confidence": domain["confidence"] == "LOW_CONFIDENCE",
         "warnings": warnings,
         "model": MODEL_ID,
         "model_note": MODEL_NOTE,
