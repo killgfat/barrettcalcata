@@ -236,12 +236,11 @@ def srkt_power(al, k, a_constant, target=0.0):
     lopt = al + rethick
     rx = target
     v = 12.0
-    num = 1000.0 * na * (na * r - (nc - 1.0) * lopt) - 0.001 * rx * (
-        v * (na * r - (nc - 1.0) * lopt) + lopt * r
-    )
-    den = (lopt - acd) * (na * r - (nc - 1.0) * acd) - 0.001 * rx * (
-        v * (na * r - (nc - 1.0) * acd) + acd * r
-    )
+    # Retzlaff 1990 附录公式 (10)：0.001*Rx 项在分子/分母的括号内。
+    term_l = na * r - (nc - 1.0) * lopt
+    term_a = na * r - (nc - 1.0) * acd
+    num = 1000.0 * na * (term_l - 0.001 * rx * (v * term_l + lopt * r))
+    den = (lopt - acd) * (term_a - 0.001 * rx * (v * term_a + acd * r))
     return num / den
 
 

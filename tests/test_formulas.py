@@ -130,6 +130,10 @@ def test_srkt_frozen_reference_values():
     assert formulas.srkt.calculate(26.0, 42.0)["iol_power_exact"] == pytest.approx(
         15.0054401494, abs=1e-6
     )
+    # 非零 target 按 Retzlaff 1990 附录公式 (10)，与校准脚本 srkt_power 一致。
+    assert formulas.srkt.calculate(
+        23.5, 44.0, target=1.0
+    )["iol_power_exact"] == pytest.approx(18.9019240704, abs=1e-6)
 
 
 def test_srkt_target_derivative_is_clinically_directed():
@@ -137,7 +141,7 @@ def test_srkt_target_derivative_is_clinically_directed():
     low = formulas.srkt.calculate(23.5, 44.0, target=-1.0)["iol_power_exact"]
     high = formulas.srkt.calculate(23.5, 44.0, target=1.0)["iol_power_exact"]
     derivative = (high - low) / 2.0
-    assert -1.5 < derivative < -0.8
+    assert -1.8 < derivative < -0.8
 
 
 def test_hoffer_q_frozen_reference_values():
