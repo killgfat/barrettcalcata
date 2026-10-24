@@ -22,13 +22,17 @@ INDEX_PAGE = """
         .github-icon { width: 28px; height: 28px; fill: white; }
         .main-content { padding: 30px; }
         .mode-switch-band { padding: 16px 30px 0; background: white; }
-        .mode-switch-band-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 12px; }
-        .mode-switch { display: flex; gap: 4px; flex: 1 1 320px; max-width: 420px; padding: 4px; border: 1px solid #cbd5e1; border-radius: 8px; background: #f1f5f9; }
-        .formula-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
-        .formula-field { display: flex; align-items: center; gap: 6px; }
-        .formula-field label { font-weight: bold; color: #475569; font-size: 14px; white-space: nowrap; }
-        .formula-field select { padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; background: #fff; color: #0f172a; }
-        .formula-field select:focus { outline: none; border-color: #007bff; box-shadow: 0 0 5px rgba(0,123,255,0.3); }
+        .mode-switch { display: flex; gap: 4px; max-width: 420px; margin: 0 auto; padding: 4px; border: 1px solid #cbd5e1; border-radius: 8px; background: #f1f5f9; }
+        .formula-switch { display: flex; flex-wrap: wrap; gap: 4px; max-width: 820px; margin: 12px auto 0; padding: 4px; border: 1px solid #cbd5e1; border-radius: 8px; background: #f1f5f9; }
+        .formula-button { flex: 1 1 160px; min-height: 40px; border: 0; border-radius: 6px; background: transparent; color: #475569; font-size: 14px; font-weight: bold; cursor: pointer; transition: background 0.2s, color 0.2s, box-shadow 0.2s; }
+        .formula-button:hover { color: #0f172a; }
+        .formula-button.active { background: white; color: #0f766e; box-shadow: 0 1px 4px rgba(15, 23, 42, 0.14); }
+        .execution-mode-row { display: flex; align-items: center; justify-content: center; gap: 10px; margin: 10px auto 0; }
+        .execution-mode-label { font-weight: bold; color: #475569; font-size: 14px; white-space: nowrap; }
+        .execution-mode-switch { display: flex; gap: 4px; padding: 4px; border: 1px solid #cbd5e1; border-radius: 8px; background: #f1f5f9; }
+        .execution-mode-button { min-width: 72px; min-height: 36px; border: 0; border-radius: 6px; background: transparent; color: #475569; font-size: 14px; font-weight: bold; cursor: pointer; transition: background 0.2s, color 0.2s, box-shadow 0.2s; }
+        .execution-mode-button:hover { color: #0f172a; }
+        .execution-mode-button.active { background: white; color: #0f766e; box-shadow: 0 1px 4px rgba(15, 23, 42, 0.14); }
         .mode-switch-hint { max-width: 720px; margin: 8px auto 0; text-align: center; }
         .formula-summary { margin-bottom: 15px; padding: 10px 14px; border: 1px solid #cbd5e1; border-radius: 8px; background: #f1f5f9; color: #0f172a; font-size: 0.95em; white-space: pre-line; line-height: 1.55; }
         .formula-input-hint { max-width: 760px; margin: 6px auto 0; text-align: center; }
@@ -129,28 +133,21 @@ INDEX_PAGE = """
         </div>
 
         <div class="mode-switch-band" aria-label="计算模式">
-            <div class="mode-switch-band-row">
-                <div class="mode-switch" role="group">
-                    <button type="button" class="mode-button active" id="sphericalModeButton" aria-pressed="true">非散光</button>
-                    <button type="button" class="mode-button" id="toricModeButton" aria-pressed="false">散光</button>
-                </div>
-                <div class="formula-controls" id="formulaControls">
-                    <div class="formula-field">
-                        <label for="formulaSelect">公式</label>
-                        <select id="formulaSelect">
-                            <option value="barrett" selected>Barrett Universal II</option>
-                            <option value="hoffer_q">Hoffer Q</option>
-                            <option value="srkt">SRK/T</option>
-                            <option value="haigis">Haigis</option>
-                        </select>
-                    </div>
-                    <div class="formula-field" id="executionModeField">
-                        <label for="executionModeSelect">执行方式</label>
-                        <select id="executionModeSelect">
-                            <option value="offline" selected>本地</option>
-                            <option value="online">在线</option>
-                        </select>
-                    </div>
+            <div class="mode-switch" role="group" aria-label="散光模式">
+                <button type="button" class="mode-button active" id="sphericalModeButton" aria-pressed="true">非散光</button>
+                <button type="button" class="mode-button" id="toricModeButton" aria-pressed="false">散光</button>
+            </div>
+            <div class="formula-switch" id="formulaSwitch" role="group" aria-label="计算公式">
+                <button type="button" class="formula-button active" data-formula="barrett" aria-pressed="true">Barrett Universal II</button>
+                <button type="button" class="formula-button" data-formula="hoffer_q" aria-pressed="false">Hoffer Q</button>
+                <button type="button" class="formula-button" data-formula="srkt" aria-pressed="false">SRK/T</button>
+                <button type="button" class="formula-button" data-formula="haigis" aria-pressed="false">Haigis</button>
+            </div>
+            <div class="execution-mode-row" id="executionModeControls">
+                <span class="execution-mode-label">执行方式</span>
+                <div class="execution-mode-switch" role="group" aria-label="执行方式">
+                    <button type="button" class="execution-mode-button active" data-execution-mode="online" aria-pressed="true">在线</button>
+                    <button type="button" class="execution-mode-button" data-execution-mode="offline" aria-pressed="false">本地</button>
                 </div>
             </div>
             <div id="executionModeHint" class="param-hint mode-switch-hint"></div>
@@ -1023,7 +1020,7 @@ INDEX_PAGE = """
                     formData.left_eye = leftEyeData;
                 }
 
-                const formula = document.getElementById('formulaSelect').value;
+                const formula = selectedFormula;
                 const executionMode = resolveExecutionMode();
 
                 const response = await fetch('/api/calculate', {
@@ -1063,10 +1060,10 @@ INDEX_PAGE = """
         const toricSection = document.getElementById('toricSection');
         const resultsSection = document.getElementById('resultsSection');
         const toricResultsSection = document.getElementById('toricResultsSection');
-        const formulaControls = document.getElementById('formulaControls');
-        const formulaSelect = document.getElementById('formulaSelect');
-        const executionModeField = document.getElementById('executionModeField');
-        const executionModeSelect = document.getElementById('executionModeSelect');
+        const formulaSwitch = document.getElementById('formulaSwitch');
+        const formulaButtons = Array.from(document.querySelectorAll('.formula-button'));
+        const executionModeControls = document.getElementById('executionModeControls');
+        const executionModeButtons = Array.from(document.querySelectorAll('.execution-mode-button'));
         const executionModeHint = document.getElementById('executionModeHint');
         const formulaInputHint = document.getElementById('formulaInputHint');
 
@@ -1083,21 +1080,56 @@ INDEX_PAGE = """
             haigis: 'Haigis 使用实测 ACD；留空时默认 3.20 mm 并降低置信度；LT/WTW 会被忽略。'
         };
 
+        let selectedFormula = 'barrett';
+        let selectedExecutionMode = 'online';
+
+        function updateFormulaButtons() {
+            formulaButtons.forEach((button) => {
+                const active = button.dataset.formula === selectedFormula;
+                button.classList.toggle('active', active);
+                button.setAttribute('aria-pressed', String(active));
+            });
+        }
+
+        function updateExecutionButtons() {
+            executionModeButtons.forEach((button) => {
+                const active = button.dataset.executionMode === selectedExecutionMode;
+                button.classList.toggle('active', active);
+                button.setAttribute('aria-pressed', String(active));
+            });
+        }
+
         function resolveExecutionMode() {
-            const formula = formulaSelect.value;
-            if (formula !== 'barrett') {
+            if (selectedFormula !== 'barrett') {
                 return 'offline';
             }
-            return executionModeSelect.value === 'online' ? 'online' : 'offline';
+            return selectedExecutionMode === 'offline' ? 'offline' : 'online';
         }
 
         function syncFormulaControls() {
-            const isBarrett = formulaSelect.value === 'barrett';
-            executionModeField.hidden = !isBarrett;
+            const isBarrett = selectedFormula === 'barrett';
+            executionModeControls.hidden = !isBarrett;
             executionModeHint.textContent = isBarrett
                 ? EXECUTION_MODE_HINTS[resolveExecutionMode()]
                 : LOCAL_FORMULA_HINT;
-            formulaInputHint.textContent = FORMULA_INPUT_HINTS[formulaSelect.value] || '';
+            formulaInputHint.textContent = FORMULA_INPUT_HINTS[selectedFormula] || '';
+        }
+
+        function selectFormula(name) {
+            const wasBarrett = selectedFormula === 'barrett';
+            selectedFormula = name;
+            if (!wasBarrett && name === 'barrett') {
+                selectedExecutionMode = 'online';
+            }
+            updateFormulaButtons();
+            updateExecutionButtons();
+            syncFormulaControls();
+        }
+
+        function selectExecutionMode(mode) {
+            selectedExecutionMode = mode === 'offline' ? 'offline' : 'online';
+            updateExecutionButtons();
+            syncFormulaControls();
         }
 
         function setCalculationMode(mode) {
@@ -1112,9 +1144,12 @@ INDEX_PAGE = """
             toricSection.hidden = !isToric;
             resultsSection.hidden = isToric;
             toricResultsSection.hidden = !isToric;
-            formulaControls.hidden = isToric;
+            formulaSwitch.hidden = isToric;
             executionModeHint.hidden = isToric;
             formulaInputHint.hidden = isToric;
+            if (isToric) {
+                executionModeControls.hidden = true;
+            }
 
             if (isToric) {
                 validateToricForm();
@@ -1126,8 +1161,14 @@ INDEX_PAGE = """
 
         sphericalModeButton.addEventListener('click', () => setCalculationMode('spherical'));
         toricModeButton.addEventListener('click', () => setCalculationMode('toric'));
-        formulaSelect.addEventListener('change', syncFormulaControls);
-        executionModeSelect.addEventListener('change', syncFormulaControls);
+        formulaButtons.forEach((button) => {
+            button.addEventListener('click', () => selectFormula(button.dataset.formula));
+        });
+        executionModeButtons.forEach((button) => {
+            button.addEventListener('click', () => selectExecutionMode(button.dataset.executionMode));
+        });
+        updateFormulaButtons();
+        updateExecutionButtons();
         setCalculationMode('spherical');
 
         function toricEyeFieldIds(eye) {

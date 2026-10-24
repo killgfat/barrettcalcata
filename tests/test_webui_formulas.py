@@ -21,11 +21,31 @@ def get_page() -> str:
 def test_formula_and_execution_mode_controls_exist():
     page = get_page()
 
-    assert 'id="formulaSelect"' in page
-    assert 'id="executionModeSelect"' in page
+    assert 'id="formulaSwitch"' in page
+    assert 'id="executionModeControls"' in page
     assert 'id="executionModeHint"' in page
     assert 'id="formulaInputHint"' in page
     assert 'class="param-hint mode-switch-hint"' in page
+
+
+def test_formula_switch_is_a_segmented_control_under_mode_switch():
+    page = get_page()
+
+    assert 'class="formula-switch" id="formulaSwitch"' in page
+    assert page.index('id="sphericalModeButton"') < page.index('id="formulaSwitch"')
+    assert page.index('id="formulaSwitch"') < page.index('id="executionModeControls"')
+    for formula in ("barrett", "hoffer_q", "srkt", "haigis"):
+        assert 'data-formula="' + formula + '"' in page
+
+
+def test_default_formula_is_barrett_and_default_mode_is_online():
+    page = get_page()
+
+    barrett = page.index('data-formula="barrett"')
+    assert barrett < page.index('data-formula="hoffer_q"')
+    assert 'class="formula-button active" data-formula="barrett"' in page
+    assert 'class="execution-mode-button active" data-execution-mode="online"' in page
+    assert "let selectedExecutionMode = 'online';" in page
 
 
 def test_formula_options_cover_all_supported_formulas():
@@ -80,12 +100,15 @@ def test_calculate_payload_sends_formula_and_execution_mode():
     assert "mode:" in page
     assert "mode: 'calculate'" not in page
     assert "fetch('/api/calculate'" in page
+    assert "const formula = selectedFormula;" in page
+    assert "formulaSelect" not in page
+    assert "executionModeSelect" not in page
 
 
 def test_toric_mode_hides_formula_controls():
     page = get_page()
 
-    assert "formulaControls.hidden = isToric;" in page
+    assert "formulaSwitch.hidden = isToric;" in page
     assert "executionModeHint.hidden = isToric;" in page
     assert "syncFormulaControls();" in page
 
