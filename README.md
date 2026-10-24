@@ -165,7 +165,6 @@ Barrett Offline 的开发期校准和验证使用
 
 - [公式实现、常数与参考文献](docs/formulas.md)
 - [Barrett Offline 校准方法、系数与误差](docs/calibration_report.md)
-- [后续重构计划](ToDo.md)
 
 ## 免责声明
 
