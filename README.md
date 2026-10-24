@@ -64,22 +64,31 @@ Barrett。选中 Barrett 时会再显示「在线 / 本地」执行方式开关�
 其余三个公式一律本地计算，不显示在线选项。公式下方会说明该公式是否使用
 ACD/LT/WTW；结果顶部显示实际公式、执行方式、每眼置信度、常数、ELP、
 使用/忽略的输入和警告。散光（Toric）模式仍由独立的 Barrett 官网接口计算，不受
-公式选择影响；API 的 mode 缺省仍为 offline，Web UI 会显式发送 online。
+公式选择影响；Web UI 通过 model 发送选择（Barrett 在线为 barrett_ii，本地为
+barrett_ii_offline）。
 
-`POST /api/calculate` 通过 `formula` 与 `mode` 两个参数表达同样的选择：
+`POST /api/calculate` 现在要求用 **`model`** 指定计算模型：
 
-- `mode = "offline"`（默认）：本地计算，零网络调用；Barrett 走
-  `src/formula/barrett.py` 的近似核心，其余公式走 `src/formula/`。
-  输入仍是 `right_eye` / `left_eye` / `a_constant` / `k_index`，返回结构与在线模式兼容
-  （`iol_options` 可直接被 Web UI 使用），并额外返回 `formula`、`formula_label`、
-  `mode`、`model`、`confidence`、`warnings`、`elp`、`formula_capabilities` 等字段。
-  每只眼还返回 `provided_inputs`、`used_inputs`、`ignored_inputs`，明确哪些输入
-  实际参与计算、哪些被公式忽略。
-- `mode = "online"`：显式走原有的 Barrett 官网路径，行为与返回结构保持不变；
-  该选项只对 `formula = "barrett"` 有效，其他公式传 `online` 会被拒绝。
-- `formula = "barrett" | "hoffer_q" | "srkt" | "haigis"`（默认 `barrett`）：
-  选择本地公式实现，详见下文「本地公式实现与引用」。响应 `data` 中新增
-  `formula`、`formula_label`、`mode`，每只眼的 `iol_options` 结构保持不变。
+| model | 含义 | 内部公式/模式 |
+|---|---|---|
+| `barrett_ii_offline` | Barrett Universal II 本地离线 | `barrett` + `offline` |
+| `barrett_ii` | Barrett Universal II 官网在线 | `barrett` + `online` |
+| `srkt` | SRK/T 本地 | `srkt` + `offline` |
+| `hoffer_q` | Hoffer Q 本地 | `hoffer_q` + `offline` |
+| `haigis` | Haigis 本地 | `haigis` + `offline` |
+
+旧的 `formula` + `mode` 字段仍可作为兼容入口，但新客户端应只传 `model`；
+两者同时出现时以 `model` 为准。
+
+响应 `data` 顶层新增：
+
+- `calculation_model` / `calculation_model_label`：实际使用的计算模型
+- `formula` / `formula_label` / `mode`：内部公式与执行方式
+- `model` / `model_note`：公式实现的技术模型标识
+- `formula_capabilities`、`confidence`、`warnings`、`elp` 等
+
+每只眼还返回 `provided_inputs`、`used_inputs`、`ignored_inputs`，明确哪些输入
+实际参与计算、哪些被公式忽略。离线路径零网络调用；`barrett_ii` 才调用官网。
 
 **ACD 缺省处理**：API 不再为所有公式统一填充 `ACD=3.00`。未提供时：
 Barrett 只用实际提供的参数近似 ELP 并给出 warning；SRK/T 与 Hoffer Q 本来就
@@ -93,8 +102,7 @@ Barrett 只用实际提供的参数近似 ELP 并给出 warning；SRK/T 与 Hoff
 {
   "right_eye": {"AL": 23.5, "K1": 43.5, "K2": 44.0, "ACD": 3.2, "Refraction": 0},
   "a_constant": 119.3,
-  "formula": "barrett",
-  "mode": "offline"
+  "model": "barrett_ii_offline"
 }
 ```
 
@@ -141,9 +149,10 @@ python scripts/calibrate_offline.py --no-download
 Web UI 的「公式」选择器与 `POST /api/calculate` 的 `formula` 参数共用同一套
 本地实现（`src/formula/`）。四个公式的执行方式如下：
 
-| formula | 展示名 | 执行方式 | 实现位置 |
-|---------|--------|----------|----------|
-| `barrett` | Barrett Universal II | 本地（默认）/ 官网在线 | `src/formula/barrett.py`（本地） / `src/formula/barrett_online.py`（在线） |
+| model | 展示名 | 执行方式 | 实现位置 |
+|-------|--------|----------|----------|
+| `barrett_ii_offline` | Barrett Universal II | 本地 | `src/formula/barrett.py` |
+| `barrett_ii` | Barrett Universal II | 官网在线 | `src/formula/barrett_online.py` |
 | `hoffer_q` | Hoffer Q | 仅本地 | `src/formula/hoffer_q.py` |
 | `srkt` | SRK/T | 仅本地 | `src/formula/srkt.py` |
 | `haigis` | Haigis | 仅本地 | `src/formula/haigis.py` |

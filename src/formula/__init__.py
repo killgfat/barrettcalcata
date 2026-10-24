@@ -8,17 +8,22 @@ from __future__ import annotations
 
 from . import barrett, haigis, hoffer_q, srkt
 from .formula import (
+    CALCULATION_MODEL_LABELS,
+    CALCULATION_MODELS,
     CAPABILITIES,
     FORMULA_LABELS,
     FORMULA_NAMES,
     calculate,
     calculate_toric,
+    calculation_model_for,
     fetch_iol_model_list,
     fetch_model_a_constant,
+    get_calculation_model_label,
     get_formula_capabilities,
     get_formula_label,
     get_hello_message,
     list_formulas,
+    normalize_calculation_model,
     normalize_formula,
     normalize_mode,
 )
@@ -75,6 +80,8 @@ def calculate_formula(
 
 
 __all__ = [
+    "CALCULATION_MODELS",
+    "CALCULATION_MODEL_LABELS",
     "CAPABILITIES",
     "FORMULA_LABELS",
     "FORMULA_NAMES",
@@ -91,12 +98,15 @@ __all__ = [
     "calculate",
     "calculate_formula",
     "calculate_toric",
+    "calculation_model_for",
     "fetch_iol_model_list",
     "fetch_model_a_constant",
+    "get_calculation_model_label",
     "get_formula_capabilities",
     "get_formula_label",
     "get_hello_message",
     "list_formulas",
+    "normalize_calculation_model",
     "normalize_formula",
     "normalize_mode",
 ]

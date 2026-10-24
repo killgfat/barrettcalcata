@@ -58,7 +58,7 @@ def get_openapi_spec():
             "/api/calculate": {
                 "post": {
                     "summary": "执行IOL计算",
-                    "description": "提交眼睛参数JSON，计算人工晶体度数。formula 选择计算公式（默认 barrett）。mode=offline（默认）时全部公式都使用本地实现，零网络调用，结果带有 confidence/model 字段；mode=online 仅 Barrett 支持，调用 Barrett 官网（原有行为）。至少提供右眼或左眼其中一组参数。k_index使用真实角膜等效折射率表示。",
+                    "description": "提交眼睛参数JSON，计算人工晶体度数。model 为必填的计算模型：barrett_ii_offline（Barrett 离线）、barrett_ii（Barrett 在线）、srkt、hoffer_q、haigis（本地实现）。旧的 formula/mode 字段仅作兼容保留，model 存在时优先。至少提供右眼或左眼其中一组参数。k_index使用真实角膜等效折射率表示。",
                     "requestBody": {
                         "required": True,
                         "content": {
@@ -178,11 +178,27 @@ def get_openapi_spec():
                                             "description": "角膜等效折射率。1.3375会转换为Barrett表单值337.5，1.332会转换为332。",
                                             "example": 1.3375,
                                         },
+                                        "model": {
+                                            "type": "string",
+                                            "enum": [
+                                                "barrett_ii_offline",
+                                                "barrett_ii",
+                                                "srkt",
+                                                "hoffer_q",
+                                                "haigis",
+                                            ],
+                                            "description": (
+                                                "计算模型（必填）。barrett_ii_offline = Barrett 本地离线；"
+                                                "barrett_ii = Barrett 官网在线；其余为对应本地公式。"
+                                            ),
+                                            "example": "barrett_ii_offline",
+                                        },
                                         "mode": {
                                             "type": "string",
                                             "enum": ["offline", "online"],
                                             "default": "offline",
-                                            "description": "计算模式。offline（默认）使用本地公式实现，零网络调用；online 仅 Barrett 支持，调用 Barrett 官网并保持原有返回结构。离线结果不是官方 BUII 的等价复刻，详见 docs/calibration_report.md。",
+                                            "deprecated": True,
+                                            "description": "兼容字段；新客户端请使用 model。model 存在时忽略本字段。",
                                             "example": "offline",
                                         },
                                         "formula": {
@@ -194,7 +210,8 @@ def get_openapi_spec():
                                                 "haigis",
                                             ],
                                             "default": "barrett",
-                                            "description": "计算公式。barrett 支持 offline/online；srkt、hoffer_q、haigis 只支持 offline（本地实现）。",
+                                            "deprecated": True,
+                                            "description": "兼容字段；新客户端请使用 model。model 存在时忽略本字段。",
                                             "example": "barrett",
                                         },
                                         "step": {
@@ -220,6 +237,7 @@ def get_openapi_spec():
                                             "required": ["a0", "a1", "a2"],
                                         },
                                     },
+                                    "required": ["model"],
                                 },
                                 "example": {
                                     "right_eye": {
@@ -238,8 +256,7 @@ def get_openapi_spec():
                                     },
                                     "a_constant": 119.3,
                                     "k_index": 1.3375,
-                                    "mode": "offline",
-                                    "formula": "barrett",
+                                    "model": "barrett_ii_offline",
                                     "patient_name": "张三",
                                 },
                             }
@@ -253,6 +270,8 @@ def get_openapi_spec():
                                     "example": {
                                         "success": True,
                                         "data": {
+                                            "calculation_model": "barrett_ii_offline",
+                                            "calculation_model_label": "Barrett Universal II（离线）",
                                             "formula": "barrett",
                                             "formula_label": "Barrett Universal II",
                                             "mode": "offline",
@@ -349,6 +368,7 @@ def get_openapi_spec():
                     "description": (
                         "提交 K1/K1Axis、K2/K2Axis 角膜曲率及轴位、眼轴、ACD、"
                         "晶体厚度、WTW 等参数，返回散光晶体型号、球镜度数和建议轴位。"
+                        "响应 calculation_model 固定为 barrett_ii_toric（在线）。"
                     ),
                     "requestBody": {
                         "required": True,

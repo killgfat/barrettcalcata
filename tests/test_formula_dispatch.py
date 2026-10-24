@@ -37,7 +37,11 @@ def reference_body(**eye_overrides):
         "WTW": 11.9,
     }
     eye.update(eye_overrides)
-    return {"right_eye": eye, "a_constant": 118.7}
+    return {
+        "right_eye": eye,
+        "a_constant": 118.7,
+        "model": "barrett_ii_offline",
+    }
 
 
 def test_offline_output_contract_and_provided_inputs():
@@ -80,6 +84,7 @@ def test_offline_output_contract_and_provided_inputs():
 
 def test_srkt_marks_measured_acd_as_ignored():
     body = reference_body()
+    body.pop("model", None)
     body["formula"] = "srkt"
     data = run_calculation(body)
 
@@ -93,6 +98,7 @@ def test_srkt_marks_measured_acd_as_ignored():
 
 def test_hoffer_q_marks_measured_acd_as_ignored():
     body = reference_body()
+    body.pop("model", None)
     body["formula"] = "hoffer_q"
     data = run_calculation(body)
 
@@ -104,6 +110,7 @@ def test_hoffer_q_marks_measured_acd_as_ignored():
 def test_all_formula_tables_are_ascending_by_iol_power():
     for formula_name in formula.FORMULA_NAMES:
         body = reference_body()
+        body.pop("model", None)
         body["formula"] = formula_name
         eye = run_calculation(body)["right_eye"]
         powers = [float(row["iol_power"]) for row in eye["iol_options"]]
@@ -160,6 +167,7 @@ def test_barrett_missing_optional_inputs_warns_without_silent_default():
         {
             "right_eye": {"AL": 23.5, "K1": 43.5, "K2": 44.0},
             "a_constant": 118.7,
+            "model": "barrett_ii_offline",
         }
     )
 
@@ -208,6 +216,7 @@ def test_invalid_a_constant_is_rejected(a_constant):
             {
                 "right_eye": {"AL": 23.5, "K1": 43.5, "K2": 44.0},
                 "a_constant": a_constant,
+                "model": "barrett_ii_offline",
             }
         )
 
@@ -282,6 +291,52 @@ def test_offline_calculation_does_not_open_network_sockets(monkeypatch):
 
     assert data["mode"] == "offline"
     assert data["right_eye"]["iol_options"]
+
+
+@pytest.mark.parametrize(
+    ("model", "expected_formula", "expected_mode"),
+    [
+        ("barrett_ii_offline", "barrett", "offline"),
+        ("srkt", "srkt", "offline"),
+        ("hoffer_q", "hoffer_q", "offline"),
+        ("haigis", "haigis", "offline"),
+    ],
+)
+def test_calculation_model_selects_formula_and_mode(
+    model, expected_formula, expected_mode
+):
+    body = reference_body()
+    body["model"] = model
+    body["formula"] = "haigis"
+    body["mode"] = "online"
+    data = run_calculation(body)
+
+    assert data["calculation_model"] == model
+    assert data["formula"] == expected_formula
+    assert data["mode"] == expected_mode
+
+
+def test_barrett_online_model_uses_online_adapter(monkeypatch):
+    async def fake_online(**kwargs):
+        return {"right_eye": {"iol_options": []}}
+
+    monkeypatch.setattr(
+        formula.barrett_online, "calculate_barrett_iol", fake_online
+    )
+    body = reference_body()
+    body["model"] = "barrett_ii"
+    data = run_calculation(body)
+
+    assert data["calculation_model"] == "barrett_ii"
+    assert data["formula"] == "barrett"
+    assert data["mode"] == "online"
+
+
+def test_unknown_calculation_model_is_rejected():
+    body = reference_body()
+    body["model"] = "barrett_v"
+    with pytest.raises(ValueError, match="model 只支持"):
+        run_calculation(body)
 
 
 def test_formula_capabilities_are_declared_for_every_formula():

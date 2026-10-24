@@ -144,6 +144,7 @@ async def test_barrett_calculate_defaults_to_offline(monkeypatch):
                 "WTW": "11.9",
             },
             "a_constant": 118.7,
+            "model": "barrett_ii_offline",
         }
     )
 
@@ -197,6 +198,7 @@ async def test_barrett_calculate_offline_rejects_out_of_range_al():
         {
             "right_eye": {"AL": 9.0, "K1": 43.5, "K2": 44.0},
             "mode": "offline",
+            "model": "barrett_ii_offline",
         }
     )
 
@@ -268,18 +270,34 @@ async def test_barrett_calculate_rejects_online_for_non_barrett_formula():
 
 
 @pytest.mark.asyncio
-async def test_barrett_calculate_defaults_to_barrett_formula_offline():
+async def test_barrett_calculate_accepts_barrett_offline_model():
+    handler = api.APIHandler(SimpleNamespace())
+
+    result, status_code = await handler._handle_barrett_calculate(
+        {
+            "right_eye": {"AL": 23.5, "K1": 43.5, "K2": 44.0},
+            "model": "barrett_ii_offline",
+        }
+    )
+
+    assert status_code == 200
+    data = result["data"]
+    assert data["calculation_model"] == "barrett_ii_offline"
+    assert data["formula"] == "barrett"
+    assert data["formula_label"] == "Barrett Universal II"
+    assert data["mode"] == "offline"
+
+
+@pytest.mark.asyncio
+async def test_barrett_calculate_requires_model():
     handler = api.APIHandler(SimpleNamespace())
 
     result, status_code = await handler._handle_barrett_calculate(
         {"right_eye": {"AL": 23.5, "K1": 43.5, "K2": 44.0}}
     )
 
-    assert status_code == 200
-    data = result["data"]
-    assert data["formula"] == "barrett"
-    assert data["formula_label"] == "Barrett Universal II"
-    assert data["mode"] == "offline"
+    assert status_code == 400
+    assert "model" in result["message"]
 
 
 @pytest.mark.asyncio
@@ -304,6 +322,24 @@ async def test_barrett_calculate_online_reports_formula(monkeypatch):
     assert data["formula_label"] == "Barrett Universal II"
     assert data["mode"] == "online"
     assert data["right_eye"]["iol_options"] == []
+
+
+def test_openapi_requires_calculation_model():
+    specification = docs.get_openapi_spec()
+    schema = specification["paths"]["/api/calculate"]["post"]["requestBody"][
+        "content"
+    ]["application/json"]["schema"]
+
+    assert schema["required"] == ["model"]
+    assert schema["properties"]["model"]["enum"] == [
+        "barrett_ii_offline",
+        "barrett_ii",
+        "srkt",
+        "hoffer_q",
+        "haigis",
+    ]
+    assert schema["properties"]["formula"].get("deprecated") is True
+    assert schema["properties"]["mode"].get("deprecated") is True
 
 
 def test_web_ui_uses_supported_worker_endpoints():

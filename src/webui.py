@@ -1033,14 +1033,12 @@ INDEX_PAGE = """
                     formData.left_eye = leftEyeData;
                 }
 
-                const formula = selectedFormula;
-                const executionMode = resolveExecutionMode();
-                const haigisConstantsValue = formula === 'haigis' ? readHaigisConstants() : null;
+                const calculationModel = resolveCalculationModel();
+                const haigisConstantsValue = calculationModel === 'haigis' ? readHaigisConstants() : null;
 
                 const payload = {
                     ...formData,
-                    formula: formula,
-                    mode: executionMode
+                    model: calculationModel
                 };
                 if (haigisConstantsValue) {
                     payload.haigis_constants = haigisConstantsValue;
@@ -1126,6 +1124,13 @@ INDEX_PAGE = """
                 return 'offline';
             }
             return selectedExecutionMode === 'offline' ? 'offline' : 'online';
+        }
+
+        function resolveCalculationModel() {
+            if (selectedFormula !== 'barrett') {
+                return selectedFormula;
+            }
+            return selectedExecutionMode === 'offline' ? 'barrett_ii_offline' : 'barrett_ii';
         }
 
         function syncFormulaControls() {

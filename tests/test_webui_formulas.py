@@ -108,14 +108,15 @@ def test_result_summary_shows_confidence_constants_and_input_usage():
     assert "parseFloat(a.iol_power) - parseFloat(b.iol_power)" in page
 
 
-def test_calculate_payload_sends_formula_and_execution_mode():
+def test_calculate_payload_sends_calculation_model():
     page = get_page()
 
-    assert "formula:" in page
-    assert "mode:" in page
-    assert "mode: 'calculate'" not in page
     assert "fetch('/api/calculate'" in page
-    assert "const formula = selectedFormula;" in page
+    assert "resolveCalculationModel" in page
+    assert "return 'barrett_ii_offline' :" not in page
+    assert "barrett_ii_offline" in page
+    assert "barrett_ii'" in page
+    assert "model: calculationModel" in page
     assert "formulaSelect" not in page
     assert "executionModeSelect" not in page
     assert "execution-mode-button" not in page

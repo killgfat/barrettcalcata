@@ -161,6 +161,7 @@ class CalculationRequest:
     k_index: float = common.K_INDEX_REF
     formula: str = "barrett"
     mode: str = "offline"
+    model: str | None = None
     step: float = 0.5
     patient_name: str | None = None
     iol_model: str | None = None
@@ -177,6 +178,12 @@ class CalculationRequest:
         if right_eye is None and left_eye is None:
             raise InputValidationError("至少需要提供右眼或左眼参数")
 
+        model = body.get("model")
+        if model is not None:
+            model = str(model).strip().lower()
+            if not model:
+                model = None
+
         formula = body.get("formula")
         formula = "barrett" if formula is None else str(formula).strip().lower()
         if not formula:
@@ -186,6 +193,16 @@ class CalculationRequest:
         mode = "offline" if mode is None else str(mode).strip().lower()
         if not mode:
             mode = "offline"
+
+        legacy_supplied = any(
+            key in body and body.get(key) not in (None, "")
+            for key in ("formula", "mode")
+        )
+        if model is None and not legacy_supplied:
+            raise InputValidationError(
+                "必须指定 model：barrett_ii_offline, barrett_ii, srkt, "
+                "hoffer_q 或 haigis"
+            )
 
         patient_name = body.get("patient_name")
         iol_model = body.get("iol_model")
@@ -202,6 +219,7 @@ class CalculationRequest:
             k_index=common.normalize_k_index(body.get("k_index")),
             formula=formula,
             mode=mode,
+            model=model,
             step=common.parse_step(body.get("step", 0.5)),
             patient_name=str(patient_name) if patient_name is not None else None,
             iol_model=str(iol_model) if iol_model is not None else None,

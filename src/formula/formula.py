@@ -38,6 +38,26 @@ FORMULA_LABELS = {
 
 FORMULA_NAMES = tuple(FORMULA_LABELS)
 
+# 计算模型 = 公式 + 执行方式的显式组合。API 的新契约使用这个名称。
+CALCULATION_MODELS = {
+    "barrett_ii_offline": ("barrett", "offline"),
+    "barrett_ii": ("barrett", "online"),
+    "srkt": ("srkt", "offline"),
+    "hoffer_q": ("hoffer_q", "offline"),
+    "haigis": ("haigis", "offline"),
+}
+
+CALCULATION_MODEL_LABELS = {
+    "barrett_ii_offline": "Barrett Universal II（离线）",
+    "barrett_ii": "Barrett Universal II（在线）",
+    "srkt": "SRK/T",
+    "hoffer_q": "Hoffer Q",
+    "haigis": "Haigis",
+}
+
+TORIC_CALCULATION_MODEL = "barrett_ii_toric"
+TORIC_CALCULATION_MODEL_LABEL = "Barrett Universal II Toric（在线）"
+
 CAPABILITIES = {
     "barrett": FormulaCapabilities(
         name="barrett",
@@ -89,6 +109,33 @@ _MODULES = {
 
 # 官网普通 Barrett 适配器在 ACD 缺失时沿用的默认值（与官网表单一致）。
 ONLINE_DEFAULT_ACD = 3.00
+
+
+def normalize_calculation_model(value):
+    """标准化计算模型名称；None/空返回 None。"""
+    if value is None:
+        return None
+    model = str(value).strip().lower()
+    if not model:
+        return None
+    if model not in CALCULATION_MODELS:
+        raise UnsupportedFormulaError(
+            "model 只支持 barrett_ii_offline, barrett_ii, srkt, hoffer_q, haigis"
+        )
+    return model
+
+
+def calculation_model_for(formula, mode):
+    """由旧 formula/mode 推导等价的 calculation model。"""
+    if formula == "barrett":
+        return "barrett_ii" if mode == "online" else "barrett_ii_offline"
+    return formula
+
+
+def get_calculation_model_label(model):
+    """返回计算模型的展示名称。"""
+    key = normalize_calculation_model(model)
+    return CALCULATION_MODEL_LABELS.get(key, key)
 
 
 def normalize_formula(value):
@@ -318,16 +365,28 @@ async def calculate(request: CalculationRequest):
     """普通 IOL 计算的唯一入口。"""
     if not isinstance(request, CalculationRequest):
         raise InputValidationError("calculate 需要 CalculationRequest")
-    formula = normalize_formula(request.formula)
-    mode = normalize_mode(request.mode)
+
+    model = normalize_calculation_model(request.model)
+    if model is not None:
+        formula, mode = CALCULATION_MODELS[model]
+    else:
+        formula = normalize_formula(request.formula)
+        mode = normalize_mode(request.mode)
+        model = calculation_model_for(formula, mode)
+
     caps = CAPABILITIES[formula]
     if mode not in caps.modes:
         if formula != "barrett":
             raise UnsupportedModeError("只有 Barrett 支持 online 模式")
         raise UnsupportedModeError(f"{caps.label} 不支持 {mode} 模式")
+
     if mode == "online":
-        return await _calculate_online(request, formula)
-    return _calculate_offline(request, formula)
+        result = await _calculate_online(request, formula)
+    else:
+        result = _calculate_offline(request, formula)
+    result["calculation_model"] = model
+    result["calculation_model_label"] = CALCULATION_MODEL_LABELS[model]
+    return result
 
 
 async def calculate_toric(request: ToricCalculationRequest):
@@ -347,6 +406,8 @@ async def calculate_toric(request: ToricCalculationRequest):
         "formula_name": "barrett_toric",
         "formula_label": "Barrett Universal II Toric",
         "mode": "online",
+        "calculation_model": TORIC_CALCULATION_MODEL,
+        "calculation_model_label": TORIC_CALCULATION_MODEL_LABEL,
         **result,
     }
     return labelled
@@ -368,17 +429,22 @@ def fetch_model_a_constant(model_name):
 
 
 __all__ = [
+    "CALCULATION_MODELS",
+    "CALCULATION_MODEL_LABELS",
     "CAPABILITIES",
     "FORMULA_LABELS",
     "FORMULA_NAMES",
     "calculate",
     "calculate_toric",
+    "calculation_model_for",
     "fetch_iol_model_list",
     "fetch_model_a_constant",
+    "get_calculation_model_label",
     "get_formula_capabilities",
     "get_formula_label",
     "get_hello_message",
     "list_formulas",
+    "normalize_calculation_model",
     "normalize_formula",
     "normalize_mode",
 ]
