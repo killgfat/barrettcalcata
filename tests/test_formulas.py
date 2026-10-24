@@ -131,9 +131,9 @@ def test_srkt_frozen_reference_values():
         15.0054401494, abs=1e-6
     )
     # 非零 target 按 Retzlaff 1990 附录公式 (10)，与校准脚本 srkt_power 一致。
-    assert formulas.srkt.calculate(
-        23.5, 44.0, target=1.0
-    )["iol_power_exact"] == pytest.approx(18.9019240704, abs=1e-6)
+    assert formulas.srkt.calculate(23.5, 44.0, target=1.0)[
+        "iol_power_exact"
+    ] == pytest.approx(18.9019240704, abs=1e-6)
 
 
 def test_srkt_target_derivative_is_clinically_directed():

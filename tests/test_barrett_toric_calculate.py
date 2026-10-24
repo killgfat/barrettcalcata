@@ -1,9 +1,9 @@
 import asyncio
 import importlib
 import sys
-from urllib.parse import unquote
 from pathlib import Path
 from types import SimpleNamespace
+from urllib.parse import unquote
 
 import pytest
 
@@ -241,7 +241,9 @@ def test_toric_payload_accepts_canonical_k_names(monkeypatch):
         "LensThickness": eye["LensThickness"],
         "WTW": eye["WTW"],
     }
-    asyncio.run(barrett_toric_calculate.calculate_barrett_toric_iol(right_eye_params=eye))
+    asyncio.run(
+        barrett_toric_calculate.calculate_barrett_toric_iol(right_eye_params=eye)
+    )
     payload = fake_session.post_payloads[-1]
     assert payload["ctl00$MainContent$MeasuredK"] == "41.50"
     assert payload["ctl00$MainContent$MeasuredAxis"] == "84.00"
@@ -254,8 +256,9 @@ def test_toric_default_incision_angle_is_135_in_ui_and_openapi():
     assert 'id="toricRightIncision" value="135"' in page
     assert 'id="toricLeftIncision" value="135"' in page
     assert (
-        docs.get_openapi_spec()["components"]["schemas"]["ToricEye"]["properties"]
-        ["incision_location"]["default"]
+        docs.get_openapi_spec()["components"]["schemas"]["ToricEye"]["properties"][
+            "incision_location"
+        ]["default"]
         == 135
     )
 
@@ -301,9 +304,7 @@ def test_current_toric_result_parser_reads_official_fields_and_tables():
       <tr><td>T6</td><td>3.75</td><td>-0.12 Cyl Axis 85</td></tr>
     </table>
     """
-    result = barrett_toric_calculate.parse_toric_results(
-        html, selected_eye="right_eye"
-    )
+    result = barrett_toric_calculate.parse_toric_results(html, selected_eye="right_eye")
     eye = result["right_eye"]
     assert eye["K1"] == 41.5
     assert eye["K1Axis"] == 84
@@ -382,9 +383,5 @@ def test_barrett_toric_endpoint_is_documented_and_rendered():
     assert 'id="toricResultsSection"' in page
     assert "Eye%20Background%20360.jpg" in page
     assert page.index('for="toricRightAL"') < page.index('for="toricRightFlatK"')
-    assert page.index('for="toricRightFlatK"') < page.index(
-        'for="toricRightFlatAxis"'
-    )
-    assert page.index('for="toricRightFlatAxis"') < page.index(
-        'for="toricRightSteepK"'
-    )
+    assert page.index('for="toricRightFlatK"') < page.index('for="toricRightFlatAxis"')
+    assert page.index('for="toricRightFlatAxis"') < page.index('for="toricRightSteepK"')

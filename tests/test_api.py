@@ -123,7 +123,6 @@ async def test_barrett_calculate_rejects_null_required_eye_value():
     assert "右眼AL" in result["message"]
 
 
-
 @pytest.mark.asyncio
 async def test_barrett_calculate_defaults_to_offline(monkeypatch):
     handler = api.APIHandler(SimpleNamespace())
@@ -131,9 +130,7 @@ async def test_barrett_calculate_defaults_to_offline(monkeypatch):
     async def fail_online(**kwargs):
         raise AssertionError("offline 模式不应调用官网")
 
-    monkeypatch.setattr(
-        formula.barrett_online, "calculate_barrett_iol", fail_online
-    )
+    monkeypatch.setattr(formula.barrett_online, "calculate_barrett_iol", fail_online)
 
     result, status_code = await handler._handle_barrett_calculate(
         {
@@ -292,9 +289,7 @@ async def test_barrett_calculate_online_reports_formula(monkeypatch):
     async def fake_calculate(**kwargs):
         return {"right_eye": {"iol_options": []}}
 
-    monkeypatch.setattr(
-        formula.barrett_online, "calculate_barrett_iol", fake_calculate
-    )
+    monkeypatch.setattr(formula.barrett_online, "calculate_barrett_iol", fake_calculate)
 
     result, status_code = await handler._handle_barrett_calculate(
         {
