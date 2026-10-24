@@ -11,23 +11,19 @@
 - 按题面合格线（mean 约 0.03 D、SD 0.12-0.18 D）衡量：纯 ALK 版 SD=0.339 D，不达标；五参数近似版 mean=+0.002 D、SD=0.164 D，落在量级内，但它依赖 ACD/LT/WTW，不是题面要求的纯 ALK 版。
 - grids.npz:AL_K 曲面存在约 +0.68 D 的整体偏移，且 README 未记录该曲面的 ACD/LT/WTW/A-constant 基线；因此对该曲面同时报告原始与去均值（形状）指标。
 
-## 1. 运行命令与环境
+## 1. 运行命令与数据完整性
 
     python scripts/calibrate_offline.py
 
-- 运行时间：2026-10-25 00:02:16
-- Python：3.12.3 (Linux-7.0.12-1-pve-x86_64-with-glibc2.39)
-- numpy：2.4.2
-- git commit：fdfb59d3e1e41ac5f18942e6d99073c77495f9b4
-- 运行前工作区状态：clean
-- 数据目录：/root/workspace/barrettcalcata/data/barrett-uii-data
+- 运行环境：Python 3.12+；numpy 仅用于该校准脚本。
 - scans.csv SHA-256：f36d6ec6c563945c11a59cf1f632d9491bfd05c4fd5074eda526173507e59207
 - grids.npz SHA-256：5736107cb3de1abb2fd92f4cadc2975eeddbf09c8e480e1b67a9396103a84354
 
 ## 2. 数据来源
 
-- 仓库：ekrbye/barrett-uii-data，许可证 CC-BY-4.0。
-- 获取方式：https://ghfast.top/https://github.com/ekrbye/barrett-uii-data/archive/refs/heads/main.tar.gz（github.com 被 SNI DPI 阻断，使用 ghfast.top 镜像）。
+- 仓库：ekrbye/barrett-uii-data；作者：Yishen Wang、Li Li；许可证 CC-BY-4.0。
+- 获取方式：开发期从公开发布仓库下载；数据不参与 Worker 运行或部署。
+- 隐私说明：样本为在线计算器的系统性参数扫描，不含患者身份信息；报告不记录本机路径、Git 状态或网络环境。
 - 内容：scans.csv（单参数扫描，4030 行可用）与 grids.npz（AL_K 曲面 1974 个可用点）。
 - README 说明数据来自官方在线计算器（A-constant 118.7），本脚本按 mean(K1,K2)、目标屈光度 0 对齐。
 - 交叉核对：scans.csv 的 B_norm 基线（AL 23.5、K1 43.5/K2 44.5、ACD 3.2、LT 4.6、WTW 11.9）官方值为 20.488 D；grids.npz 的 AL_K 最近点（AL 23.571、K 44.143）官方值为 19.473 D。两者 AL/K 几乎相同却相差约 1.0 D，说明该曲面的 ACD/LT/WTW/A-constant 基线未记录且与 scans 不同，因此不能把 +0.68 D 偏移全部归因于离线模型。
@@ -54,7 +50,7 @@
 - A-constant <-> LF：用厂商公开的四组常数对 (118.7,1.73)/(119.0,1.88)/(119.1,1.94)/(119.3,2.04) 做线性最小二乘，得到 LF = 0.518667*A -59.836800。
 - ELP：在公开网格上用薄透镜反演得到等效 ELP，再对 AL/K 做二次、对 ACD/LT/WTW 做线性回归。系数是 CALIBRATED（非官方）。
 - 参考对照：SRK/T（Retzlaff 1990）与 Holladay 1（1988）按公开公式独立实现，用于给离线 BUII 一个第三方包络。
-- 实时复核尝试：本机直接请求 calc.apacrs.org 返回 403（反爬），因此无法做实时官网对照；本报告的官方值全部来自公开数据集。
+- 本报告不包含实时官网对照；报告的官方输出值全部来自公开数据集。
 
 ## 4. 模型系数
 

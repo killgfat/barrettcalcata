@@ -22,8 +22,6 @@ import argparse
 import csv
 import hashlib
 import math
-import platform
-import subprocess
 import sys
 import tarfile
 import tempfile
@@ -691,25 +689,12 @@ def main():
                 ]
             )
 
-    try:
-        git_commit = subprocess.check_output(
-            ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True
-        ).strip()
-        git_status = subprocess.check_output(
-            ["git", "status", "--porcelain"], cwd=ROOT, text=True
-        ).strip()
-    except (OSError, subprocess.CalledProcessError):
-        git_commit = "unknown"
-        git_status = ""
-    numpy_version = np.__version__ if np is not None else "not installed"
     scans_hash = sha256sum(DATA_DIR / "scans.csv")
     grids_hash = (
         sha256sum(DATA_DIR / "grids.npz")
         if (DATA_DIR / "grids.npz").exists()
         else "missing"
     )
-    stamp = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
-
     report = []
     report.append("# Barrett Universal II 离线模块校准报告\n")
     report.append(
@@ -753,25 +738,26 @@ def main():
     )
     report.append("")
 
-    report.append("## 1. 运行命令与环境\n")
+    report.append("## 1. 运行命令与数据完整性\n")
     report.append(
         "    python scripts/calibrate_offline.py" + (" --refit" if args.refit else "")
     )
     report.append("")
-    report.append(f"- 运行时间：{stamp}")
-    report.append(f"- Python：{platform.python_version()} ({platform.platform()})")
-    report.append(f"- numpy：{numpy_version}")
-    report.append(f"- git commit：{git_commit}")
-    report.append(f"- 运行前工作区状态：{git_status or 'clean'}")
-    report.append(f"- 数据目录：{DATA_DIR}")
+    report.append("- 运行环境：Python 3.12+；numpy 仅用于该校准脚本。")
     report.append(f"- scans.csv SHA-256：{scans_hash}")
     report.append(f"- grids.npz SHA-256：{grids_hash}")
     report.append("")
 
     report.append("## 2. 数据来源\n")
-    report.append("- 仓库：ekrbye/barrett-uii-data，许可证 CC-BY-4.0。")
     report.append(
-        f"- 获取方式：{TARBALL_URL}（github.com 被 SNI DPI 阻断，使用 ghfast.top 镜像）。"
+        "- 仓库：ekrbye/barrett-uii-data；作者：Yishen Wang、Li Li；许可证 CC-BY-4.0。"
+    )
+    report.append(
+        "- 获取方式：开发期从公开发布仓库下载；数据不参与 Worker 运行或部署。"
+    )
+    report.append(
+        "- 隐私说明：样本为在线计算器的系统性参数扫描，不含患者身份信息；"
+        "报告不记录本机路径、Git 状态或网络环境。"
     )
     report.append(
         f"- 内容：scans.csv（单参数扫描，{len(scans)} 行可用）与 grids.npz"
@@ -841,10 +827,7 @@ def main():
         "- 参考对照：SRK/T（Retzlaff 1990）与 Holladay 1（1988）按公开公式"
         "独立实现，用于给离线 BUII 一个第三方包络。"
     )
-    report.append(
-        "- 实时复核尝试：本机直接请求 calc.apacrs.org 返回 403（反爬），"
-        "因此无法做实时官网对照；本报告的官方值全部来自公开数据集。\n"
-    )
+    report.append("- 本报告不包含实时官网对照；报告的官方输出值全部来自公开数据集。\n")
 
     report.append("## 4. 模型系数\n")
     report.append("| 常量 | 值 | 说明 |")
