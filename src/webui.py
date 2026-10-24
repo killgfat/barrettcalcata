@@ -29,10 +29,12 @@ INDEX_PAGE = """
         .formula-button.active { background: white; color: #0f766e; box-shadow: 0 1px 4px rgba(15, 23, 42, 0.14); }
         .execution-mode-row { display: flex; align-items: center; justify-content: center; gap: 10px; margin: 10px auto 0; }
         .execution-mode-label { font-weight: bold; color: #475569; font-size: 14px; white-space: nowrap; }
-        .execution-mode-switch { display: flex; gap: 4px; padding: 4px; border: 1px solid #cbd5e1; border-radius: 8px; background: #f1f5f9; }
-        .execution-mode-button { min-width: 72px; min-height: 36px; border: 0; border-radius: 6px; background: transparent; color: #475569; font-size: 14px; font-weight: bold; cursor: pointer; transition: background 0.2s, color 0.2s, box-shadow 0.2s; }
-        .execution-mode-button:hover { color: #0f172a; }
-        .execution-mode-button.active { background: white; color: #0f766e; box-shadow: 0 1px 4px rgba(15, 23, 42, 0.14); }
+        .execution-mode-state { min-width: 32px; color: #475569; font-size: 14px; font-weight: bold; }
+        .toggle-switch { position: relative; width: 58px; height: 32px; padding: 0; border: 2px solid #3f3f46; border-radius: 999px; background: #fff; cursor: pointer; transition: background 0.2s, border-color 0.2s; }
+        .toggle-switch .toggle-knob { position: absolute; top: 50%; left: 4px; width: 22px; height: 22px; border-radius: 50%; background: #6b7280; transform: translateY(-50%); transition: left 0.2s, background 0.2s; }
+        .toggle-switch[aria-checked="true"] { background: #2f8cff; border-color: #2f8cff; }
+        .toggle-switch[aria-checked="true"] .toggle-knob { left: 30px; background: #fff; }
+        .toggle-switch:focus-visible { outline: 3px solid rgba(47, 140, 255, 0.35); outline-offset: 2px; }
         .mode-switch-hint { max-width: 720px; margin: 8px auto 0; text-align: center; }
         .formula-summary { margin-bottom: 15px; padding: 10px 14px; border: 1px solid #cbd5e1; border-radius: 8px; background: #f1f5f9; color: #0f172a; font-size: 0.95em; white-space: pre-line; line-height: 1.55; }
         .formula-input-hint { max-width: 760px; margin: 6px auto 0; text-align: center; }
@@ -145,10 +147,10 @@ INDEX_PAGE = """
             </div>
             <div class="execution-mode-row" id="executionModeControls">
                 <span class="execution-mode-label">执行方式</span>
-                <div class="execution-mode-switch" role="group" aria-label="执行方式">
-                    <button type="button" class="execution-mode-button active" data-execution-mode="online" aria-pressed="true">在线</button>
-                    <button type="button" class="execution-mode-button" data-execution-mode="offline" aria-pressed="false">本地</button>
-                </div>
+                <button type="button" class="toggle-switch" id="executionModeSwitch" role="switch" aria-checked="true" aria-label="切换在线或本地执行">
+                    <span class="toggle-knob"></span>
+                </button>
+                <span class="execution-mode-state" id="executionModeState">在线</span>
             </div>
             <div id="executionModeHint" class="param-hint mode-switch-hint"></div>
             <div id="formulaInputHint" class="param-hint formula-input-hint"></div>
@@ -1063,7 +1065,8 @@ INDEX_PAGE = """
         const formulaSwitch = document.getElementById('formulaSwitch');
         const formulaButtons = Array.from(document.querySelectorAll('.formula-button'));
         const executionModeControls = document.getElementById('executionModeControls');
-        const executionModeButtons = Array.from(document.querySelectorAll('.execution-mode-button'));
+        const executionModeSwitch = document.getElementById('executionModeSwitch');
+        const executionModeState = document.getElementById('executionModeState');
         const executionModeHint = document.getElementById('executionModeHint');
         const formulaInputHint = document.getElementById('formulaInputHint');
 
@@ -1091,12 +1094,10 @@ INDEX_PAGE = """
             });
         }
 
-        function updateExecutionButtons() {
-            executionModeButtons.forEach((button) => {
-                const active = button.dataset.executionMode === selectedExecutionMode;
-                button.classList.toggle('active', active);
-                button.setAttribute('aria-pressed', String(active));
-            });
+        function updateExecutionToggle() {
+            const online = selectedExecutionMode === 'online';
+            executionModeSwitch.setAttribute('aria-checked', String(online));
+            executionModeState.textContent = online ? '在线' : '本地';
         }
 
         function resolveExecutionMode() {
@@ -1122,13 +1123,13 @@ INDEX_PAGE = """
                 selectedExecutionMode = 'online';
             }
             updateFormulaButtons();
-            updateExecutionButtons();
+            updateExecutionToggle();
             syncFormulaControls();
         }
 
         function selectExecutionMode(mode) {
             selectedExecutionMode = mode === 'offline' ? 'offline' : 'online';
-            updateExecutionButtons();
+            updateExecutionToggle();
             syncFormulaControls();
         }
 
@@ -1164,11 +1165,11 @@ INDEX_PAGE = """
         formulaButtons.forEach((button) => {
             button.addEventListener('click', () => selectFormula(button.dataset.formula));
         });
-        executionModeButtons.forEach((button) => {
-            button.addEventListener('click', () => selectExecutionMode(button.dataset.executionMode));
+        executionModeSwitch.addEventListener('click', () => {
+            selectExecutionMode(selectedExecutionMode === 'online' ? 'offline' : 'online');
         });
         updateFormulaButtons();
-        updateExecutionButtons();
+        updateExecutionToggle();
         setCalculationMode('spherical');
 
         function toricEyeFieldIds(eye) {

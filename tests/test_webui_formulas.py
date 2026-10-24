@@ -44,8 +44,11 @@ def test_default_formula_is_barrett_and_default_mode_is_online():
     barrett = page.index('data-formula="barrett"')
     assert barrett < page.index('data-formula="hoffer_q"')
     assert 'class="formula-button active" data-formula="barrett"' in page
-    assert 'class="execution-mode-button active" data-execution-mode="online"' in page
+    assert 'class="toggle-switch" id="executionModeSwitch"' in page
+    assert 'role="switch" aria-checked="true"' in page
+    assert 'id="executionModeState">在线<' in page
     assert "let selectedExecutionMode = 'online';" in page
+    assert "updateExecutionToggle" in page
 
 
 def test_formula_options_cover_all_supported_formulas():
@@ -103,6 +106,8 @@ def test_calculate_payload_sends_formula_and_execution_mode():
     assert "const formula = selectedFormula;" in page
     assert "formulaSelect" not in page
     assert "executionModeSelect" not in page
+    assert "execution-mode-button" not in page
+    assert "execution-mode-switch" not in page
 
 
 def test_toric_mode_hides_formula_controls():

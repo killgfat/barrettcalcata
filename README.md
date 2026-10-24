@@ -60,7 +60,7 @@
 
 Web UI 顶部先选择 **非散光 / 散光**；非散光模式下，下方是
 **Barrett Universal II / Hoffer Q / SRK/T / Haigis** 公式滑块，默认选中第一项
-Barrett。选中 Barrett 时会再显示「在线 / 本地」执行方式滑块，Web UI **默认在线**；
+Barrett。选中 Barrett 时会再显示「在线 / 本地」执行方式开关，Web UI **默认在线**；
 其余三个公式一律本地计算，不显示在线选项。公式下方会说明该公式是否使用
 ACD/LT/WTW；结果顶部显示实际公式、执行方式、每眼置信度、常数、ELP、
 使用/忽略的输入和警告。散光（Toric）模式仍由独立的 Barrett 官网接口计算，不受
