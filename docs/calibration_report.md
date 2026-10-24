@@ -7,20 +7,20 @@
 - 官方 BUII 的 ELP 模型未公开；任务书引用的 2021 年论文无法检索到。
 - 因此本仓库交付的是 Gaussian 聚散度核心 + 公开网格反演的 ELP 近似式，不是官方公式的逐系数复刻。
 - 在 scans.csv 留出集（n=1994）上，五参数离线模型的 p95|Δ|=0.328 D、max|Δ|=0.918 D；纯 ALK 版 p95|Δ|=0.685 D、max|Δ|=1.805 D。
-- 文献中的 mean ~0.03 D / SD 0.12-0.18 D 是官方全量版与临床结果之间的差异量级，不是 ALK 简化版与官方全量版之间的差异；本报告的 ALK 偏差明显更大，这正是简化付出的代价。
+- 文献中的 mean ~0.03 D / SD 0.12-0.18 D 是官方全量版与临床结果之间的差异量级，不是 ALK 简化版与官方全量版之间的差异。
+- 按题面合格线（mean 约 0.03 D、SD 0.12-0.18 D）衡量：纯 ALK 版 SD=0.339 D，不达标；五参数近似版 mean=+0.002 D、SD=0.164 D，落在量级内，但它依赖 ACD/LT/WTW，不是题面要求的纯 ALK 版。
 - grids.npz:AL_K 曲面存在约 +0.68 D 的整体偏移，且 README 未记录该曲面的 ACD/LT/WTW/A-constant 基线；因此对该曲面同时报告原始与去均值（形状）指标。
 
 ## 1. 运行命令与环境
 
     python scripts/calibrate_offline.py
 
-- 运行时间：2026-10-24 21:38:30
+- 运行时间：2026-10-24 21:39:56
 - Python：3.12.3 (Linux-7.0.12-1-pve-x86_64-with-glibc2.39)
 - numpy：2.4.2
-- git commit：9c45c9629cc866aac297bf7b0f443326dce07445
-- 运行前工作区状态：M src/api.py
- M src/barrett_offline.py
- M tests/test_barrett_offline.py
+- git commit：03c8e0721139b7c281228f55e818aeb139342063
+- 运行前工作区状态：M README.md
+ M scripts/calibrate_offline.py
 - 数据目录：/root/workspace/barrettcalcata/data/barrett-uii-data
 - scans.csv SHA-256：f36d6ec6c563945c11a59cf1f632d9491bfd05c4fd5074eda526173507e59207
 - grids.npz SHA-256：5736107cb3de1abb2fd92f4cadc2975eeddbf09c8e480e1b67a9396103a84354
@@ -182,6 +182,7 @@ AL_K 曲面（官方基线未记录，故分开报告）：
 
 1. 离线模块是一个近似实现：五参数模式在公开 scans 留出集上 median|Δ|=0.091 D、p95|Δ|=0.328 D；纯 ALK 模式 median|Δ|=0.159 D、p95|Δ|=0.685 D。
 2. 它不是官方 BUII 的等价复刻：没有官方 ELP 系数，也没有官方厚透镜主平面迭代；短眼/长眼和高低 K 端的偏差更大。
+2b. 按题面合格线，纯 ALK 版不达标（SD=0.339 D > 0.18 D）；五参数近似版达标（SD=0.164 D），但必须提供 ACD/LT/WTW。
 3. 论文适用域外（AL<22 或 >26 mm、K<38 或 >48 D）只降置信度并在结果里返回 LOW_CONFIDENCE，不拒绝计算；临床使用前必须人工复核。
 3b. 目标屈光度按标准 12 mm 顶点距离折算；公开网格只有 target=0，因此非零目标的数值准确性没有外部数据验证。
 4. 如果拿到官方系数或论文全文，只需替换 ELP 常量并在同一脚本上重跑，即可得到真正的包络报告；当前版本的正确定位是默认离线近似 + online 显式降级/对照。

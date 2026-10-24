@@ -736,8 +736,16 @@ def main():
     )
     report.append(
         "- 文献中的 mean ~0.03 D / SD 0.12-0.18 D 是官方全量版与临床结果"
-        "之间的差异量级，不是 ALK 简化版与官方全量版之间的差异；"
-        "本报告的 ALK 偏差明显更大，这正是简化付出的代价。"
+        "之间的差异量级，不是 ALK 简化版与官方全量版之间的差异。"
+    )
+    report.append(
+        "- 按题面合格线（mean 约 0.03 D、SD 0.12-0.18 D）衡量：纯 ALK 版 "
+        "SD={:.3f} D，不达标；五参数近似版 mean={:+.3f} D、SD={:.3f} D，"
+        "落在量级内，但它依赖 ACD/LT/WTW，不是题面要求的纯 ALK 版。".format(
+            m_alk_holdout["sd"],
+            m_full_holdout["mean"],
+            m_full_holdout["sd"],
+        )
     )
     report.append(
         "- grids.npz:AL_K 曲面存在约 {:+.2f} D 的整体偏移，"
@@ -965,6 +973,12 @@ def main():
     report.append(
         "2. 它不是官方 BUII 的等价复刻：没有官方 ELP 系数，也没有"
         "官方厚透镜主平面迭代；短眼/长眼和高低 K 端的偏差更大。"
+    )
+    report.append(
+        "2b. 按题面合格线，纯 ALK 版不达标（SD={:.3f} D > 0.18 D）；"
+        "五参数近似版达标（SD={:.3f} D），但必须提供 ACD/LT/WTW。".format(
+            m_alk_holdout["sd"], m_full_holdout["sd"]
+        )
     )
     report.append(
         "3. 论文适用域外（AL<22 或 >26 mm、K<38 或 >48 D）只降置信度并在"
