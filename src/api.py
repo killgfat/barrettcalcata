@@ -50,7 +50,7 @@ class APIHandler:
         except ValueError as e:
             return {"error": "Bad Request", "message": str(e)}, 400
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - HTTP 边界
             print(f"处理图片提取请求时发生错误: {e!s}")
             import traceback
 
@@ -127,7 +127,7 @@ class APIHandler:
                 else:
                     return response_data, 500
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - HTTP 边界
             print(f"处理图片提取请求时发生错误: {e!s}")
             import traceback
 
@@ -165,7 +165,7 @@ class APIHandler:
                 "message": "获取晶体型号列表成功",
             }, 200
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - HTTP 边界
             return {
                 "error": "Internal Server Error",
                 "message": f"获取晶体型号数据失败: {e!s}",
@@ -192,7 +192,7 @@ class APIHandler:
             return {"error": "Bad Request", "message": "无效的JSON格式"}, 400
         except (FormulaError, ValueError) as exc:
             return {"error": "Bad Request", "message": str(exc)}, 400
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 - HTTP 边界
             print(f"处理IOL计算请求时发生错误: {exc!s}")
             import traceback
 
@@ -215,7 +215,7 @@ class APIHandler:
             return {"success": True, "data": result, "message": message}, 200
         except (FormulaError, ValueError) as exc:
             return {"error": "Bad Request", "message": str(exc)}, 400
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 - HTTP 边界
             print(f"处理IOL计算请求时发生错误: {exc!s}")
             import traceback
 
@@ -246,7 +246,7 @@ class APIHandler:
             return {"error": "Bad Request", "message": "无效的JSON格式"}, 400
         except (FormulaError, ValueError, TypeError) as exc:
             return {"error": "Bad Request", "message": str(exc)}, 400
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 - HTTP 边界
             print(f"处理Barrett散光计算请求时发生错误: {exc!s}")
             return {
                 "error": "Internal Server Error",
@@ -265,7 +265,7 @@ class APIHandler:
             }, 200
         except (FormulaError, ValueError, TypeError) as exc:
             return {"error": "Bad Request", "message": str(exc)}, 400
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 - HTTP 边界
             return {
                 "error": "Internal Server Error",
                 "message": f"散光计算过程中发生错误: {exc!s}",
