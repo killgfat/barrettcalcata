@@ -15,10 +15,10 @@
 
     python scripts/calibrate_offline.py
 
-- 运行时间：2026-10-24 23:57:29
+- 运行时间：2026-10-25 00:02:16
 - Python：3.12.3 (Linux-7.0.12-1-pve-x86_64-with-glibc2.39)
 - numpy：2.4.2
-- git commit：df1c00d9a6390308e95c34ef7c9934795b869dbf
+- git commit：fdfb59d3e1e41ac5f18942e6d99073c77495f9b4
 - 运行前工作区状态：clean
 - 数据目录：/root/workspace/barrettcalcata/data/barrett-uii-data
 - scans.csv SHA-256：f36d6ec6c563945c11a59cf1f632d9491bfd05c4fd5074eda526173507e59207
