@@ -82,7 +82,7 @@ def test_formula_specific_input_hints_exist():
     page = get_page()
 
     assert "SRK/T 由 A 常数和 K 自行推导 ACD" in page
-    assert "Hoffer Q 由 A 常数和 AL/K 推导 pACD" in page
+    assert "Hoffer Q 可使用报告中的 pACD" in page
     assert "Haigis 使用实测 ACD" in page
     assert "Barrett 本地/在线均使用 ACD" in page
 
@@ -129,6 +129,46 @@ def test_toric_mode_hides_formula_controls():
     assert "formulaSwitch.hidden = isToric;" in page
     assert "executionModeHint.hidden = isToric;" in page
     assert "syncFormulaControls();" in page
+
+
+def test_select_formula_preserves_user_inputs_and_execution_mode():
+    """切换公式不能清空输入，也不能强制重置执行模式。"""
+    page = get_page()
+
+    # 提取 selectFormula 函数体
+    start = page.index("function selectFormula(name)")
+    # 找到函数结束（下一个顶级 function）
+    rest = page[start:]
+    end = rest.index("\n        function ", 10)
+    body = rest[:end]
+
+    # 不允许在切换公式时清空输入或重置执行模式
+    assert ".value = ''" not in body
+    assert '.value = ""' not in body
+    assert "selectedExecutionMode = 'online'" not in body
+    assert "selectedExecutionMode = 'offline'" not in body
+    # 必须重新验证表单（不同公式对必填项要求可能不同）
+    assert "validateForm()" in body
+
+
+def test_select_formula_shows_preservation_hint_when_data_present():
+    """已有数据时切换公式应提示"参数已保留"。"""
+    page = get_page()
+
+    assert "hasAnyEyeData" in page
+    assert "已保留之前填写/识别的参数" in page
+
+
+def test_ai_formula_constants_are_filled_and_submitted():
+    """Haigis 三常数与 Hoffer Q pACD 识别后可自动回填并用于计算。"""
+    page = get_page()
+
+    assert 'id="hofferQPacdControls"' in page
+    assert 'id="hofferQPacd"' in page
+    assert "const constants = data.haigis_constants" in page
+    assert "haigisA0.value = Number(constants.a0).toFixed(3)" in page
+    assert "data.hoffer_q_pacd" in page
+    assert "payload.hoffer_q_pacd = hofferQPacdValue" in page
 
 
 def test_page_does_not_claim_official_paper_implementation():

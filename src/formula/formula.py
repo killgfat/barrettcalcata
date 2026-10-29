@@ -85,7 +85,7 @@ CAPABILITIES = {
         required_inputs=("AL", "K1", "K2"),
         optional_inputs=(),
         ignored_inputs=("ACD", "LenThickness", "WTW"),
-        constants="A-constant（推导 pACD）",
+        constants="A-constant（推导 pACD）；或 hoffer_q_pacd（报告中的 pACD）",
     ),
     "haigis": FormulaCapabilities(
         name="haigis",
@@ -214,6 +214,8 @@ def _used_inputs(formula, eye, request, solved):
             used["a2"] = request.haigis_constants.a2
     else:
         used.update({"ACD": None, "LenThickness": None, "WTW": None})
+        if formula == "hoffer_q" and request.hoffer_q_pacd is not None:
+            used["pACD"] = request.hoffer_q_pacd
     return used
 
 
@@ -297,6 +299,8 @@ def _calculate_offline(request, formula):
         }
         if formula == "haigis":
             calculate_kwargs["constants"] = request.haigis_constants
+        elif formula == "hoffer_q":
+            calculate_kwargs["pacd"] = request.hoffer_q_pacd
         solved = _MODULES[formula].calculate(
             eye.al,
             eye.k_mean,

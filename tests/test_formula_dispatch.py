@@ -135,6 +135,41 @@ def test_haigis_custom_constants_override_a_constant():
     assert "自定义 a0" in eye["constants"]
 
 
+def test_haigis_constants_accepted_when_only_model_is_haigis():
+    """回归：在线 Barrett 失败后切 Haigis，仅传 model 不带 formula 也要可用。"""
+    body = {
+        "right_eye": {"AL": 23.5, "K1": 43.5, "K2": 44.0, "ACD": 3.2},
+        "a_constant": 118.7,
+        "model": "haigis",
+        "haigis_constants": {"a0": 1.80, "a1": 0.40, "a2": 0.10},
+    }
+    data = run_calculation(body)
+
+    assert data["calculation_model"] == "haigis"
+    assert data["formula"] == "haigis"
+    eye = data["right_eye"]
+    assert eye["used_inputs"]["a0"] == 1.8
+    assert eye["used_inputs"]["a_constant"] is None
+
+
+def test_hoffer_q_uses_extracted_pacd_when_model_is_hoffer_q():
+    body = reference_body()
+    body["model"] = "hoffer_q"
+    body["hoffer_q_pacd"] = 5.25
+    data = run_calculation(body)
+
+    eye = data["right_eye"]
+    assert eye["used_inputs"]["pACD"] == 5.25
+    assert "pACD=5.25 mm" in eye["constants"]
+
+
+def test_hoffer_q_pacd_is_rejected_for_other_formulas():
+    body = reference_body()
+    body["hoffer_q_pacd"] = 5.25
+    with pytest.raises(InputValidationError, match="hoffer_q_pacd"):
+        CalculationRequest.from_mapping(body)
+
+
 def test_haigis_constants_are_rejected_for_other_formulas():
     with pytest.raises(InputValidationError, match="haigis_constants"):
         CalculationRequest.from_mapping(
@@ -314,6 +349,35 @@ def test_calculation_model_selects_formula_and_mode(
     assert data["calculation_model"] == model
     assert data["formula"] == expected_formula
     assert data["mode"] == expected_mode
+
+
+@pytest.mark.parametrize("model", ["barrett_ii_offline", "srkt", "hoffer_q", "haigis"])
+def test_web_payload_with_only_model_works_for_every_formula(model):
+    """模拟 Web 端切换公式后的实际 payload：只传 model，不传 formula/mode。"""
+    body = {
+        "patient_name": None,
+        "a_constant": 118.7,
+        "iol_model": "Personal Constant",
+        "k_index": 1.3375,
+        "right_eye": {
+            "AL": 23.5,
+            "K1": 43.5,
+            "K2": 44.0,
+            "ACD": 3.2,
+            "Refraction": 0.0,
+            "SiliconeOil": False,
+        },
+        "model": model,
+    }
+    if model == "haigis":
+        # Web 端只有切到 Haigis 时才附加常数
+        body["haigis_constants"] = {"a0": 1.8, "a1": 0.4, "a2": 0.1}
+
+    data = run_calculation(body)
+
+    assert data["calculation_model"] == model
+    assert data["mode"] == "offline"
+    assert data["right_eye"]["iol_options"]
 
 
 def test_barrett_online_model_uses_online_adapter(monkeypatch):

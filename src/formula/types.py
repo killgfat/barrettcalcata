@@ -166,6 +166,7 @@ class CalculationRequest:
     patient_name: str | None = None
     iol_model: str | None = None
     haigis_constants: HaigisConstants | None = None
+    hoffer_q_pacd: float | None = None
 
     @classmethod
     def from_mapping(cls, body):
@@ -204,12 +205,34 @@ class CalculationRequest:
                 "hoffer_q 或 haigis"
             )
 
+        # model 优先于 formula/mode；校验 haigis_constants 时用 model 推导的
+        # 实际公式，避免只传 model=haigis 时被默认 formula="barrett" 拒绝。
+        effective_formula = formula
+        if model is not None:
+            from . import formula as formula_module
+
+            effective_formula, _ = formula_module.CALCULATION_MODELS.get(
+                model, (formula, None)
+            )
+
+        raw_hoffer_q_pacd = body.get("hoffer_q_pacd")
+        hoffer_q_pacd = None
+        if raw_hoffer_q_pacd not in (None, ""):
+            if effective_formula != "hoffer_q":
+                raise InputValidationError("hoffer_q_pacd 只适用于 formula=hoffer_q")
+            hoffer_q_pacd = common.parse_optional_float(
+                raw_hoffer_q_pacd, "hoffer_q_pacd"
+            )
+            if not 0.0 <= hoffer_q_pacd <= 8.0:
+                raise InputValidationError("hoffer_q_pacd 超出合理范围 0~8 mm")
+            hoffer_q_pacd = round(hoffer_q_pacd, 2)
+
         patient_name = body.get("patient_name")
         iol_model = body.get("iol_model")
         raw_constants = body.get("haigis_constants")
         haigis_constants = None
         if raw_constants not in (None, ""):
-            if formula != "haigis":
+            if effective_formula != "haigis":
                 raise InputValidationError("haigis_constants 只适用于 formula=haigis")
             haigis_constants = HaigisConstants.from_mapping(raw_constants)
         return cls(
@@ -224,6 +247,7 @@ class CalculationRequest:
             patient_name=str(patient_name) if patient_name is not None else None,
             iol_model=str(iol_model) if iol_model is not None else None,
             haigis_constants=haigis_constants,
+            hoffer_q_pacd=hoffer_q_pacd,
         )
 
 

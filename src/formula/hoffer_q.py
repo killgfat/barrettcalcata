@@ -83,7 +83,7 @@ def _pacd(a_constant):
     return PACD_SLOPE * a_constant + PACD_INTERCEPT
 
 
-def _acd(al, k, a_constant):
+def _acd(al, k, a_constant, pacd=None):
     """Hoffer Q 修正后的前房深度 ACD（mm，不含 0.05 偏移）。"""
     al_clamped = min(max(al, AL_CLAMP_MIN), AL_CLAMP_MAX)
     if al <= 23.0:
@@ -92,7 +92,7 @@ def _acd(al, k, a_constant):
         m, g = -1.0, 23.5
     tan_k = math.tan(math.radians(k))
     return (
-        _pacd(a_constant)
+        (_pacd(a_constant) if pacd is None else pacd)
         + 0.3 * (al_clamped - 23.5)
         + tan_k * tan_k
         + 0.1
@@ -140,6 +140,7 @@ def calculate(
     lt=None,
     wtw=None,
     step=0.5,
+    pacd=None,
 ):
     """按统一返回结构计算 Hoffer Q。
 
@@ -152,8 +153,8 @@ def calculate(
     a_value = as_float(a_constant, "a_constant")
     target_value = as_float(target, "target_refraction")
 
-    pacd = _pacd(a_value)
-    elp = _acd(al_value, k_ref, a_value) + ELP_OFFSET
+    pacd_value = _pacd(a_value) if pacd is None else as_float(pacd, "pACD")
+    elp = _acd(al_value, k_ref, a_value, pacd_value) + ELP_OFFSET
     exact_power = _power(
         al_value,
         elp,
@@ -175,7 +176,7 @@ def calculate(
         a_constant=a_value,
         lens_factor=None,
         constants_text=(
-            f"A={a_value:.2f}; pACD={pacd:.2f} mm; ACD={elp:.2f} mm; "
+            f"A={a_value:.2f}; pACD={pacd_value:.2f} mm; ACD={elp:.2f} mm; "
             f"K index={k_index_value}"
         ),
         model=MODEL,

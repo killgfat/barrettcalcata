@@ -165,6 +165,11 @@ INDEX_PAGE = """
                 <input type="number" id="haigisA2" step="0.001" placeholder="a2">
                 <span class="haigis-constants-note">照抄 IOL Master 的 a0/a1/a2；不填则用 A 常数近似</span>
             </div>
+            <div class="haigis-constants" id="hofferQPacdControls" hidden>
+                <label class="haigis-constants-label" for="hofferQPacd">Hoffer Q pACD</label>
+                <input type="number" id="hofferQPacd" step="0.01" min="0" max="8" placeholder="留空由 A 常数推导">
+                <span class="haigis-constants-note">单位 mm；这是公式常数，不是术前 ACD</span>
+            </div>
         </div>
 
         <div class="main-content">
@@ -716,7 +721,9 @@ INDEX_PAGE = """
                     const fillData = (result.data && result.data.extracted_data)
                         ? Object.assign({}, result.data.extracted_data, {
                             patient_name: result.data.patient_name ?? result.data.extracted_data.patient_name,
-                            a_constant: result.data.a_constant ?? result.data.extracted_data.a_constant
+                            a_constant: result.data.a_constant ?? result.data.extracted_data.a_constant,
+                            haigis_constants: result.data.haigis_constants ?? result.data.extracted_data.haigis_constants,
+                            hoffer_q_pacd: result.data.hoffer_q_pacd ?? result.data.extracted_data.hoffer_q_pacd
                           })
                         : result.data;
                     fillFormData(fillData);
@@ -862,6 +869,17 @@ INDEX_PAGE = """
             // 填充A常数
             if (data.a_constant !== null && data.a_constant !== undefined) {
                 document.getElementById('aConstant').value = formatToTwoDecimals(data.a_constant);
+            }
+
+            // 公式常数仅回填，不自动切换公式；切换后无需重新识别。
+            const constants = data.haigis_constants;
+            if (constants && ['a0', 'a1', 'a2'].every((key) => Number.isFinite(Number(constants[key])))) {
+                haigisA0.value = Number(constants.a0).toFixed(3);
+                haigisA1.value = Number(constants.a1).toFixed(3);
+                haigisA2.value = Number(constants.a2).toFixed(3);
+            }
+            if (data.hoffer_q_pacd !== null && data.hoffer_q_pacd !== undefined) {
+                hofferQPacd.value = formatToTwoDecimals(data.hoffer_q_pacd);
             }
 
             // 同时把 AI 识别出的 K1/K2 及轴位填入散光表单，保持两种计算模式一致。
@@ -1035,6 +1053,7 @@ INDEX_PAGE = """
 
                 const calculationModel = resolveCalculationModel();
                 const haigisConstantsValue = calculationModel === 'haigis' ? readHaigisConstants() : null;
+                const hofferQPacdValue = calculationModel === 'hoffer_q' ? parseFloat(hofferQPacd.value) : NaN;
 
                 const payload = {
                     ...formData,
@@ -1042,6 +1061,9 @@ INDEX_PAGE = """
                 };
                 if (haigisConstantsValue) {
                     payload.haigis_constants = haigisConstantsValue;
+                }
+                if (Number.isFinite(hofferQPacdValue)) {
+                    payload.hoffer_q_pacd = hofferQPacdValue;
                 }
 
                 const response = await fetch('/api/calculate', {
@@ -1086,6 +1108,8 @@ INDEX_PAGE = """
         const haigisA0 = document.getElementById('haigisA0');
         const haigisA1 = document.getElementById('haigisA1');
         const haigisA2 = document.getElementById('haigisA2');
+        const hofferQPacdControls = document.getElementById('hofferQPacdControls');
+        const hofferQPacd = document.getElementById('hofferQPacd');
         const executionModeHint = document.getElementById('executionModeHint');
         const formulaInputHint = document.getElementById('formulaInputHint');
 
@@ -1098,7 +1122,7 @@ INDEX_PAGE = """
         const FORMULA_INPUT_HINTS = {
             barrett: 'Barrett 本地/在线均使用 ACD（可选）；本地还使用 LT/WTW（可选），缺失时会警告并降置信度。',
             srkt: 'SRK/T 由 A 常数和 K 自行推导 ACD；填写的 ACD、LT、WTW 会被忽略。',
-            hoffer_q: 'Hoffer Q 由 A 常数和 AL/K 推导 pACD；填写的 ACD、LT、WTW 会被忽略。',
+            hoffer_q: 'Hoffer Q 可使用报告中的 pACD；留空则由 A 常数推导。填写的 ACD、LT、WTW 会被忽略。',
             haigis: 'Haigis 使用实测 ACD；a0/a1/a2 请照抄 IOL Master（不填则用 A 常数近似，可能差 1–3 D）；LT/WTW 会被忽略。'
         };
 
@@ -1141,17 +1165,34 @@ INDEX_PAGE = """
                 : LOCAL_FORMULA_HINT;
             formulaInputHint.textContent = FORMULA_INPUT_HINTS[selectedFormula] || '';
             haigisConstants.hidden = selectedFormula !== 'haigis';
+            hofferQPacdControls.hidden = selectedFormula !== 'hoffer_q';
+        }
+
+        function hasAnyEyeData() {
+            // 检查是否已有任何一眼的核心数据，用于切换公式时给出"参数已保留"提示。
+            return ['right', 'left'].some((eye) => {
+                const enabled = document.getElementById(eye + 'EyeEnabled');
+                const al = document.getElementById(eye + 'AL');
+                const k1 = document.getElementById(eye + 'K1');
+                const k2 = document.getElementById(eye + 'K2');
+                return enabled && enabled.checked && al.value && k1.value && k2.value;
+            });
         }
 
         function selectFormula(name) {
-            const wasBarrett = selectedFormula === 'barrett';
+            // 只切换公式与执行方式控件的可见性/状态，绝不清空任何输入；
+            // 双眼参数、A 常数、K-index、Haigis 常数、患者信息全部保留，
+            // 执行模式也保持用户上一次的选择，避免切回 Barrett 时被强制 online。
+            const changed = selectedFormula !== name;
             selectedFormula = name;
-            if (!wasBarrett && name === 'barrett') {
-                selectedExecutionMode = 'online';
-            }
             updateFormulaButtons();
             updateExecutionToggle();
             syncFormulaControls();
+            validateForm();
+            if (changed && hasAnyEyeData()) {
+                const base = FORMULA_INPUT_HINTS[name] || '';
+                formulaInputHint.textContent = '✓ 已保留之前填写/识别的参数，可直接计算。' + base;
+            }
         }
 
         function selectExecutionMode(mode) {
@@ -1184,6 +1225,7 @@ INDEX_PAGE = """
             executionModeHint.hidden = isToric;
             formulaInputHint.hidden = isToric;
             haigisConstants.hidden = isToric;
+            hofferQPacdControls.hidden = isToric;
             if (isToric) {
                 executionModeControls.hidden = true;
             }

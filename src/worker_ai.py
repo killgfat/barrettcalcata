@@ -244,6 +244,8 @@ class WorkerAI:
                 "2. 【任务描述】请仔细分析这张 IOL master 晶体单图片，准确提取以下数据：\\n"
                 "   - 患者姓名\\n"
                 "   - A常数（A constant）\\n"
+                "   - Haigis 公式的 a0、a1、a2 三个优化常数\\n"
+                "   - Hoffer Q 公式的 pACD（个性化/预测前房深度，单位 mm）\\n"
                 "   - 右眼（OD）的AL（眼轴长度）、K1、K1Axis、K2、K2Axis（角膜曲率及轴位）、ACD（前房深度）\\n"
                 "   - 左眼（OS）的AL、K1、K1Axis、K2、K2Axis、ACD\\n"
                 "3. 【自我验证步骤】在生成最终结果前，请回答以下自我质询问题：\\n"
@@ -264,12 +266,15 @@ class WorkerAI:
                 "常见错误3: 单位混淆 - AL 是 mm，K1/K2 是 D，注意不要混淆\\n"
                 "常见错误4: 小数点位置错误 - 注意小数点位置，如 23.45 不是 2345\\n"
                 "常见错误5: ACD数值读取错误- 仪器不一定测得出ACD的数值，不要识别成Cyl的数值\\n"
+                "常见错误6: 把 Haigis 的 a0 当成 A 常数，或把术前实测 ACD 当成 Hoffer Q 的 pACD\\n"
                 "\\n"
                 "=== 输出格式要求 ===\\n"
                 "请严格按照以下 JSON 格式返回，如果某个字段找不到就设为 null：\\n"
                 "{\\n"
                 '  "patient_name": "患者姓名或null",\\n'
                 '  "a_constant": 数值或null,\\n'
+                '  "haigis_constants": {"a0": 数值或null, "a1": 数值或null, "a2": 数值或null},\\n'
+                '  "hoffer_q_pacd": 数值或null,\\n'
                 '  "right_eye": {\\n'
                 '    "AL": 数值或null,\\n'
                 '    "K1": 数值或null,\\n'
@@ -290,6 +295,8 @@ class WorkerAI:
                 '    "confidence_scores": {\\n'
                 '      "patient_name": 1-5,\\n'
                 '      "a_constant": 1-5,\\n'
+                '      "haigis_constants": {"a0": 1-5, "a1": 1-5, "a2": 1-5},\\n'
+                '      "hoffer_q_pacd": 1-5,\\n'
                 '      "right_eye": {\\n'
                 '        "AL": 1-5,\\n'
                 '        "K1": 1-5,\\n'
@@ -315,10 +322,12 @@ class WorkerAI:
                 "- 眼轴长度 AL: 15.00-35.00mm（正常范围20.00-30.00mm）\\n"
                 "- 角膜曲率 K1, K2: 30.00-65.00D（正常范围35.00-50.00D）；K1Axis、K2Axis：0-180°\\n"
                 "- 前房深度 ACD: 1.00-6.00mm（正常范围2.00-4.50mm）\\n"
-                "- A常数: 110.00-125.00（常见范围115.00-122.00）\\n\\n"
+                "- A常数: 110.00-125.00（常见范围115.00-122.00）\\n"
+                "- Haigis 常数: a0 通常 -10.000~10.000，a1 通常 -2.000~2.000，a2 通常 -1.000~1.000\\n"
+                "- Hoffer Q pACD: 0.00-8.00mm；它不是术前 ACD\\n\\n"
                 "=== 重要要求 ===\\n"
                 "- 只返回 JSON，不要其他文字\\n"
-                "- 所有数值（AL、K1、K2、ACD、a_constant）必须保留2位小数；轴位K1Axis、K2Axis保留整数或1位小数\\n"
+                "- AL、K1、K2、ACD、a_constant、pACD 保留2位小数；Haigis a0/a1/a2 保留3位小数；轴位保留整数或1位小数\\n"
                 "- 数值请提取原始数字，不要单位\\n"
                 "- 如果左右眼数据都存在，请分别提取\\n"
                 "- 如果只有单眼数据，另一眼设为 null\\n"
@@ -326,6 +335,7 @@ class WorkerAI:
                 "- 如果提取的数值超出上述合理范围，请仔细检查图片，确保识别准确\\n"
                 "- 对于明显异常的数值，请以图片实际显示为准，不要强行修正\\n"
                 "- 在 self_verification 中诚实评估置信度，低置信度（≤2）的字段需要特别说明\\n"
+                "- 只有图片明确印出对应字段才提取；整组 Haigis 常数或 pACD 未显示时必须返回 null，严禁根据其他字段推算\\n"
                 "\\n"
                 "=== 最终检查 ===\\n"
                 "在返回结果前，最后确认：\\n"
@@ -353,7 +363,7 @@ class WorkerAI:
                         ],
                     }
                 ],
-                "max_tokens": 1024,
+                "max_tokens": 1400,
                 "temperature": 0.5,
             }
 
@@ -459,6 +469,78 @@ class WorkerAI:
                 except (ValueError, TypeError):
                     return None
 
+            def normalize_haigis_constants(value):
+                """规范化单次提取结果，兼容模型返回的字符串数值。"""
+                if not isinstance(value, dict):
+                    return None
+                try:
+                    return {
+                        name: round(float(value[name]), 3)
+                        for name in ("a0", "a1", "a2")
+                    }
+                except (KeyError, TypeError, ValueError):
+                    return None
+
+            for data in data_points:
+                data["haigis_constants"] = normalize_haigis_constants(
+                    data.get("haigis_constants")
+                )
+                data["hoffer_q_pacd"] = format_to_two_decimal(
+                    data.get("hoffer_q_pacd")
+                )
+
+            def optional_value(name, valid):
+                """公式专属可选字段：只取多次识别一致的值，不纳入多数决统计。
+
+                IOL Master 表单版式差异很大，Haigis a0/a1/a2 与 Hoffer Q pACD
+                并非所有表单都会打印。把它们计入共识阈值或 failed_fields 会让
+                通用表单频繁被判为"需人工复核"，因此这里只在三次结果一致时
+                采纳，不一致就留空交由用户决定。
+                """
+                values = [d.get(name) for d in data_points]
+                present = [value for value in values if value is not None]
+                if not present:
+                    return None
+                if name == "haigis_constants":
+                    serialized = [
+                        json.dumps(item, sort_keys=True) for item in present
+                    ]
+                    consensus = self._get_consensus_value(
+                        serialized, is_string=True
+                    )
+                    value = json.loads(consensus) if consensus else None
+                else:
+                    value = self._get_consensus_value(present)
+                return value if valid(value) else None
+
+            def valid_haigis_constants(value):
+                """a0/a1/a2 必须整组有效，不能只采用其中一两个。"""
+                if not isinstance(value, dict):
+                    return False
+                limits = {"a0": 10.0, "a1": 2.0, "a2": 1.0}
+                try:
+                    return all(
+                        -limit <= float(value[name]) <= limit
+                        for name, limit in limits.items()
+                    )
+                except (KeyError, TypeError, ValueError):
+                    return False
+
+            haigis_constants = optional_value(
+                "haigis_constants", valid_haigis_constants
+            )
+            hoffer_q_pacd = optional_value(
+                "hoffer_q_pacd",
+                lambda value: value is not None and 0.0 <= float(value) <= 8.0,
+            )
+            if haigis_constants is not None:
+                haigis_constants = {
+                    name: round(float(haigis_constants[name]), 3)
+                    for name in ("a0", "a1", "a2")
+                }
+            if hoffer_q_pacd is not None:
+                hoffer_q_pacd = round(float(hoffer_q_pacd), 2)
+
             # 执行多数决分析
             consensus_data = {
                 "patient_name": self._get_consensus_value(
@@ -526,6 +608,9 @@ class WorkerAI:
                     ),
                 },
             }
+
+            consensus_data["haigis_constants"] = haigis_constants
+            consensus_data["hoffer_q_pacd"] = hoffer_q_pacd
 
             # 统计达成共识的字段数量
             total_fields = 0
@@ -710,6 +795,17 @@ class WorkerAI:
                 "reason": "未达成共识",
             }
 
+        if isinstance(consensus_value, dict):
+            matching_count = sum(value == consensus_value for value in valid_values)
+            return {
+                "has_consensus": matching_count >= 2,
+                "consensus_value": consensus_value,
+                "matching_count": matching_count,
+                "total_valid": len(valid_values),
+                "original_values": values,
+                "valid_values": valid_values,
+            }
+
         # 统计匹配情况
         matching_count = 0
         for v in valid_values:
@@ -744,7 +840,8 @@ class WorkerAI:
                 "1. 患者姓名是否正确\n"
                 "2. A常数是否正确\n"
                 "3. 左右眼的AL、K1/K1Axis、K2/K2Axis、ACD数值是否准确\n"
-                "4. 数值范围是否合理（AL通常在20-30mm，K值通常在35-50D）\n\n"
+                "4. Haigis 的 a0/a1/a2 与 Hoffer Q 的 pACD 是否与图片一致；未印出时是否为 null\n"
+                "5. 数值范围是否合理（AL通常在20-30mm，K值通常在35-50D）\n\n"
                 "请只回答：\n"
                 "- 如果数据完全正确，回答：正确\n"
                 "- 如果有任何错误，回答：错误，并简要说明错误原因"
@@ -811,7 +908,7 @@ class WorkerAI:
             prompt2 = (
                 "以下是从 IOL master 晶体单图片中提取的文本内容：\n\n"
                 f"{initial_response}\n\n"
-                "请使用自我验证的方法，仔细提取患者姓名、A 常数、左右眼的 AL、K1、K1Axis、K2、K2Axis、ACD 数据，"
+                "请使用自我验证的方法，仔细提取患者姓名、A 常数、Haigis 的 a0/a1/a2、Hoffer Q 的 pACD，以及左右眼的 AL、K1、K1Axis、K2、K2Axis、ACD 数据，"
                 "返回 JSON 格式。如果找不到某个字段就设为 null。\n\n"
                 "=== 自我验证要求 ===\n"
                 "在提取数据前，请思考：\n"
@@ -825,6 +922,8 @@ class WorkerAI:
                 "{\n"
                 '  "patient_name": "患者姓名或null",\n'
                 '  "a_constant": 数值或null,\n'
+                '  "haigis_constants": {"a0": 数值或null, "a1": 数值或null, "a2": 数值或null},\n'
+                '  "hoffer_q_pacd": 数值或null,\n'
                 '  "right_eye": {\n'
                 '    "AL": 数值或null,\n'
                 '    "K1": 数值或null,\n'
@@ -845,6 +944,8 @@ class WorkerAI:
                 '    "confidence_scores": {\n'
                 '      "patient_name": 1-5,\n'
                 '      "a_constant": 1-5,\n'
+                '      "haigis_constants": {"a0": 1-5, "a1": 1-5, "a2": 1-5},\n'
+                '      "hoffer_q_pacd": 1-5,\n'
                 '      "right_eye": {\n'
                 '        "AL": 1-5,\n'
                 '        "K1": 1-5,\n'
@@ -870,22 +971,25 @@ class WorkerAI:
                 "- 眼轴长度 AL: 12.00-38.00mm（正常范围20.00-30.00mm）\n"
                 "- 角膜曲率 K1, K2: 30.00-60.00D（正常范围35.00-50.00D）；K1Axis、K2Axis：0-180°\n"
                 "- 前房深度 ACD: 0.00-6.00mm（正常范围2.00-4.50mm）\n"
-                "- A常数: 110.00-125.00（常见范围115.00-122.00）\n\n"
+                "- A常数: 110.00-125.00（常见范围115.00-122.00）\n"
+                "- Haigis 常数: a0 通常 -10.000~10.000，a1 通常 -2.000~2.000，a2 通常 -1.000~1.000\n"
+                "- Hoffer Q pACD: 0.00-8.00mm；它不是术前 ACD\n\n"
                 "=== 重要要求 ===\n"
                 "- 只返回 JSON，不要其他文字\n"
-                "- 所有数值（AL、K1、K2、ACD、a_constant）必须保留2位小数；K1Axis、K2Axis必须在0-180°范围内\n"
+                "- AL、K1、K2、ACD、a_constant、pACD 保留2位小数；Haigis a0/a1/a2 保留3位小数；K1Axis、K2Axis必须在0-180°范围内\n"
                 "- 即使原始数据是整数，也要写成2位小数格式（如23写成23.00）\n"
                 "- 请确保数值精度和格式正确\n"
                 "- 如果提取的数值超出上述合理范围，请仔细检查文本内容，确保识别准确\n"
                 "- 对于明显异常的数值，请以文本实际显示为准，不要强行修正\n"
-                "- 在 self_verification 中诚实评估置信度，低置信度（≤2）的字段需要特别说明"
+                "- 在 self_verification 中诚实评估置信度，低置信度（≤2）的字段需要特别说明\n"
+                "- 只有原文明确出现对应字段才提取；未显示时必须返回 null，严禁推算"
             )
 
             # 构造fallback请求payload
             payload = {
                 "model": self.model,
                 "messages": [{"role": "user", "content": prompt2}],
-                "max_tokens": 1000,
+                "max_tokens": 1400,
                 "temperature": 0.1,
             }
 
@@ -962,7 +1066,7 @@ class WorkerAI:
     def _validate_and_clean_data(self, data: dict):
         """
         验证 & 清理提取出的数据，把字符串中的数字提取出来。
-        规范化数值格式，确保AL、K1、K2、ACD都是2位小数。
+        规范化数值格式，并校验 Haigis 常数与 Hoffer Q pACD。
         处理新格式：包含 self_verification 字段
         """
 
@@ -982,6 +1086,26 @@ class WorkerAI:
                 return None
             return round(normalized, 1)
 
+        def clean_haigis_constants(value):
+            """仅在 a0/a1/a2 全部有效时保留整组 Haigis 常数。"""
+            if not isinstance(value, dict):
+                return None
+            limits = {"a0": 10.0, "a1": 2.0, "a2": 1.0}
+            constants = {}
+            for name, limit in limits.items():
+                number = self._clean_number(value.get(name))
+                if number is None or not -limit <= number <= limit:
+                    return None
+                constants[name] = round(number, 3)
+            return constants
+
+        def clean_hoffer_q_pacd(value):
+            """pACD 是可选的公式常数；缺失或超范围时返回 None。"""
+            number = self._clean_number(value)
+            if number is None or not 0.0 <= number <= 8.0:
+                return None
+            return round(number, 2)
+
         def eye_value(eye_data, *names):
             """从眼部结果读取规范字段，并兼容常见轴位别名。"""
             for name in names:
@@ -995,6 +1119,10 @@ class WorkerAI:
             "a_constant": format_to_two_decimal(
                 self._clean_number(data.get("a_constant"))
             ),
+            "haigis_constants": clean_haigis_constants(
+                data.get("haigis_constants")
+            ),
+            "hoffer_q_pacd": clean_hoffer_q_pacd(data.get("hoffer_q_pacd")),
             "right_eye": {
                 "AL": format_to_two_decimal(
                     self._clean_number(data.get("right_eye", {}).get("AL"))
