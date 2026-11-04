@@ -326,9 +326,9 @@ async def test_barrett_calculate_online_reports_formula(monkeypatch):
 
 def test_openapi_requires_calculation_model():
     specification = docs.get_openapi_spec()
-    schema = specification["paths"]["/api/calculate"]["post"]["requestBody"][
-        "content"
-    ]["application/json"]["schema"]
+    schema = specification["paths"]["/api/calculate"]["post"]["requestBody"]["content"][
+        "application/json"
+    ]["schema"]
 
     assert schema["required"] == ["model"]
     assert schema["properties"]["model"]["enum"] == [
@@ -337,6 +337,7 @@ def test_openapi_requires_calculation_model():
         "srkt",
         "hoffer_q",
         "haigis",
+        "haigis-toric",
     ]
     assert schema["properties"]["formula"].get("deprecated") is True
     assert schema["properties"]["mode"].get("deprecated") is True

@@ -153,7 +153,7 @@ class HaigisConstants:
 
 @dataclass(frozen=True)
 class CalculationRequest:
-    """普通（非散光）IOL 计算请求。"""
+    """IOL 计算请求；本地散光的扩展参数保留在 EyeInput.raw。"""
 
     right_eye: EyeInput | None
     left_eye: EyeInput | None
@@ -202,7 +202,7 @@ class CalculationRequest:
         if model is None and not legacy_supplied:
             raise InputValidationError(
                 "必须指定 model：barrett_ii_offline, barrett_ii, srkt, "
-                "hoffer_q 或 haigis"
+                "hoffer_q、haigis 或 haigis-toric"
             )
 
         # model 优先于 formula/mode；校验 haigis_constants 时用 model 推导的
@@ -232,8 +232,10 @@ class CalculationRequest:
         raw_constants = body.get("haigis_constants")
         haigis_constants = None
         if raw_constants not in (None, ""):
-            if effective_formula != "haigis":
-                raise InputValidationError("haigis_constants 只适用于 formula=haigis")
+            if effective_formula not in {"haigis", "haigis-toric"}:
+                raise InputValidationError(
+                    "haigis_constants 只适用于 formula=haigis/haigis-toric"
+                )
             haigis_constants = HaigisConstants.from_mapping(raw_constants)
         return cls(
             right_eye=right_eye,

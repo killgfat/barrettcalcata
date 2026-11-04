@@ -16,6 +16,7 @@ from . import (
     barrett_toric,
     common,
     haigis,
+    haigis_toric,
     hoffer_q,
     iol_models,
     srkt,
@@ -34,6 +35,7 @@ FORMULA_LABELS = {
     "srkt": "SRK/T",
     "hoffer_q": "Hoffer Q",
     "haigis": "Haigis",
+    "haigis-toric": haigis_toric.LABEL,
 }
 
 FORMULA_NAMES = tuple(FORMULA_LABELS)
@@ -45,6 +47,7 @@ CALCULATION_MODELS = {
     "srkt": ("srkt", "offline"),
     "hoffer_q": ("hoffer_q", "offline"),
     "haigis": ("haigis", "offline"),
+    "haigis-toric": ("haigis-toric", "offline"),
 }
 
 CALCULATION_MODEL_LABELS = {
@@ -53,12 +56,23 @@ CALCULATION_MODEL_LABELS = {
     "srkt": "SRK/T",
     "hoffer_q": "Hoffer Q",
     "haigis": "Haigis",
+    "haigis-toric": haigis_toric.LABEL,
 }
 
 TORIC_CALCULATION_MODEL = "barrett_ii_toric"
 TORIC_CALCULATION_MODEL_LABEL = "Barrett Universal II Toric（在线）"
 
 CAPABILITIES = {
+    "haigis-toric": FormulaCapabilities(
+        name="haigis-toric",
+        label=haigis_toric.LABEL,
+        modes=("offline",),
+        required_inputs=("AL", "K1", "K2", "K1Axis", "K2Axis", "ACD"),
+        optional_inputs=haigis_toric.OPTIONAL_INPUTS,
+        ignored_inputs=("LenThickness", "WTW"),
+        constants="haigis_constants(a0/a1/a2)，必须提供完整三常数",
+        supports_toric=True,
+    ),
     "barrett": FormulaCapabilities(
         name="barrett",
         label="Barrett Universal II",
@@ -105,6 +119,7 @@ _MODULES = {
     "srkt": srkt,
     "hoffer_q": hoffer_q,
     "haigis": haigis,
+    "haigis-toric": haigis_toric,
 }
 
 # 官网普通 Barrett 适配器在 ACD 缺失时沿用的默认值（与官网表单一致）。
@@ -119,9 +134,7 @@ def normalize_calculation_model(value):
     if not model:
         return None
     if model not in CALCULATION_MODELS:
-        raise UnsupportedFormulaError(
-            "model 只支持 barrett_ii_offline, barrett_ii, srkt, hoffer_q, haigis"
-        )
+        raise UnsupportedFormulaError("model 只支持 " + ", ".join(CALCULATION_MODELS))
     return model
 
 
@@ -146,7 +159,7 @@ def normalize_formula(value):
     if not formula:
         return "barrett"
     if formula not in FORMULA_LABELS:
-        raise UnsupportedFormulaError("formula 只支持 barrett, srkt, hoffer_q, haigis")
+        raise UnsupportedFormulaError("formula 只支持 " + ", ".join(FORMULA_NAMES))
     return formula
 
 
@@ -195,7 +208,7 @@ def _used_inputs(formula, eye, request, solved):
                 "WTW": eye.wtw,
             }
         )
-    elif formula == "haigis":
+    elif formula in {"haigis", "haigis-toric"}:
         acd_value = eye.acd
         if acd_value is None:
             acd_value = haigis.DEFAULT_ACD
@@ -212,6 +225,8 @@ def _used_inputs(formula, eye, request, solved):
             used["a0"] = request.haigis_constants.a0
             used["a1"] = request.haigis_constants.a1
             used["a2"] = request.haigis_constants.a2
+        if formula == "haigis-toric":
+            used.update(solved["used_toric_inputs"])
     else:
         used.update({"ACD": None, "LenThickness": None, "WTW": None})
         if formula == "hoffer_q" and request.hoffer_q_pacd is not None:
@@ -246,9 +261,9 @@ def _build_eye_result(formula, eye, request, solved):
     iol_options = sorted(solved["iol_options"], key=lambda row: float(row["iol_power"]))
     caps = CAPABILITIES[formula]
     ignored_inputs = list(caps.ignored_inputs)
-    if formula == "haigis" and request.haigis_constants is not None:
+    if formula in {"haigis", "haigis-toric"} and request.haigis_constants is not None:
         ignored_inputs.append("a_constant")
-    return {
+    result = {
         "biometry": (
             f"AL {eye.al:.2f} mm; "
             f"K1 {eye.k1:.2f} D; K2 {eye.k2:.2f} D; "
@@ -269,6 +284,29 @@ def _build_eye_result(formula, eye, request, solved):
         "used_inputs": _used_inputs(formula, eye, request, solved),
         "ignored_inputs": ignored_inputs,
     }
+    if formula == "haigis-toric":
+        result["provided_inputs"] = {
+            **dict(eye.raw),
+            **eye.provided_inputs(),
+        }
+        for field in (
+            "posterior_mode",
+            "anterior_astigmatism",
+            "posterior_astigmatism",
+            "net_astigmatism",
+            "iol_spherical_equivalent",
+            "iol_cylinder",
+            "iol_axis",
+            "corneal_factor",
+            "corneal_correction",
+            "residual_astigmatism",
+            "recommended_iol_cylinder_exact",
+            "recommended_iol_cylinder",
+            "recommended_axis",
+            "toric_options",
+        ):
+            result[field] = solved[field]
+    return result
 
 
 def _calculate_offline(request, formula):
@@ -297,10 +335,24 @@ def _calculate_offline(request, formula):
             "wtw": eye.wtw,
             "step": request.step,
         }
-        if formula == "haigis":
+        if formula in {"haigis", "haigis-toric"}:
             calculate_kwargs["constants"] = request.haigis_constants
         elif formula == "hoffer_q":
             calculate_kwargs["pacd"] = request.hoffer_q_pacd
+        if formula == "haigis-toric":
+            calculate_kwargs.update(
+                {
+                    "k1": eye.k1,
+                    "k2": eye.k2,
+                    "k1_axis": eye.raw.get("K1Axis"),
+                    "k2_axis": eye.raw.get("K2Axis"),
+                    **{
+                        field: eye.raw[field]
+                        for field in haigis_toric.OPTIONAL_INPUTS
+                        if field in eye.raw
+                    },
+                }
+            )
         solved = _MODULES[formula].calculate(
             eye.al,
             eye.k_mean,

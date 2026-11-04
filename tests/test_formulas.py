@@ -21,7 +21,8 @@ FORMULA_MODULES = {
     "haigis": formulas.haigis,
 }
 
-FORMULA_NAMES = list(formulas.FORMULA_NAMES)
+# 本文件验证球镜公式的共同契约；散光所需轴位及三常数另有专门测试。
+FORMULA_NAMES = list(FORMULA_MODULES)
 
 REFERENCE_AL = 23.5
 REFERENCE_K = 44.0
@@ -207,7 +208,13 @@ def test_normalize_formula_accepts_defaults_and_case():
     assert formulas.normalize_formula("") == "barrett"
     assert formulas.normalize_formula("  SRKT ") == "srkt"
     assert formulas.normalize_formula("Hoffer_Q") == "hoffer_q"
-    assert formulas.FORMULA_NAMES == ("barrett", "srkt", "hoffer_q", "haigis")
+    assert formulas.FORMULA_NAMES == (
+        "barrett",
+        "srkt",
+        "hoffer_q",
+        "haigis",
+        "haigis-toric",
+    )
 
 
 def test_normalize_formula_rejects_unknown_name():

@@ -64,6 +64,39 @@ def as_float(value, name):
     return result
 
 
+def astigmatism_vector(cylinder: float, axis: float) -> tuple[float, float]:
+    """返回全柱镜双角矢量；C>0 时 axis 表示光学强子午线，单位 D/度。
+
+    使用 (C*cos(2a), C*sin(2a))，不是半柱镜 J0/J45。
+    负 C 表示该子午线的扁平化效应，如切口 SICA。
+    """
+    magnitude = as_float(cylinder, "cylinder")
+    angle = math.radians(2 * (as_float(axis, "axis") % 180))
+    return magnitude * math.cos(angle), magnitude * math.sin(angle)
+
+
+def vector_astigmatism(x: float, y: float) -> dict:
+    """把全柱镜双角矢量还原为量值、强子午线及负柱镜处方轴。
+
+    零散光轴无定义，返回 None；axis 是强子午线，minus_cylinder_axis
+    是矫正该光学散光的负柱镜轴，两者相差 90 度。
+    """
+    x_value = as_float(x, "vector.x")
+    y_value = as_float(y, "vector.y")
+    magnitude = math.hypot(x_value, y_value)
+    axis = None
+    if magnitude > 1e-10:
+        axis = math.degrees(math.atan2(y_value, x_value)) / 2 % 180
+        if math.isclose(axis, 180, abs_tol=1e-10):
+            axis = 0.0
+    return {
+        "cylinder": magnitude if axis is not None else 0.0,
+        "axis": axis,
+        "minus_cylinder_axis": None if axis is None else (axis + 90) % 180,
+        "vector": {"x": x_value, "y": y_value},
+    }
+
+
 def parse_optional_float(value, name, default=None):
     """解析可选数值：None/空字符串返回 default，其他交给 as_float。"""
     if value is None:
@@ -336,6 +369,7 @@ __all__ = [
     "WTW_MIN",
     "as_float",
     "assess_domain",
+    "astigmatism_vector",
     "build_formula_result",
     "build_table",
     "format_power",
@@ -347,4 +381,5 @@ __all__ = [
     "round_to_step",
     "validate_eye",
     "validate_optional_measurements",
+    "vector_astigmatism",
 ]

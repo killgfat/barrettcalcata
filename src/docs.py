@@ -9,7 +9,7 @@ def get_openapi_spec():
     """
     返回OpenAPI规范文档
     """
-    return {
+    specification = {
         "openapi": "3.0.0",
         "info": {
             "title": "Barretcalcata IOL Calculator API",
@@ -58,7 +58,7 @@ def get_openapi_spec():
             "/api/calculate": {
                 "post": {
                     "summary": "执行IOL计算",
-                    "description": "提交眼睛参数JSON，计算人工晶体度数。model 为必填的计算模型：barrett_ii_offline（Barrett 离线）、barrett_ii（Barrett 在线）、srkt、hoffer_q、haigis（本地实现）。旧的 formula/mode 字段仅作兼容保留，model 存在时优先。至少提供右眼或左眼其中一组参数。k_index使用真实角膜等效折射率表示。",
+                    "description": "提交眼睛参数JSON，计算人工晶体度数。model 为必填的计算模型：barrett_ii_offline（Barrett 离线）、barrett_ii（Barrett 在线）、srkt、hoffer_q、haigis、haigis-toric（本地实现）。haigis-toric 是公开框架近轴实现，完整一手算法尚未核实；每眼额外要求 K1Axis/K2Axis、实测 ACD 及请求级 haigis_constants，输出角膜平面残余散光。参数详见 HaigisToricEye。旧的 formula/mode 字段仅作兼容保留，model 存在时优先。至少提供右眼或左眼其中一组参数。k_index使用真实角膜等效折射率表示。",
                     "requestBody": {
                         "required": True,
                         "content": {
@@ -91,7 +91,7 @@ def get_openapi_spec():
                                                 "ACD": {
                                                     "type": "number",
                                                     "format": "float",
-                                                    "description": "前房深度（mm），默认3.0",
+                                                    "description": "术前前房深度（mm）；haigis-toric 必填实测值，其他模型按各自规则处理",
                                                     "example": 3.0,
                                                 },
                                                 "Refraction": {
@@ -136,7 +136,7 @@ def get_openapi_spec():
                                                 "ACD": {
                                                     "type": "number",
                                                     "format": "float",
-                                                    "description": "前房深度（mm），默认3.0",
+                                                    "description": "术前前房深度（mm）；haigis-toric 必填实测值，其他模型按各自规则处理",
                                                     "example": 3.0,
                                                 },
                                                 "Refraction": {
@@ -186,6 +186,7 @@ def get_openapi_spec():
                                                 "srkt",
                                                 "hoffer_q",
                                                 "haigis",
+                                                "haigis-toric",
                                             ],
                                             "description": (
                                                 "计算模型（必填）。barrett_ii_offline = Barrett 本地离线；"
@@ -208,6 +209,7 @@ def get_openapi_spec():
                                                 "srkt",
                                                 "hoffer_q",
                                                 "haigis",
+                                                "haigis-toric",
                                             ],
                                             "default": "barrett",
                                             "deprecated": True,
@@ -232,7 +234,7 @@ def get_openapi_spec():
                                         "haigis_constants": {
                                             "type": "object",
                                             "description": (
-                                                "仅 model=haigis 可用。提供优化后的 a0/a1/a2 时，"
+                                                "仅 model=haigis/haigis-toric 可用；haigis-toric 必填。提供优化后的 a0/a1/a2 时，"
                                                 "不再由 A 常数推导 a0；a_constant 会被忽略。"
                                             ),
                                             "properties": {
@@ -288,7 +290,11 @@ def get_openapi_spec():
                                                 "label": "Barrett Universal II",
                                                 "modes": ["offline", "online"],
                                                 "required_inputs": ["AL", "K1", "K2"],
-                                                "optional_inputs": ["ACD", "LenThickness", "WTW"],
+                                                "optional_inputs": [
+                                                    "ACD",
+                                                    "LenThickness",
+                                                    "WTW",
+                                                ],
                                                 "ignored_inputs": [],
                                                 "constants": "A-constant / Lens Factor",
                                                 "supports_toric": True,
@@ -475,6 +481,136 @@ def get_openapi_spec():
             }
         },
     }
+    # 本地散光复用普通计算入口；在线 Barrett Toric 的 schema 独立保留。
+    schema = specification["paths"]["/api/calculate"]["post"]["requestBody"]["content"][
+        "application/json"
+    ]["schema"]
+    toric_properties = {
+        "K1Axis": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 180,
+            "description": "Haigis-T：K1 的光学弱子午线，与 K2Axis 正交",
+        },
+        "K2Axis": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 180,
+            "description": "Haigis-T：K2 的光学强子午线",
+        },
+        "iol_cylinder": {
+            "type": "number",
+            "minimum": 0,
+            "default": 0,
+            "description": "实际植入的 IOL 平面柱镜量值（D）",
+        },
+        "iol_axis": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 180,
+            "description": "IOL 弱子午线对齐轴；非零 iol_cylinder 时必填",
+        },
+        "iol_spherical_equivalent": {
+            "type": "number",
+            "minimum": -10,
+            "maximum": 45,
+            "description": "实际 IOL 球镜等效度数 SE；缺省使用 Haigis 推荐 SE",
+        },
+        "posterior_mode": {
+            "type": "string",
+            "enum": ["none", "measured", "estimated", "total"],
+            "default": "none",
+            "description": (
+                "none=忽略 PCA 并警告；measured=实测光学 PCA；"
+                "estimated=显式启用 0.30 D@0 ATR 代理，"
+                "UNVERIFIED-PENDING-PRIMARY，尚非已核实的 Haigis-T 系数；"
+                "total=用 TK/TCRP 总散光替换前表面及 PCA，禁止重复叠加"
+            ),
+        },
+        "posterior_cylinder": {
+            "type": "number",
+            "minimum": 0,
+            "description": "measured 必填；角膜平面 PCA 光学量值（D）",
+        },
+        "posterior_axis": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 180,
+            "description": "measured 必填；PCA 光学强子午线，不是后表面曲率陡轴",
+        },
+        "total_cylinder": {
+            "type": "number",
+            "minimum": 0,
+            "description": "total 必填；经测量定义校准的角膜平面总散光（D）",
+        },
+        "total_axis": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 180,
+            "description": "total 必填；总散光光学强子午线",
+        },
+        "total_source": {
+            "type": "string",
+            "enum": ["TK", "TCRP"],
+            "description": "total 必填；不自动换算 TK/TCRP 的平均屈光力",
+        },
+        "incision_sia": {
+            "type": "number",
+            "minimum": 0,
+            "default": 0,
+            "description": "角膜平面 SICA；沿切口子午线的扁平化量（D）",
+        },
+        "incision_location": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 360,
+            "description": "切口位置（度）；非零 incision_sia 时必填",
+        },
+        "cylinder_powers": {
+            "type": "array",
+            "minItems": 1,
+            "items": {"type": "number", "minimum": 0},
+            "description": "可供的 IOL 平面柱镜档位；省略时仅返回连续解",
+        },
+    }
+    for eye in ("right_eye", "left_eye"):
+        schema["properties"][eye]["properties"].update(toric_properties)
+    specification["components"]["schemas"]["HaigisToricEye"] = {
+        "type": "object",
+        "description": (
+            "model=haigis-toric 的每眼参数。ACD 必须实测；完整三常数放在"
+            "请求级 haigis_constants。球镜使用前表面平均 K，残余散光在"
+            "角膜平面，axis 为光学强子午线，负柱镜处方轴为 axis+90。"
+            "toric_options 使用推荐轴，residual_astigmatism 使用实际植入轴。"
+            "LT/WTW 不参与计算。完整来源及推导见 docs/formulas.md。"
+        ),
+        "required": ["AL", "K1", "K2", "K1Axis", "K2Axis", "ACD"],
+        "properties": {
+            **schema["properties"]["right_eye"]["properties"],
+            "ACD": {
+                "type": "number",
+                "minimum": 0.5,
+                "maximum": 8,
+                "description": "术前实测 ACD（mm），无默认值",
+            },
+        },
+    }
+    schema["allOf"] = [
+        {
+            "oneOf": [
+                {"properties": {"model": {"not": {"enum": ["haigis-toric"]}}}},
+                {
+                    "properties": {
+                        "model": {"enum": ["haigis-toric"]},
+                        "right_eye": {"$ref": "#/components/schemas/HaigisToricEye"},
+                        "left_eye": {"$ref": "#/components/schemas/HaigisToricEye"},
+                    },
+                    "required": ["haigis_constants"],
+                },
+            ],
+        }
+    ]
+    return specification
 
 
 def get_swagger_ui_html():

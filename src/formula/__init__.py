@@ -6,7 +6,7 @@ API 层不再直接 import 任何具体公式模块。
 
 from __future__ import annotations
 
-from . import barrett, haigis, hoffer_q, srkt
+from . import barrett, haigis, haigis_toric, hoffer_q, srkt
 from .formula import (
     CALCULATION_MODEL_LABELS,
     CALCULATION_MODELS,
@@ -45,6 +45,7 @@ _MODULES = {
     "srkt": srkt,
     "hoffer_q": hoffer_q,
     "haigis": haigis,
+    "haigis-toric": haigis_toric,
 }
 
 
@@ -59,6 +60,7 @@ def calculate_formula(
     lt=None,
     wtw=None,
     step=0.5,
+    **formula_params,
 ):
     """同步单眼计算（脚本/测试兼容入口）。
 
@@ -76,6 +78,7 @@ def calculate_formula(
         lt=lt,
         wtw=wtw,
         step=step,
+        **formula_params,
     )
 
 

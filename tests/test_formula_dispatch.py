@@ -112,6 +112,9 @@ def test_all_formula_tables_are_ascending_by_iol_power():
         body = reference_body()
         body.pop("model", None)
         body["formula"] = formula_name
+        if formula_name == "haigis-toric":
+            body["right_eye"].update({"K1Axis": 0, "K2Axis": 90})
+            body["haigis_constants"] = {"a0": 1.8, "a1": 0.4, "a2": 0.1}
         eye = run_calculation(body)["right_eye"]
         powers = [float(row["iol_power"]) for row in eye["iol_options"]]
         assert powers == sorted(powers)
@@ -384,9 +387,7 @@ def test_barrett_online_model_uses_online_adapter(monkeypatch):
     async def fake_online(**kwargs):
         return {"right_eye": {"iol_options": []}}
 
-    monkeypatch.setattr(
-        formula.barrett_online, "calculate_barrett_iol", fake_online
-    )
+    monkeypatch.setattr(formula.barrett_online, "calculate_barrett_iol", fake_online)
     body = reference_body()
     body["model"] = "barrett_ii"
     data = run_calculation(body)
