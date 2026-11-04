@@ -588,13 +588,10 @@ INDEX_PAGE = """
         iolModelSelect.addEventListener('change', async function() {
             const selected = this.value;
             if (selected === 'Personal Constant') {
-                // 自定义常数不是内置的任何一款晶体，清掉上一款自动填入的
-                // ULIB 常数，避免 Haigis/Hoffer Q 静默沿用别的型号数值。
+                // 自定义常数不是内置的任何一款晶体：解除型号锁定，
+                // 保留用户已经填过的值，只在空值时补默认。
                 clearUlibConstants();
-                aConstantInput.readOnly = false;
-                aConstantInput.value = '119.30';
-                document.getElementById('aConstantHint').textContent =
-                    '默认值：119.30（可根据晶体类型调整）';
+                resetAConstantToDefault();
                 document.getElementById('iolModelHint').textContent =
                     '选择晶体型号可自动填充A常数';
                 ulibModelSearch.value = '';
@@ -603,8 +600,9 @@ INDEX_PAGE = """
                 return;
             }
 
+            // 先不动输入框里的值，拿到官网常数后再覆盖；请求失败时用户
+            // 原来填的常数仍然在。
             aConstantInput.readOnly = true;
-            aConstantInput.value = '';
             document.getElementById('iolModelHint').textContent = '正在获取常数...';
 
             try {
@@ -624,9 +622,8 @@ INDEX_PAGE = """
                         'Lens Factor: ' +
                         (lf !== null && lf !== undefined ? lf : 'N/A');
                     if (data.source === 'ulib') {
-                        // ULIB 常数比 A 常数换算更具体：直接把 Haigis / Hoffer Q
-                        // 常数填进各自的输入框，避免用 A 常数近似。
-                        fillUlibConstants(data);
+                        // Barrett 走自己的 Lens Factor 路径，Haigis/Hoffer Q
+                        // 常数与它无关，这里不回填，避免看起来像已生效。
                         let hint = 'ULIB ' + data.source_revision +
                             '（n=' + data.samples + '）';
                         if (data.preliminary) {
@@ -647,28 +644,37 @@ INDEX_PAGE = """
             } finally {
                 validateToricForm();
             }
+            if (!aConstantInput.value) aConstantInput.readOnly = false;
         });
 
+        const FORMULA_CONSTANT_FIELDS = {
+            haigisA0: 'a0',
+            haigisA1: 'a1',
+            haigisA2: 'a2',
+            hofferQPacd: '留空由 A 常数推导'
+        };
+
         function clearUlibConstants() {
-            ['haigisA0', 'haigisA1', 'haigisA2', 'hofferQPacd'].forEach(id => {
+            // 只解除锁定，保留用户已经填过的值（切换到自定义常数时用）。
+            Object.entries(FORMULA_CONSTANT_FIELDS).forEach(([id, placeholder]) => {
                 const input = document.getElementById(id);
-                if (input) input.value = '';
+                if (!input) return;
+                input.disabled = false;
+                input.placeholder = placeholder;
             });
+            aConstantInput.readOnly = false;
         }
 
-        function fillUlibConstants(data) {
-            const haigis = data.haigis_constants;
-            if (haigis && haigis.length === 3) {
-                ['haigisA0', 'haigisA1', 'haigisA2'].forEach((id, index) => {
-                    const input = document.getElementById(id);
-                    if (input) input.value = Number(haigis[index]).toFixed(3);
-                });
-            }
-            const pacdInput = document.getElementById('hofferQPacd');
-            if (pacdInput && data.hoffer_q_pacd !== null &&
-                data.hoffer_q_pacd !== undefined) {
-                pacdInput.value = Number(data.hoffer_q_pacd).toFixed(2);
-            }
+        function lockUlibConstants() {
+            // 型号已声明时常数由后端查表：输入框锁定但保留原值，
+            // 用户能看到自己填过什么，提交时这些字段不会被发送。
+            Object.entries(FORMULA_CONSTANT_FIELDS).forEach(([id]) => {
+                const input = document.getElementById(id);
+                if (!input) return;
+                input.disabled = true;
+                input.placeholder = '由所选型号决定';
+            });
+            aConstantInput.readOnly = true;
         }
 
         loadIolModels();
@@ -937,6 +943,9 @@ INDEX_PAGE = """
             document.getElementById('kIndex').value = '1.3375';
             document.getElementById('aConstant').readOnly = false;
             clearUlibConstants();
+            ulibModelSearch.value = '';
+            selectedUlibModelName = '';
+            resetUlibHint();
             document.getElementById('aConstantHint').textContent =
                 '默认值：119.30（可根据晶体类型调整）';
             document.getElementById('iolModelHint').textContent =
@@ -1140,14 +1149,18 @@ INDEX_PAGE = """
             try {
                 const formData = {
                     patient_name: document.getElementById('patientName').value || null,
-                    a_constant: roundToTwoDecimals(
-                        document.getElementById('aConstant').value
-                    ),
                     iol_model: (selectedFormula === 'barrett'
                         ? document.getElementById('iolModel').value
                         : (selectedUlibModelName || undefined)),
                     k_index: parseFloat(document.getElementById('kIndex').value)
                 };
+                // 声明了晶体型号时交给后端查表，不再上报本地常数输入。
+                const usesModelConstants = Boolean(activeUlibModelName());
+                if (!usesModelConstants) {
+                    formData.a_constant = roundToTwoDecimals(
+                        document.getElementById('aConstant').value
+                    );
+                }
 
                 if (rightEyeEnabled.checked) {
                     const rightACDValue = roundToTwoDecimals(
@@ -1188,8 +1201,10 @@ INDEX_PAGE = """
                 }
 
                 const calculationModel = resolveCalculationModel();
-                const haigisConstantsValue = calculationModel === 'haigis' ? readHaigisConstants() : null;
-                const hofferQPacdValue = calculationModel === 'hoffer_q' ? parseFloat(hofferQPacd.value) : NaN;
+                const haigisConstantsValue = calculationModel === 'haigis' && !usesModelConstants
+                    ? readHaigisConstants() : null;
+                const hofferQPacdValue = calculationModel === 'hoffer_q' && !usesModelConstants
+                    ? parseFloat(hofferQPacd.value) : NaN;
 
                 const payload = {
                     ...formData,
@@ -1400,6 +1415,8 @@ INDEX_PAGE = """
                     selectedUlibModelName = '';
                     clearUlibConstants();
                     resetAConstantToDefault();
+                    resetUlibHint();
+                    syncFormulaControls();
                 }
                 return;
             }
@@ -1409,10 +1426,17 @@ INDEX_PAGE = """
         }
 
         function resetAConstantToDefault() {
+            // 只在空着时补默认值，不覆盖用户已经填过的常数。
             aConstantInput.readOnly = false;
-            aConstantInput.value = '119.30';
+            if (!aConstantInput.value) aConstantInput.value = '119.30';
             document.getElementById('aConstantHint').textContent =
                 '默认值：119.30（可根据晶体类型调整）';
+        }
+
+        function resetUlibHint() {
+            document.getElementById('ulibModelHint').textContent = ulibModelsLoaded
+                ? '源自 ULIB Constants（2016-10-31）· ' + ulibModels.length + ' 款'
+                : '源自 ULIB Constants（2016-10-31）';
         }
 
         function pickUlibModel(name) {
@@ -1481,25 +1505,74 @@ INDEX_PAGE = """
             if (!ulibModelGroup.contains(event.target)) closeUlibList();
         });
 
-        function applyUlibModel(model) {
-            // 选中 ULIB 型号后把常数写进输入框。这些值会随请求显式提交，
-            // 优先级高于后端的自动映射，不会再被替换。
-            aConstantInput.readOnly = false;
+        function ulibConstantsSummary(model) {
+            // 只把型号常数显示成说明文字，不写进输入框；真实取值由后端查表。
+            const parts = [];
             if (model.a_constant !== null && model.a_constant !== undefined) {
-                aConstantInput.value = model.a_constant.toFixed(2);
+                parts.push('A ' + Number(model.a_constant).toFixed(2));
             }
             if (model.haigis && model.haigis.length === 3) {
-                ['haigisA0', 'haigisA1', 'haigisA2'].forEach((id, index) => {
-                    const input = document.getElementById(id);
-                    if (input) input.value = Number(model.haigis[index]).toFixed(3);
-                });
+                parts.push('Haigis ' + model.haigis
+                    .map(value => Number(value).toFixed(3)).join(' / '));
             }
             if (model.pacd !== null && model.pacd !== undefined) {
-                const pacdInput = document.getElementById('hofferQPacd');
-                if (pacdInput) pacdInput.value = Number(model.pacd).toFixed(2);
+                parts.push('pACD ' + Number(model.pacd).toFixed(2));
             }
+            return parts;
+        }
+
+        function applyUlibModel(model) {
+            // 声明型号后常数由 calculate 内部查表：输入框锁定但保留用户
+            // 原来填的值，只显示将采用的常数，避免把查表值伪装成输入。
+            const parts = ulibConstantsSummary(model);
+            if (parts.length === 0) {
+                setConstantInputsLocked(false);
+                document.getElementById('ulibModelHint').textContent =
+                    '该型号缺少可用常数，请手动填写';
+                return;
+            }
+            lockUlibConstants();
+            let hint = '按型号查表：' + parts.join(' · ');
+            if (model.preliminary) hint += '（样本量偏小，仅供参考）';
+            document.getElementById('ulibModelHint').textContent = hint;
             document.getElementById('aConstantHint').textContent =
-                '来自 ULIB Constants';
+                '由所选型号决定，输入框值不参与计算';
+        }
+
+        function activeUlibModelName() {
+            // 只有本地公式走 ULIB 查表；Barrett 用官网型号和自己的常数。
+            if (currentCalculationMode === 'toric') {
+                return selectedToricFormula === 'haigis-toric'
+                    ? selectedUlibModelName : '';
+            }
+            return selectedFormula !== 'barrett' ? selectedUlibModelName : '';
+        }
+
+        function setConstantInputsLocked(locked) {
+            // 只切可编辑状态，不动输入值：用户自己填的常数切回来还在。
+            Object.entries(FORMULA_CONSTANT_FIELDS).forEach(([id, placeholder]) => {
+                const input = document.getElementById(id);
+                if (!input) return;
+                input.disabled = locked;
+                input.placeholder = locked ? '由所选型号决定' : placeholder;
+            });
+            aConstantInput.readOnly = locked;
+        }
+
+        function refreshConstantLock() {
+            // 切公式/切模式后同步锁定状态：声明了型号就锁输入框，
+            // 让常数由后端按型号查表；否则恢复可编辑。
+            if (activeUlibModelName()) {
+                setConstantInputsLocked(true);
+                const model = findExactUlibModel(selectedUlibModelName);
+                if (model) applyUlibModel(model);
+                return;
+            }
+            setConstantInputsLocked(false);
+            // 解锁后输入框仍是用户原值；只有空值时补默认，免得 Barrett
+            // 分支带着空值提交。
+            if (!aConstantInput.value) resetAConstantToDefault();
+            resetUlibHint();
         }
 
         function syncModelSelectors() {
@@ -1513,6 +1586,7 @@ INDEX_PAGE = """
             barrettModelGroup.hidden = !useBarrettList;
             ulibModelGroup.hidden = useBarrettList;
             if (!useBarrettList) loadUlibModels();
+            refreshConstantLock();
         }
 
         function syncFormulaControls() {
@@ -1635,11 +1709,11 @@ INDEX_PAGE = """
                 ? '本地公开框架近轴实现；完整商用算法未核实，结果为低置信度。'
                 : '在线调用 Barrett Toric 官网，不保证稳定性。';
             document.getElementById('toricInputHint').textContent = isHaigis
-                ? '必填：完整 a0/a1/a2、AL、前表面 K1/K2 及正交轴位、术前实测 ACD。标有 * 的参数必填；LT、WTW、A 常数不参与计算。切口 SIA 表示沿切口方向的扁平化量。'
+                ? '必填：晶体型号（或完整 a0/a1/a2）、AL、前表面 K1/K2 及正交轴位、术前实测 ACD。标有 * 的参数必填；LT、WTW、A 常数不参与计算。切口 SIA 表示沿切口方向的扁平化量。'
                 : '使用上方患者、晶体型号、A 常数和 K-index 设置；请至少启用一眼。标有 * 的参数必填。';
             haigisConstants.hidden = !isHaigis;
             document.getElementById('haigisConstantsNote').textContent = isHaigis
-                ? 'a0/a1/a2 全部必填；请核对晶体型号，不使用 A 常数近似。'
+                ? '选择晶体型号后由该型号常数计算；未选型号时须完整填写 a0/a1/a2。'
                 : '照抄 IOL Master 的 a0/a1/a2；不填则用 A 常数近似';
             document.getElementById('aConstantGroup').hidden = isHaigis;
             aConstantInput.required = !isHaigis;
@@ -1709,8 +1783,10 @@ INDEX_PAGE = """
             const enabled = ['right', 'left'].filter(eye => document.getElementById(toricPrefix(eye) + 'EyeEnabled').checked);
             let error = enabled.length ? '' : '请至少启用一只眼睛并填写参数。';
             if (selectedToricFormula === 'haigis-toric') {
-                const constantsValid = [haigisA0, haigisA1, haigisA2].every(input => input.value !== '' && input.checkValidity());
-                if (!constantsValid) error = '请完整填写有效的 Haigis a0、a1、a2 常数。';
+                // 已声明型号时三常数由后端查表，不再要求手工填写。
+                const constantsValid = Boolean(selectedUlibModelName) ||
+                    [haigisA0, haigisA1, haigisA2].every(input => input.value !== '' && input.checkValidity());
+                if (!constantsValid) error = '请选择晶体型号，或完整填写有效的 Haigis a0、a1、a2 常数。';
             } else if (!aConstantInput.value || !aConstantInput.checkValidity()) {
                 error = '请填写有效的 A 常数。';
             }
@@ -1824,7 +1900,10 @@ INDEX_PAGE = """
                 };
                 if (requestFormula === 'haigis-toric') {
                     formData.model = 'haigis-toric';
-                    formData.haigis_constants = readHaigisConstants();
+                    // 声明型号后常数由后端查表，不再提交本地输入值。
+                    if (!selectedUlibModelName) {
+                        formData.haigis_constants = readHaigisConstants();
+                    }
                     delete formData.a_constant;
                 } else {
                     formData.cylinder_mode = document.getElementById('toricCylinderMode').value;
@@ -1974,6 +2053,13 @@ INDEX_PAGE = """
             const formulaLabel = data && data.formula_label ? data.formula_label : 'Barrett Universal II';
             const modeLabel = data && data.mode === 'online' ? '在线' : '本地';
             const lines = ['公式：' + formulaLabel + '（' + modeLabel + '）'];
+            const source = data && data.constants_source;
+            if (source && source.source === 'ulib') {
+                lines.push('常数来源：ULIB ' + (source.ulib_name || '')
+                    + (source.ignored_request && source.ignored_request.length
+                        ? '（已忽略请求中的 ' + source.ignored_request.join('、') + '）'
+                        : ''));
+            }
             [['右眼', 'right_eye'], ['左眼', 'left_eye']].forEach((item) => {
                 const label = item[0];
                 const eye = data && data[item[1]];

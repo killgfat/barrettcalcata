@@ -56,21 +56,23 @@ def test_ui_supplied_ulib_name_is_not_reported_as_unmapped():
     assert info["ulib_name"] == "AMO Tecnis 1 ZCB00"
 
 
-def test_ui_flow_with_explicit_constants_still_reports_ulib():
-    """UI 选中后显式提交常数时，说明仍标明来自哪个 ULIB 条目。"""
+def test_ui_flow_with_explicit_constants_reports_override():
+    """UI 同时提交型号与常数时，以型号查表结果为准并标注被屏蔽的字段。"""
     result = run(
         "haigis",
         iol_model="AMO Tecnis 1 ZCB00",
-        a_constant=119.3,
-        haigis_constants={"a0": -1.302, "a1": 0.21, "a2": 0.251},
+        a_constant=118.8,
+        haigis_constants={"a0": 1.0, "a1": 0.4, "a2": 0.1},
     )
     info = result["constants_source"]
     assert info["source"] == "ulib"
-    assert info["applied"] == []
+    assert info["applied"] == ["a_constant", "haigis_constants"]
+    assert info["ignored_request"] == ["a_constant", "haigis_constants"]
     assert info["ulib_name"] == "AMO Tecnis 1 ZCB00"
-    # 计算用的确实是显式提供的三常数。
+    # 计算用的是型号常数，不是请求里的值。
     used = result["right_eye"]["used_inputs"]
     assert used["a0"] == -1.302
+    assert "a_constant" in result["right_eye"]["ignored_inputs"]
 
 
 def test_generic_ulib_name_drives_constants_for_all_three_formulas():

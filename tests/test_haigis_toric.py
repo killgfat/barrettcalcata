@@ -323,7 +323,11 @@ def test_openapi_describes_local_toric_parameters_and_required_constants():
         "content"
     ]["application/json"]["schema"]
     toric_branch = request_schema["allOf"][0]["oneOf"][1]
-    assert toric_branch["required"] == ["haigis_constants"]
+    # 三常数可直接给，也可由命中 ULIB 的 iol_model 查表得到。
+    assert toric_branch["anyOf"] == [
+        {"required": ["haigis_constants"]},
+        {"required": ["iol_model"]},
+    ]
     assert toric_branch["properties"]["model"]["enum"] == ["haigis-toric"]
     json.dumps(spec, allow_nan=False)
 

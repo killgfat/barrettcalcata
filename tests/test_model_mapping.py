@@ -77,12 +77,24 @@ def test_srkt_uses_ulib_optimized_a_when_a_constant_not_given():
     assert result["right_eye"]["used_inputs"]["a_constant"] == 119.3
 
 
-def test_explicit_a_constant_wins_over_ulib():
-    """调用方显式给的 A 常数优先。"""
+def test_iol_model_overrides_request_a_constant():
+    """声明型号后，请求里的 A 常数被型号常数屏蔽。"""
     result = run("srkt", iol_model="AMO ZCB00", a_constant=118.8)
+    eye = result["right_eye"]
+    assert eye["used_inputs"]["a_constant"] == 119.3
+    assert "a_constant" in eye["ignored_inputs"]
+    info = result["constants_source"]
+    assert info["applied"] == ["a_constant"]
+    assert info["ignored_request"] == ["a_constant"]
+
+
+def test_request_a_constant_applies_without_iol_model():
+    """不声明型号时按请求给的常数计算。"""
+    result = run("srkt", a_constant=118.8)
     assert result["right_eye"]["used_inputs"]["a_constant"] == 118.8
     info = result["constants_source"]
-    assert "a_constant" not in info["applied"]
+    assert info["source"] == "a_constant_conversion"
+    assert info["applied"] == []
 
 
 def test_hoffer_q_uses_ulib_pacd():
@@ -92,9 +104,18 @@ def test_hoffer_q_uses_ulib_pacd():
     assert result["right_eye"]["used_inputs"]["pACD"] == 5.8
 
 
-def test_explicit_pacd_wins_over_ulib():
-    """调用方显式给的 pACD 优先。"""
+def test_iol_model_overrides_request_pacd():
+    """声明型号后，请求里的 Hoffer Q pACD 被型号常数屏蔽。"""
     result = run("hoffer_q", iol_model="AMO ZCB00", hoffer_q_pacd=5.40)
+    eye = result["right_eye"]
+    assert eye["used_inputs"]["pACD"] == 5.8
+    assert "hoffer_q_pacd" in eye["ignored_inputs"]
+    assert "hoffer_q_pacd" in result["constants_source"]["ignored_request"]
+
+
+def test_request_pacd_applies_without_iol_model():
+    """不声明型号时按请求给的 pACD 计算。"""
+    result = run("hoffer_q", hoffer_q_pacd=5.40)
     assert result["right_eye"]["used_inputs"]["pACD"] == 5.40
 
 
@@ -108,15 +129,55 @@ def test_haigis_uses_ulib_three_constants():
     assert used["a2"] == 0.251
 
 
-def test_explicit_haigis_constants_win_over_ulib():
-    """调用方显式给的三常数优先。"""
+def test_iol_model_overrides_request_haigis_constants():
+    """声明型号后，请求里的 Haigis 三常数被型号常数屏蔽。"""
     result = run(
         "haigis",
         iol_model="AMO ZCB00",
         haigis_constants={"a0": 1.0, "a1": 0.4, "a2": 0.1},
     )
     used = result["right_eye"]["used_inputs"]
+    assert (used["a0"], used["a1"], used["a2"]) == (-1.302, 0.21, 0.251)
+    assert "haigis_constants" in result["right_eye"]["ignored_inputs"]
+    assert "haigis_constants" in result["constants_source"]["ignored_request"]
+
+
+def test_request_haigis_constants_apply_without_iol_model():
+    """不声明型号时按请求给的三常数计算。"""
+    result = run("haigis", haigis_constants={"a0": 1.0, "a1": 0.4, "a2": 0.1})
+    used = result["right_eye"]["used_inputs"]
     assert used["a0"] == 1.0
+
+
+def test_missing_ulib_field_falls_back_to_request_value(monkeypatch):
+    """ULIB 缺某项时回落到请求值，并给出警告。"""
+    mapped = {
+        "barrett_model": "AMO ZCB00",
+        "ulib_name": "AMO Tecnis 1 ZCB00",
+        "match": "exact",
+        "matched_by": "barrett_model",
+        "samples": 100,
+        "preliminary": False,
+        "note": "",
+        "warnings": [],
+        "a_constant": 119.3,
+        "haigis_constants": None,
+        "hoffer_q_pacd": None,
+    }
+    monkeypatch.setattr(
+        constants,
+        "resolve_model_constants",
+        lambda name: dict(mapped),
+    )
+    result = run(
+        "haigis",
+        iol_model="AMO ZCB00",
+        haigis_constants={"a0": 1.0, "a1": 0.4, "a2": 0.1},
+    )
+    info = result["constants_source"]
+    assert "haigis_constants" not in info["applied"]
+    assert any("缺少 Haigis" in item for item in info["warnings"])
+    assert result["right_eye"]["used_inputs"]["a0"] == 1.0
 
 
 def test_barrett_does_not_read_ulib():

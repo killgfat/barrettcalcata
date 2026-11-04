@@ -128,8 +128,8 @@ pACD = 0.58357 × A - 63.896
 
 术前实测 ACD 不等于 pACD；标准 Hoffer Q 不使用实测 ACD、LT、WTW。
 接口由 A 常数推导 pACD，结果不应自动视为与任意设备晶体库的优化常数一致。
-型号已收录在内置 ULIB 快照时，`GET /api/iol-models?model=<型号>` 会
-直接给出优化后的 pACD，可通过 `hoffer_q_pacd` 传入以覆盖上述推导。
+型号已收录在内置 ULIB 快照时，请求里声明 `iol_model` 即可让服务端
+查表取优化 pACD；不声明型号时才用 `hoffer_q_pacd` 或由 A 常数推导。
 
 ## 5. Haigis
 
@@ -146,10 +146,10 @@ K-index 恢复角膜半径，再计算 Haigis 所需的角膜屈光度。
 
 常数有两种来源：
 
-1. **显式三常数**：请求传入 haigis_constants: {a0,a1,a2}，优先使用，
-   此时直接使用传入的三常数，不从 A 常数推导 a0。应与 IOL Master 或晶体库中的具体晶体常数一致。
-   型号已收录在内置 ULIB 快照时，`GET /api/iol-models?model=<型号>`
-   会直接给出这组 a0/a1/a2，照抄即可。
+1. **型号或显式三常数**：请求声明了命中 ULIB 的 `iol_model` 时，
+   服务端查出该晶体的 a0/a1/a2 并直接使用；未声明型号时才用请求里的
+   `haigis_constants`。两种情况下都不再从 A 常数推导 a0。常数应与
+   IOL Master 或晶体库中的具体晶体一致。
 2. **标准近似起点**：固定 a1=0.4、a2=0.1，并由
    a0=0.62467×A−72.434 推导 a0。该结果不是个体化优化常数，
    与设备使用的晶体专属常数可能明显不同，结果会给出警告并降低置信度。
@@ -459,10 +459,13 @@ SRK/T、Hoffer Q、Haigis     -> 型号能映射到 ULIB 时用 ULIB 优化常�
 | Hoffer Q | ULIB 优化后的 pACD |
 | Haigis / Haigis-T | ULIB 的 a0 / a1 / a2 |
 
-**调用方显式提供的常数永远优先**：请求里给了 `a_constant`、
-`hoffer_q_pacd` 或 `haigis_constants` 时不做任何替换。为了实现这个
-区分，`CalculationRequest` 记录 `a_constant_provided`，否则无法分辨
-"没给"和"给了正好等于默认值 119.30"。
+**声明了型号就以型号为准**：请求里带了能命中 ULIB 的 `iol_model` 时，
+同类的 `a_constant` / `hoffer_q_pacd` / `haigis_constants` 直接被屏蔽，
+不再参与计算；没有声明型号时才按请求给的常数算。ULIB 恰好缺某一项时
+回落到请求值，并在 `warnings` 中说明来源混杂。
+
+Haigis-T 因此有两种给常数的路径：直接给 `haigis_constants`，或给一个
+命中 ULIB 的 `iol_model` 让服务端查表。两者都没有时返回 400。
 
 响应里的 `constants_source` 说明实际用了什么：
 
@@ -471,12 +474,15 @@ SRK/T、Hoffer Q、Haigis     -> 型号能映射到 ULIB 时用 ULIB 优化常�
 | `source` | `ulib`（型号映射命中）或 `a_constant_conversion`（退回换算） |
 | `barrett_model` / `ulib_name` | Barrett 型号名与对应的 ULIB 条目名 |
 | `match` | `exact` / `series` |
-| `applied` | 实际被替换的字段，如 `["a_constant", "hoffer_q_pacd"]` |
+| `applied` | 型号提供并实际生效的字段，如 `["a_constant", "hoffer_q_pacd"]` |
+| `ignored_request` | 被型号屏蔽的请求字段，如 `["a_constant"]` |
 | `note` | 映射说明；退回换算时说明"不是晶体优化常数" |
+
+每眼的 `ignored_inputs` 也会列出被屏蔽的字段，便于调用方核对。
 
 实测（AL 23.5 / K 44.0 / ACD 3.2，`iol_model=AMO ZCB00`）：
 
-| 公式 | 用 ULIB | 显式给 A=118.8 |
+| 公式 | 声明型号（A=119.3） | 不声明型号、A=118.8 |
 |---|---|---|
 | SRK/T | 21 D（A=119.3） | 20.5 D |
 | Hoffer Q | 21 D（pACD=5.80） | 20.5 D |

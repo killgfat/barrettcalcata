@@ -269,14 +269,25 @@ def _online_used_inputs(eye, request):
     return used
 
 
-def _build_eye_result(formula, eye, request, solved, overrides=None):
+def _build_eye_result(
+    formula, eye, request, solved, overrides=None, constants_info=None
+):
     """把一个公式的原始结果映射为 API 的单眼结构。"""
     predicted = solved["predicted_refraction"]
     iol_options = sorted(solved["iol_options"], key=lambda row: float(row["iol_power"]))
     caps = CAPABILITIES[formula]
+    overrides = overrides or {}
     ignored_inputs = list(caps.ignored_inputs)
-    if formula in {"haigis", "haigis-toric"} and request.haigis_constants is not None:
+    # Haigis 用三常数时 A 常数不参与；否则 A 常数才是常数来源。
+    if formula in {"haigis", "haigis-toric"} and (
+        "constants" in overrides or request.haigis_constants is not None
+    ):
         ignored_inputs.append("a_constant")
+    # 型号常数优先时，请求里被屏蔽的同类常数也要如实列出。
+    if constants_info is not None:
+        ignored_inputs.extend(constants_info.get("ignored_request", []))
+    # 同名字段可能从两条路径计入，去重但保持顺序。
+    ignored_inputs = list(dict.fromkeys(ignored_inputs))
     result = {
         "biometry": (
             f"AL {eye.al:.2f} mm; "
@@ -327,9 +338,11 @@ def _resolve_offline_constants(request, formula):
     """按公式决定常数来源。
 
     - Barrett 走自己的 Lens Factor 换算，不读 ULIB（ULIB 表内没有 LF 列）；
-    - 其余本地公式在「型号能映射到 ULIB」且「调用方没显式给 a_constant」时，
-      用 ULIB 的优化常数替换 A 常数：SRK/T 用优化 A，Hoffer Q 补 pACD，
-      Haigis 补 a0/a1/a2。
+    - 其余本地公式在型号命中 ULIB 时由型号常数说了算：SRK/T 用优化 A，
+      Hoffer Q 用 pACD，Haigis 用 a0/a1/a2。请求里同类的 a_constant /
+      hoffer_q_pacd / haigis_constants 会被屏蔽（记入 ignored_request），
+      避免同一请求里出现两套互相冲突的常数。
+    - 型号命中但 ULIB 缺该项时才回落到请求值，并在 warnings 中说明。
 
     返回 (calculate_kwargs 的常数部分, 说明信息 dict 或 None)。
     """
@@ -352,6 +365,7 @@ def _resolve_offline_constants(request, formula):
             "source": "a_constant_conversion",
             "barrett_model": model_name or None,
             "applied": [],
+            "ignored_request": [],
             "warnings": [],
             "note": (
                 f"型号 {model_name!r} 未映射到 ULIB 条目，常数由 A 常数按厂商"
@@ -374,44 +388,69 @@ def _resolve_offline_constants(request, formula):
         "preliminary": mapped["preliminary"],
         "note": mapped["note"],
         "applied": [],
+        "ignored_request": [],
         "warnings": list(mapped["warnings"]),
     }
     overrides = {}
+    ignored = info["ignored_request"]
 
-    # 调用方显式给的 A 常数优先，不擅自替换。
-    if not request.a_constant_provided and mapped.get("a_constant") is not None:
-        overrides["a_constant"] = mapped["a_constant"]
+    # 型号常数优先：请求里显式给的 A 常数不再参与计算。
+    ulib_a_constant = mapped.get("a_constant")
+    if ulib_a_constant is not None:
+        overrides["a_constant"] = ulib_a_constant
         info["applied"].append("a_constant")
+        if request.a_constant_provided:
+            ignored.append("a_constant")
+    elif request.a_constant_provided:
+        info["warnings"].append(
+            f"ULIB 条目 {mapped['ulib_name']} 缺少 A 常数，沿用请求中的 a_constant"
+        )
 
-    if (
-        formula == "hoffer_q"
-        and request.hoffer_q_pacd is None
-        and mapped.get("hoffer_q_pacd") is not None
-    ):
-        overrides["pacd"] = mapped["hoffer_q_pacd"]
-        info["applied"].append("hoffer_q_pacd")
+    if formula == "hoffer_q":
+        ulib_pacd = mapped.get("hoffer_q_pacd")
+        if ulib_pacd is not None:
+            overrides["pacd"] = ulib_pacd
+            info["applied"].append("hoffer_q_pacd")
+            if request.hoffer_q_pacd is not None:
+                ignored.append("hoffer_q_pacd")
+        elif request.hoffer_q_pacd is not None:
+            info["warnings"].append(
+                f"ULIB 条目 {mapped['ulib_name']} 缺少 Hoffer Q pACD，"
+                "沿用请求中的 hoffer_q_pacd"
+            )
 
-    haigis_values = mapped.get("haigis_constants")
-    if (
-        formula in {"haigis", "haigis-toric"}
-        and request.haigis_constants is None
-        and haigis_values
-    ):
-        overrides["constants"] = {
-            "a0": haigis_values[0],
-            "a1": haigis_values[1],
-            "a2": haigis_values[2],
-        }
-        info["applied"].append("haigis_constants")
+    if formula in {"haigis", "haigis-toric"}:
+        haigis_values = mapped.get("haigis_constants")
+        if haigis_values:
+            overrides["constants"] = {
+                "a0": haigis_values[0],
+                "a1": haigis_values[1],
+                "a2": haigis_values[2],
+            }
+            info["applied"].append("haigis_constants")
+            if request.haigis_constants is not None:
+                ignored.append("haigis_constants")
+        elif request.haigis_constants is not None:
+            info["warnings"].append(
+                f"ULIB 条目 {mapped['ulib_name']} 缺少 Haigis 三常数，"
+                "沿用请求中的 haigis_constants"
+            )
 
-    # applied 为空时 overrides 也是空 dict：调用方显式给了常数，不做覆盖，
-    # 但仍把映射信息返回，便于前端提示「ULIB 有这条，但你用自己的值」。
     return overrides, info
 
 
 def _calculate_offline(request, formula):
     """本地公式单/双眼计算与结果组装。"""
     constant_overrides, constants_info = _resolve_offline_constants(request, formula)
+    if (
+        formula == "haigis-toric"
+        and request.haigis_constants is None
+        and "constants" not in constant_overrides
+    ):
+        raise InputValidationError(
+            "haigis-toric 需要 haigis_constants，"
+            "或指定能命中内置 ULIB 的 iol_model 由型号提供常数"
+        )
     eyes = {}
     solved_eyes = {}
     for eye_name, eye in (
@@ -466,7 +505,7 @@ def _calculate_offline(request, formula):
                 solved["confidence"] = "LOW_CONFIDENCE"
         solved_eyes[eye_name] = solved
         eyes[eye_name] = _build_eye_result(
-            formula, eye, request, solved, constant_overrides
+            formula, eye, request, solved, constant_overrides, constants_info
         )
 
     reference = next(iter(solved_eyes.values()))

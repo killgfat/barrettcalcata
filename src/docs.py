@@ -168,7 +168,22 @@ def get_openapi_spec():
                                         },
                                         "iol_model": {
                                             "type": "string",
-                                            "description": "IOL晶体型号名称（可选），如 Alcon SN60WF",
+                                            "description": (
+                                                "IOL 晶体型号（可选），如 Alcon SN60WF 或"
+                                                " ULIB 原始型号名。声明且命中内置 ULIB "
+                                                "快照时，常数由型号查表决定："
+                                                "srkt 用优化 A 常数、hoffer_q 用 pACD、"
+                                                "haigis/haigis-toric 用 a0/a1/a2，"
+                                                "请求里同类的 a_constant / "
+                                                "hoffer_q_pacd / haigis_constants "
+                                                "会被屏蔽并在 ignored_inputs 与 "
+                                                "constants_source.ignored_request "
+                                                "中列出；ULIB 缺该项时回落到请求值并给出"
+                                                "警告。Barrett 系列不查 ULIB，仍用"
+                                                "请求中的 a_constant。未声明型号时"
+                                                "完全按请求给出的常数计算。"
+                                            ),
+                                            "example": "AMO ZCB00",
                                         },
                                         "k_index": {
                                             "type": "number",
@@ -234,8 +249,10 @@ def get_openapi_spec():
                                         "haigis_constants": {
                                             "type": "object",
                                             "description": (
-                                                "仅 model=haigis/haigis-toric 可用；haigis-toric 必填。提供优化后的 a0/a1/a2 时，"
+                                                "仅 model=haigis/haigis-toric 可用。提供优化后的 a0/a1/a2 时，"
                                                 "不再由 A 常数推导 a0；a_constant 会被忽略。"
+                                                "声明了命中 ULIB 的 iol_model 时本字段被型号常数"
+                                                "屏蔽；没声明 iol_model 时 haigis-toric 必须提供。"
                                             ),
                                             "properties": {
                                                 "a0": {"type": "number"},
@@ -605,7 +622,11 @@ def get_openapi_spec():
                         "right_eye": {"$ref": "#/components/schemas/HaigisToricEye"},
                         "left_eye": {"$ref": "#/components/schemas/HaigisToricEye"},
                     },
-                    "required": ["haigis_constants"],
+                    # 三常数可以直接给，也可以由命中 ULIB 的型号查表得到。
+                    "anyOf": [
+                        {"required": ["haigis_constants"]},
+                        {"required": ["iol_model"]},
+                    ],
                 },
             ],
         }
