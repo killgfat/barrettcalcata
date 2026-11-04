@@ -1,4 +1,7 @@
-"""IOL晶体型号同步模块 - 从Barrett官方站点获取晶体型号及A常数"""
+"""IOL晶体型号同步模块 - 从Barrett官方站点获取晶体型号及A常数
+
+另外提供 ULIB 常数快照的本地查询入口，见 constants.py。
+"""
 
 import re
 import time
@@ -6,7 +9,14 @@ import time
 import requests
 from bs4 import BeautifulSoup
 
+from . import constants as ulib_constants
 from .config import DEFAULT_K_INDEX, to_barrett_k_index_value
+
+# 内置 ULIB 快照只覆盖 ULIB 收录的型号，且 ULIB 已于 2016-10-31 停更。
+# 查询顺序：先本地快照（零网络），未收录再走 Barrett 官网，官网失败时
+# 放宽到 ULIB 的模糊匹配，并在结果里标记 source。
+ULIB_SOURCE = "ulib"
+BARRETT_SOURCE = "barrett"
 
 
 class IOLModelError(RuntimeError):
@@ -85,6 +95,61 @@ def fetch_iol_model_list():
     _model_list_cache["data"] = models
     _model_list_cache["ts"] = now
     return models
+
+
+def fetch_model_constants(model_name):
+    """按型号查询常数，优先使用手工映射与内置 ULIB 快照。
+
+    查询顺序：
+    1. Barrett 官网型号 → data_model_map.py 的手工映射 → ULIB 快照；
+    2. ULIB 快照里的原始型号名（中国大陆/其他来源的输入可能是 ULIB 写法）；
+    3. 回退到 Barrett 官网的 A 常数/Lens Factor 查询（可能发起网络请求）。
+
+    第 3 步在官网被 Cloudflare 拦截时是高频失败点，调用方应能容忍异常。
+    """
+    mapped = ulib_constants.lookup_for_barrett_model(model_name)
+    if mapped is not None:
+        return mapped
+
+    entry = ulib_constants.lookup(model_name)
+    if entry is not None:
+        return entry.to_model_result()
+
+    result = fetch_model_a_constant(model_name)
+    result["source"] = BARRETT_SOURCE
+    result["source_revision"] = None
+    result["ulib_name"] = None
+    result["samples"] = None
+    result["preliminary"] = False
+    result["haigis_constants"] = None
+    result["hoffer_q_pacd"] = None
+    result["holladay1_sf"] = None
+    result["srkt_a"] = None
+    result["srk2_a"] = None
+    result["nominal_a"] = result.get("a_constant")
+    result["warnings"] = []
+    return result
+
+
+def lookup_ulib_constants(model_name):
+    """只查内置 ULIB 快照与型号映射；未收录返回 None，不发网络请求。"""
+    mapped = ulib_constants.lookup_for_barrett_model(model_name)
+    if mapped is not None:
+        return mapped
+    entry = ulib_constants.lookup(model_name)
+    if entry is None:
+        return None
+    return entry.to_model_result()
+
+
+def list_ulib_models():
+    """返回内置 ULIB 快照收录的型号名（按名称排序）。"""
+    return sorted(entry.name for entry in ulib_constants.iter_entries())
+
+
+def list_ulib_model_details():
+    """返回带常数的 ULIB 型号列表，供前端选择器与关键词搜索使用。"""
+    return ulib_constants.list_models()
 
 
 def fetch_model_a_constant(model_name):

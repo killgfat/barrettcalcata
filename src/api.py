@@ -9,7 +9,8 @@ from formula import (
     calculate,
     calculate_toric,
     fetch_iol_model_list,
-    fetch_model_a_constant,
+    fetch_model_constants,
+    list_ulib_model_details,
 )
 from worker_ai import WorkerAI
 
@@ -147,13 +148,16 @@ class APIHandler:
 
         try:
             if model_name:
-                result = fetch_model_a_constant(model_name)
+                # 先查内置 ULIB 快照（零网络），未收录才回退 Barrett 官网。
+                # 返回结构在原有 a_constant / lens_factor 之外补充 ULIB 的
+                # Haigis、Hoffer Q、Holladay 1、SRK II 常数，供上层按晶体
+                # 型号直接选取，而不是用 A 常数近似换算。
+                result = fetch_model_constants(model_name)
                 return {
                     "success": True,
                     "data": {
                         "name": model_name,
-                        "a_constant": result["a_constant"],
-                        "lens_factor": result["lens_factor"],
+                        **result,
                     },
                     "message": "查询成功",
                 }, 200
@@ -169,6 +173,31 @@ class APIHandler:
             return {
                 "error": "Internal Server Error",
                 "message": f"获取晶体型号数据失败: {e!s}",
+            }, 500
+
+    async def handle_ulib_models(self, request):
+        """返回内置 ULIB 晶体列表，供前端做关键词搜索与常数填充。"""
+        if request.method != "GET":
+            return {
+                "error": "Method Not Allowed",
+                "message": "此端点只支持GET请求",
+            }, 405
+        try:
+            models = list_ulib_model_details()
+            return {
+                "success": True,
+                "data": {
+                    "models": models,
+                    "source": "ulib",
+                    "source_url": "http://www.ocusoft.de/ulib/c1.htm",
+                    "source_revision": "2016-10-31",
+                },
+                "message": "获取ULIB晶体列表成功",
+            }, 200
+        except Exception as e:  # noqa: BLE001 - HTTP 边界
+            return {
+                "error": "Internal Server Error",
+                "message": f"获取ULIB晶体列表失败: {e!s}",
             }, 500
 
     async def handle_barrett_calculate(self, request):

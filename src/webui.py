@@ -112,6 +112,22 @@ INDEX_PAGE = """
         .spinner { border: 4px solid #f3f3f3; border-top: 4px solid #007bff; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto 10px; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         .param-hint { font-size: 0.9em; color: #666; margin-top: 5px; }
+        .ulib-combobox { position: relative; }
+        .ulib-model-list {
+            position: absolute; left: 0; right: 0; top: calc(100% + 4px);
+            z-index: 60; max-height: 264px; overflow-y: auto;
+            margin: 0; padding: 4px 0; list-style: none;
+            background: #fff; border: 1px solid #cbd5e1; border-radius: 8px;
+            box-shadow: 0 10px 28px rgba(15, 23, 42, 0.14);
+        }
+        .ulib-model-list[hidden] { display: none; }
+        .ulib-model-item {
+            padding: 8px 12px; font-size: 15px; color: #1e293b;
+            cursor: pointer; white-space: nowrap; overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .ulib-model-item:hover, .ulib-model-item.is-active { background: #eff6ff; }
+        .ulib-model-empty { padding: 10px 12px; font-size: 14px; color: #94a3b8; }
         .suggestion-box {
             background: #fff3cd;
             border: 1px solid #ffeaa7;
@@ -205,10 +221,19 @@ INDEX_PAGE = """
                     </div>
                     <div class="form-group">
                         <label for="iolModel">晶体型号</label>
-                        <select id="iolModel" name="iolModel">
-                            <option value="Personal Constant">Personal Constant（自定义A常数）</option>
-                        </select>
-                        <div class="param-hint" id="iolModelHint">选择晶体型号可自动填充A常数</div>
+                        <div id="barrettModelGroup">
+                            <select id="iolModel" name="iolModel">
+                                <option value="Personal Constant">Personal Constant（自定义A常数）</option>
+                            </select>
+                            <div class="param-hint" id="iolModelHint">选择晶体型号可自动填充A常数</div>
+                        </div>
+                        <div id="ulibModelGroup" hidden>
+                            <div class="ulib-combobox">
+                                <input type="text" id="ulibModelSearch" placeholder="选择晶体或输入关键词搜索" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="ulibModelList" aria-autocomplete="list">
+                                <ul id="ulibModelList" class="ulib-model-list" role="listbox" hidden></ul>
+                            </div>
+                            <div class="param-hint" id="ulibModelHint">源自 ULIB Constants（2016-10-31）</div>
+                        </div>
                     </div>
                     <div class="form-group" id="aConstantGroup">
                         <label for="aConstant">A常数</label>
@@ -563,19 +588,24 @@ INDEX_PAGE = """
         iolModelSelect.addEventListener('change', async function() {
             const selected = this.value;
             if (selected === 'Personal Constant') {
+                // 自定义常数不是内置的任何一款晶体，清掉上一款自动填入的
+                // ULIB 常数，避免 Haigis/Hoffer Q 静默沿用别的型号数值。
+                clearUlibConstants();
                 aConstantInput.readOnly = false;
                 aConstantInput.value = '119.30';
                 document.getElementById('aConstantHint').textContent =
                     '默认值：119.30（可根据晶体类型调整）';
                 document.getElementById('iolModelHint').textContent =
                     '选择晶体型号可自动填充A常数';
+                ulibModelSearch.value = '';
+                selectedUlibModelName = '';
                 validateToricForm();
                 return;
             }
 
             aConstantInput.readOnly = true;
             aConstantInput.value = '';
-            document.getElementById('iolModelHint').textContent = '正在获取A常数...';
+            document.getElementById('iolModelHint').textContent = '正在获取常数...';
 
             try {
                 const response = await fetch(
@@ -583,24 +613,63 @@ INDEX_PAGE = """
                 );
                 const result = await response.json();
                 if (result.success) {
-                    aConstantInput.value = result.data.a_constant.toFixed(2);
-                    const lf = result.data.lens_factor;
+                    const data = result.data;
+                    if (data.a_constant !== null && data.a_constant !== undefined) {
+                        aConstantInput.value = data.a_constant.toFixed(2);
+                    } else {
+                        aConstantInput.readOnly = false;
+                    }
+                    const lf = data.lens_factor;
                     document.getElementById('aConstantHint').textContent =
-                        'Lens Factor: ' + (lf !== null ? lf : 'N/A');
-                    document.getElementById('iolModelHint').textContent =
-                        '已从Barrett官方同步';
+                        'Lens Factor: ' +
+                        (lf !== null && lf !== undefined ? lf : 'N/A');
+                    if (data.source === 'ulib') {
+                        // ULIB 常数比 A 常数换算更具体：直接把 Haigis / Hoffer Q
+                        // 常数填进各自的输入框，避免用 A 常数近似。
+                        fillUlibConstants(data);
+                        let hint = 'ULIB ' + data.source_revision +
+                            '（n=' + data.samples + '）';
+                        if (data.preliminary) {
+                            hint += ' · 样本量偏小，仅供参考';
+                        }
+                        document.getElementById('iolModelHint').textContent = hint;
+                    } else {
+                        document.getElementById('iolModelHint').textContent =
+                            '已从Barrett官方同步';
+                    }
                 } else {
                     throw new Error(result.message);
                 }
             } catch (e) {
                 aConstantInput.readOnly = false;
-                aConstantInput.value = '119.30';
                 document.getElementById('iolModelHint').textContent =
-                    '获取失败，请手动输入A常数';
+                    '获取失败，请手动输入常数';
             } finally {
                 validateToricForm();
             }
         });
+
+        function clearUlibConstants() {
+            ['haigisA0', 'haigisA1', 'haigisA2', 'hofferQPacd'].forEach(id => {
+                const input = document.getElementById(id);
+                if (input) input.value = '';
+            });
+        }
+
+        function fillUlibConstants(data) {
+            const haigis = data.haigis_constants;
+            if (haigis && haigis.length === 3) {
+                ['haigisA0', 'haigisA1', 'haigisA2'].forEach((id, index) => {
+                    const input = document.getElementById(id);
+                    if (input) input.value = Number(haigis[index]).toFixed(3);
+                });
+            }
+            const pacdInput = document.getElementById('hofferQPacd');
+            if (pacdInput && data.hoffer_q_pacd !== null &&
+                data.hoffer_q_pacd !== undefined) {
+                pacdInput.value = Number(data.hoffer_q_pacd).toFixed(2);
+            }
+        }
 
         loadIolModels();
 
@@ -867,6 +936,7 @@ INDEX_PAGE = """
             document.getElementById('aConstant').value = '119.30'; // 恢复默认值
             document.getElementById('kIndex').value = '1.3375';
             document.getElementById('aConstant').readOnly = false;
+            clearUlibConstants();
             document.getElementById('aConstantHint').textContent =
                 '默认值：119.30（可根据晶体类型调整）';
             document.getElementById('iolModelHint').textContent =
@@ -1073,7 +1143,9 @@ INDEX_PAGE = """
                     a_constant: roundToTwoDecimals(
                         document.getElementById('aConstant').value
                     ),
-                    iol_model: document.getElementById('iolModel').value,
+                    iol_model: (selectedFormula === 'barrett'
+                        ? document.getElementById('iolModel').value
+                        : (selectedUlibModelName || undefined)),
                     k_index: parseFloat(document.getElementById('kIndex').value)
                 };
 
@@ -1190,10 +1262,18 @@ INDEX_PAGE = """
             haigis: 'Haigis 使用实测 ACD；a0/a1/a2 请照抄 IOL Master（不填则用 A 常数近似，可能差 1–3 D）；LT/WTW 会被忽略。'
         };
 
+        // 型号选择器的 DOM 引用必须在使用前就绪：syncFormulaControls() 会在
+        // 初始化阶段被调用，届时这些常量必须已经赋值。
+
         let selectedToricFormula = 'barrett';
         let toricCalculating = false;
+        let ulibModels = [];
+        let ulibModelsLoaded = false;
+        let ulibLoading = false;
+
         let selectedFormula = 'barrett';
         let selectedExecutionMode = 'online';
+        let currentCalculationMode = 'spherical';
 
         function updateFormulaButtons() {
             formulaButtons.forEach((button) => {
@@ -1223,6 +1303,218 @@ INDEX_PAGE = """
             return selectedExecutionMode === 'offline' ? 'barrett_ii_offline' : 'barrett_ii';
         }
 
+
+        // ---- ULIB 晶体选择器（非 Barrett 公式使用）----
+        // 自绘下拉：输入关键词即时缩小候选，候选项只显示型号名。
+        // 不用原生 datalist，因为它会再过滤一遍且各浏览器行为不一致。
+        const barrettModelGroup = document.getElementById('barrettModelGroup');
+        const ulibModelGroup = document.getElementById('ulibModelGroup');
+        const ulibModelSearch = document.getElementById('ulibModelSearch');
+        const ulibModelList = document.getElementById('ulibModelList');
+        const ulibModelHint = document.getElementById('ulibModelHint');
+
+        let selectedUlibModelName = '';
+
+        async function loadUlibModels() {
+            if (ulibModelsLoaded || ulibLoading) return;
+            ulibLoading = true;
+            try {
+                const response = await fetch('/api/ulib-models');
+                const result = await response.json();
+                if (result.success && result.data && Array.isArray(result.data.models)) {
+                    ulibModels = result.data.models;
+                    ulibModelsLoaded = true;
+                    ulibModelHint.textContent = '源自 ULIB Constants（2016-10-31）· '
+                        + ulibModels.length + ' 款';
+                } else {
+                    throw new Error(result.message || '返回结构异常');
+                }
+            } catch (e) {
+                ulibModelHint.textContent = 'ULIB 列表加载失败：' + e.message;
+            } finally {
+                ulibLoading = false;
+            }
+        }
+
+        function filteredUlibModels(keyword) {
+            // 空格分隔的多关键词按 AND 组合，任一关键词不命中就排除。
+            const key = String(keyword || '').trim().toLowerCase();
+            if (!key) return ulibModels;
+            const terms = key.split(' ').filter(Boolean);
+            return ulibModels.filter((model) => {
+                const name = model.name.toLowerCase();
+                return terms.every((term) => name.includes(term));
+            });
+        }
+
+        function closeUlibList() {
+            ulibModelList.hidden = true;
+            ulibModelSearch.setAttribute('aria-expanded', 'false');
+        }
+
+        function renderUlibList() {
+            const matched = filteredUlibModels(ulibModelSearch.value);
+            ulibModelList.innerHTML = '';
+
+            if (!ulibModelsLoaded) {
+                const loading = document.createElement('li');
+                loading.className = 'ulib-model-empty';
+                loading.textContent = ulibLoading ? '正在加载…' : '列表尚未加载';
+                ulibModelList.appendChild(loading);
+            } else if (matched.length === 0) {
+                const empty = document.createElement('li');
+                empty.className = 'ulib-model-empty';
+                empty.textContent = '没有匹配的晶体型号';
+                ulibModelList.appendChild(empty);
+            } else {
+                const fragment = document.createDocumentFragment();
+                matched.forEach((model) => {
+                    const item = document.createElement('li');
+                    item.className = 'ulib-model-item';
+                    item.setAttribute('role', 'option');
+                    item.dataset.modelName = model.name;
+                    item.textContent = model.name;
+                    fragment.appendChild(item);
+                });
+                ulibModelList.appendChild(fragment);
+            }
+
+            ulibModelList.hidden = false;
+            ulibModelSearch.setAttribute('aria-expanded', 'true');
+            ulibModelList.scrollTop = 0;
+        }
+
+        function findExactUlibModel(name) {
+            const key = String(name || '').trim();
+            if (!key) return null;
+            const lower = key.toLowerCase();
+            return ulibModels.find((model) => model.name.toLowerCase() === lower) || null;
+        }
+
+        function syncUlibSelection() {
+            // 只有输入框内容恰好等于某个型号名时才认定为「选中」，
+            // 半截关键词不会误填常数。
+            const model = findExactUlibModel(ulibModelSearch.value);
+            if (model === null) {
+                if (selectedUlibModelName) {
+                    selectedUlibModelName = '';
+                    clearUlibConstants();
+                    resetAConstantToDefault();
+                }
+                return;
+            }
+            if (model.name === selectedUlibModelName) return;
+            selectedUlibModelName = model.name;
+            applyUlibModel(model);
+        }
+
+        function resetAConstantToDefault() {
+            aConstantInput.readOnly = false;
+            aConstantInput.value = '119.30';
+            document.getElementById('aConstantHint').textContent =
+                '默认值：119.30（可根据晶体类型调整）';
+        }
+
+        function pickUlibModel(name) {
+            const model = findExactUlibModel(name);
+            if (model === null) return;
+            ulibModelSearch.value = model.name;
+            selectedUlibModelName = model.name;
+            applyUlibModel(model);
+            closeUlibList();
+            ulibModelSearch.blur();
+        }
+
+        ulibModelSearch.addEventListener('focus', function() {
+            if (!ulibModelsLoaded && !ulibLoading) loadUlibModels();
+            renderUlibList();
+        });
+
+        ulibModelSearch.addEventListener('input', function() {
+            // 输入时先刷新候选，用户能立刻看到被关键词缩小后的结果。
+            renderUlibList();
+            syncUlibSelection();
+        });
+
+        ulibModelList.addEventListener('mousedown', function(event) {
+            // 用 mousedown 抢在 input 的 blur 之前处理点击，避免列表先被关掉。
+            const item = event.target.closest('.ulib-model-item');
+            if (!item) return;
+            event.preventDefault();
+            pickUlibModel(item.dataset.modelName);
+        });
+
+        ulibModelSearch.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape') {
+                closeUlibList();
+                return;
+            }
+            const items = Array.from(ulibModelList.querySelectorAll('.ulib-model-item'));
+            if (items.length === 0) return;
+            const activeIndex = items.findIndex((el) => el.classList.contains('is-active'));
+            if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+                event.preventDefault();
+                const step = event.key === 'ArrowDown' ? 1 : -1;
+                let next = activeIndex + step;
+                if (next < 0) next = items.length - 1;
+                if (next >= items.length) next = 0;
+                items.forEach((el) => el.classList.remove('is-active'));
+                items[next].classList.add('is-active');
+                items[next].scrollIntoView({ block: 'nearest' });
+                return;
+            }
+            if (event.key === 'Enter' && activeIndex >= 0) {
+                event.preventDefault();
+                pickUlibModel(items[activeIndex].dataset.modelName);
+            }
+        });
+
+        ulibModelSearch.addEventListener('blur', function() {
+            // 焦点离开后若没选中任何型号，把半截关键词还原成空，
+            // 避免看起来像已选但实际常数没生效。
+            syncUlibSelection();
+            if (!selectedUlibModelName) ulibModelSearch.value = '';
+            closeUlibList();
+        });
+
+        document.addEventListener('click', function(event) {
+            if (!ulibModelGroup.contains(event.target)) closeUlibList();
+        });
+
+        function applyUlibModel(model) {
+            // 选中 ULIB 型号后把常数写进输入框。这些值会随请求显式提交，
+            // 优先级高于后端的自动映射，不会再被替换。
+            aConstantInput.readOnly = false;
+            if (model.a_constant !== null && model.a_constant !== undefined) {
+                aConstantInput.value = model.a_constant.toFixed(2);
+            }
+            if (model.haigis && model.haigis.length === 3) {
+                ['haigisA0', 'haigisA1', 'haigisA2'].forEach((id, index) => {
+                    const input = document.getElementById(id);
+                    if (input) input.value = Number(model.haigis[index]).toFixed(3);
+                });
+            }
+            if (model.pacd !== null && model.pacd !== undefined) {
+                const pacdInput = document.getElementById('hofferQPacd');
+                if (pacdInput) pacdInput.value = Number(model.pacd).toFixed(2);
+            }
+            document.getElementById('aConstantHint').textContent =
+                '来自 ULIB Constants';
+        }
+
+        function syncModelSelectors() {
+            // 晶体列表跟着当前生效的公式走：
+            //   非散光模式看 selectedFormula；散光模式看 selectedToricFormula。
+            // Barrett 系列（含 Barrett Toric）用 Barrett 官网型号列表，
+            // 只有 Haigis 与 Haigis-T 用 ULIB 列表。
+            const isToric = currentCalculationMode === 'toric';
+            const activeFormula = isToric ? selectedToricFormula : selectedFormula;
+            const useBarrettList = activeFormula === 'barrett';
+            barrettModelGroup.hidden = !useBarrettList;
+            ulibModelGroup.hidden = useBarrettList;
+            if (!useBarrettList) loadUlibModels();
+        }
+
         function syncFormulaControls() {
             const isBarrett = selectedFormula === 'barrett';
             executionModeControls.hidden = !isBarrett;
@@ -1232,6 +1524,7 @@ INDEX_PAGE = """
             formulaInputHint.textContent = FORMULA_INPUT_HINTS[selectedFormula] || '';
             haigisConstants.hidden = selectedFormula !== 'haigis';
             hofferQPacdControls.hidden = selectedFormula !== 'hoffer_q';
+            syncModelSelectors();
         }
 
         function hasAnyEyeData() {
@@ -1277,6 +1570,7 @@ INDEX_PAGE = """
 
         function setCalculationMode(mode) {
             const isToric = mode === 'toric';
+            currentCalculationMode = isToric ? 'toric' : 'spherical';
             sphericalModeButton.classList.toggle('active', !isToric);
             sphericalModeButton.setAttribute('aria-pressed', String(!isToric));
             toricModeButton.classList.toggle('active', isToric);
@@ -1294,6 +1588,7 @@ INDEX_PAGE = """
             formulaInputHint.hidden = isToric;
             haigisConstants.hidden = isToric;
             hofferQPacdControls.hidden = isToric;
+            syncModelSelectors();
             if (isToric) {
                 executionModeControls.hidden = true;
             }
@@ -1349,6 +1644,7 @@ INDEX_PAGE = """
             document.getElementById('aConstantGroup').hidden = isHaigis;
             aConstantInput.required = !isHaigis;
             ['right', 'left'].forEach(syncToricPosteriorControls);
+            syncModelSelectors();
             validateToricForm();
         }
 
@@ -1521,7 +1817,9 @@ INDEX_PAGE = """
                 const formData = {
                     patient_name: document.getElementById('patientName').value || null,
                     a_constant: roundToTwoDecimals(document.getElementById('aConstant').value),
-                    iol_model: document.getElementById('iolModel').value,
+                    iol_model: (selectedToricFormula === 'haigis-toric'
+                        ? (selectedUlibModelName || undefined)
+                        : document.getElementById('iolModel').value),
                     k_index: parseFloat(document.getElementById('kIndex').value)
                 };
                 if (requestFormula === 'haigis-toric') {

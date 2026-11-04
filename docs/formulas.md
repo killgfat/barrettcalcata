@@ -128,6 +128,8 @@ pACD = 0.58357 × A - 63.896
 
 术前实测 ACD 不等于 pACD；标准 Hoffer Q 不使用实测 ACD、LT、WTW。
 接口由 A 常数推导 pACD，结果不应自动视为与任意设备晶体库的优化常数一致。
+型号已收录在内置 ULIB 快照时，`GET /api/iol-models?model=<型号>` 会
+直接给出优化后的 pACD，可通过 `hoffer_q_pacd` 传入以覆盖上述推导。
 
 ## 5. Haigis
 
@@ -146,9 +148,13 @@ K-index 恢复角膜半径，再计算 Haigis 所需的角膜屈光度。
 
 1. **显式三常数**：请求传入 haigis_constants: {a0,a1,a2}，优先使用，
    此时直接使用传入的三常数，不从 A 常数推导 a0。应与 IOL Master 或晶体库中的具体晶体常数一致。
+   型号已收录在内置 ULIB 快照时，`GET /api/iol-models?model=<型号>`
+   会直接给出这组 a0/a1/a2，照抄即可。
 2. **标准近似起点**：固定 a1=0.4、a2=0.1，并由
    a0=0.62467×A−72.434 推导 a0。该结果不是个体化优化常数，
    与设备使用的晶体专属常数可能明显不同，结果会给出警告并降低置信度。
+   该线性式属于「厂商标准关系」，与 ULIB 的「优化常数关系」不同，
+   详见第 7 节。
 
 Haigis 应优先使用实测 ACD。未提供时使用明确的默认值并标记
 ACD_defaulted、LOW_CONFIDENCE；默认值不能解释为患者的真实 ACD。
@@ -393,10 +399,150 @@ PY
 TK/TCRP 总散光禁止重复 PCA、输入边界、AI 常数到调度、双眼 API 与零网络。
 这些测试证明算术和接口一致性，不等于设备等价性或临床准确度验证。
 
-## 7. 常数、适用域与临床限制
+## 7. 常数来源：ULIB 快照与 A 常数换算的边界
+
+### 7.1 常数从哪来
+
+IOLMaster 的优化常数不是蔡司自行维护的数据，而是来自公开的 ULIB
+（User Group for Laser Interference Biometry，Wolfgang Haigis）。链条是：
+
+```text
+临床数据 -> ULIB（2016-10-31 停更）-> 打包进 IOLMaster
+         -> IOLCon（2017 年起，Steinbeis / Saarland 大学）作为后继平台
+```
+
+- ULIB 常数表：http://www.ocusoft.de/ulib/c1.htm
+- ULIB 常数换算器：http://ocusoft.de/scripts2/ciolc.php
+- IOLCon（后继平台）：https://iolcon.org
+
+ULIB 表每款晶体给出：名义 A、Haigis a0/a1/a2、Hoffer Q pACD、
+Holladay 1 SF、SRK/T A、SRK II A、样本量 n，以及文献编号。
+本项目的 `src/formula/data_ulib.py` 是它的**事实字段快照**（304 条），
+不含原页面的文献编号列与晶体别名对照表。
+
+### 7.2 Barrett 型号 → ULIB 的手工映射
+
+Barrett 官网下拉是固定的一小份清单（文献记载 18 个），每款带一个
+Lens Factor；不在清单里的晶体走「A 常数 → 自动换算 LF」。ULIB 是另一套
+命名体系（旧厂名 + 完整型号串），收 304 款。
+
+两者**没有稳定的自动映射规则**。实测按名称直接匹配只命中 21/304，按
+`(pACD, SF)` 双值指纹匹配命中 66/304 但大量多义（一款 ULIB 条目会撞上
+十几个型号）。因此 `src/formula/data_model_map.py` 逐条人工对照：
+
+| 类型 | 数量 | 含义 |
+|---|---:|---|
+| `exact` | 6 | 同一款晶体，型号完全对应 |
+| `series` | 5 | 系列型号与 ULIB 合并条目对应（如 SN6AD → SN6AD1/3） |
+| 无（None） | 7 | ULIB 未收录或型号不同，**不做近似替代** |
+
+无法映射的 7 个（`Alcon SND1Tx`、`Alcon MN60MA`、`AMO ZCT`、
+`AMO AR40M`、`Hoya iSert 351`、`Bausch & Lomb BL1UT`、
+`Bausch & Lomb LI60AO`）在表里写 `None` 并注明原因，绝不挑"最接近的
+那一款"。
+
+### 7.3 计算时的常数选择规则
+
+```text
+Barrett（离线/在线/Toric）  -> 用自己的 Lens Factor，不读 ULIB
+                              （ULIB 表内根本没有 LF 列）
+
+SRK/T、Hoffer Q、Haigis     -> 型号能映射到 ULIB 时用 ULIB 优化常数
+   型号无映射 / 未选型号    -> 退回 A 常数按厂商标准关系换算（并标注来源）
+```
+
+覆盖范围（`src/formula/formula.py:_resolve_offline_constants`）：
+
+| 公式 | 型号映射命中时改用 |
+|---|---|
+| SRK/T | ULIB 优化后的 SRK/T A |
+| Hoffer Q | ULIB 优化后的 pACD |
+| Haigis / Haigis-T | ULIB 的 a0 / a1 / a2 |
+
+**调用方显式提供的常数永远优先**：请求里给了 `a_constant`、
+`hoffer_q_pacd` 或 `haigis_constants` 时不做任何替换。为了实现这个
+区分，`CalculationRequest` 记录 `a_constant_provided`，否则无法分辨
+"没给"和"给了正好等于默认值 119.30"。
+
+响应里的 `constants_source` 说明实际用了什么：
+
+| 字段 | 含义 |
+|---|---|
+| `source` | `ulib`（型号映射命中）或 `a_constant_conversion`（退回换算） |
+| `barrett_model` / `ulib_name` | Barrett 型号名与对应的 ULIB 条目名 |
+| `match` | `exact` / `series` |
+| `applied` | 实际被替换的字段，如 `["a_constant", "hoffer_q_pacd"]` |
+| `note` | 映射说明；退回换算时说明"不是晶体优化常数" |
+
+实测（AL 23.5 / K 44.0 / ACD 3.2，`iol_model=AMO ZCB00`）：
+
+| 公式 | 用 ULIB | 显式给 A=118.8 |
+|---|---|---|
+| SRK/T | 21 D（A=119.3） | 20.5 D |
+| Hoffer Q | 21 D（pACD=5.80） | 20.5 D |
+| Haigis | 21 D（a0=−1.302） | 21.5 D（a0=1.78 近似） |
+
+### 7.4 内置快照的用途
+
+`GET /api/iol-models?model=<型号>` 先查型号映射，再查 ULIB 原始型号名，
+未收录才回退 Barrett 官网。响应中的 `source` 字段标明数据来源：
+
+| 字段 | 含义 |
+|---|---|
+| `a_constant` | 优先取 ULIB 优化后的 SRK/T A；快照缺该值时用名义 A |
+| `haigis_constants` | `[a0, a1, a2]` 优化三常数，可直接填入计算请求 |
+| `hoffer_q_pacd` | Hoffer Q 优化 pACD（mm） |
+| `holladay1_sf` | Holladay 1 SF（本项目未实现 Holladay 1，仅作记录） |
+| `srkt_a` / `srk2_a` | 两种 SRK 的优化 A |
+| `nominal_a` | 厂商名义 A |
+| `samples` / `preliminary` | 优化样本量；小于 50 时原页面标注 prelim。 |
+| `source_revision` | 快照对应的 ULIB 修订日期 |
+
+匹配规则刻意保守：宁可不命中，也不混用地区版本。例如
+`Alcon SN60WF` 与 `Alcon SN60WF (Japan)` 的 Haigis 常数完全不同
+（−0.769/0.234/0.217 对 −1.268/0.342/0.233）；`Alcon MA60MA` 有
+(+) 与 (−) 两个版本，去掉正负标记后不会匹配到任何一条。
+
+快照是固定文件，运行时不联网、不读取外部文件。更新需重新生成并经评审。
+
+### 7.5 不要用 A 常数换算替代优化常数
+
+ULIB 换算器把「优化常数关系」和「厂商标准关系」作为两套结果分别给出：
+
+| 关系 | pACD | a0 | SF |
+|---|---|---|---|
+| 厂商标准关系 | 0.58357·A − 63.896 | 0.62467·A − 72.434 | 0.5663·A − 65.60 |
+| 优化常数关系 | 0.51255·A − 55.677 | 0.5296·A − 61.925 | 0.5114·A − 59.33 |
+
+`hoffer_q.PACD_SLOPE` / `PACD_INTERCEPT` 与 `haigis.A0_SLOPE` /
+`A0_INTERCEPT` 采用的是**厂商标准关系**，这是缺常数时的兜底起点，不是
+优化结果。同一 A 常数可以对应差异很大的优化常数（ULIB 中 A=118.0 对应
+15 个不同的 Barrett LF），因此拿 A 常数反推 pACD/a0 只应视为近似。
+
+实测差异（AL 23.5 mm、K 44.0 D、ACD 3.2 mm、target 0）：
+
+| 公式 | A 常数近似 | ULIB 优化常数 |
+|---|---|---|
+| Haigis | a0=1.714 → 21.5 D | a0=−0.769 → 21.0 D |
+| Hoffer Q | pACD=5.374 → 20.0 D | pACD=5.64 → 20.5 D |
+| SRK/T | A=118.7 → 20.5 D | A=119.0 → 21.0 D |
+
+Barrett 的 Lens Factor 同理：`barrett.a_constant_to_lens_factor` 的
+线性式来自四组厂商常数对，ULIB 表本身不提供 LF，IOLCon 才给。需要精确
+LF 时应显式传入，而不是由 A 常数推算。
+
+## 8. 常数、适用域与临床限制
 
 - 公式专属常数不能不加区分地相互代入。设备或晶体库提供优化常数时，
   应优先使用同一公式、同一晶体的常数。
+- **不要用 A 常数去反查晶体**。ULIB 里名义 A 只有 32 个取值、SRK/T A 只有
+  33 个，单个 A 值平均对应 9~11 款晶体；例如 SRK/T A=119.30 撞上 11 个
+  型号，Haigis 度数跨度 0.48 D，选错看不出来。反查只能用 Haigis 三常数
+  这类高区分度组合（66% 唯一）。
+- 晶体型号选择 `AMO ZCB00` 这类**能映射到 ULIB 的名称**时，非 Barrett
+  公式会自动采用优化常数；选 `Personal Constant` 或无法映射的型号时，
+  常数来自 A 常数换算，两者相差可达 0.5 D 以上。响应中
+  `constants_source.applied` 会标明实际替换了哪些字段。
 - 当前通用舒适域为 AL 22–26 mm、K 38–48 D；超出时返回
   LOW_CONFIDENCE 和警告，不等于该公式在临床上绝对不可用。
 - 超出硬边界或输入在物理上无法计算时拒绝返回推荐度数。
@@ -404,7 +550,7 @@ TK/TCRP 总散光禁止重复 PCA、输入边界、AI 常数到调度、双眼 A
 - 本地公式用于估算和横向对照，不保证术后误差不超过某个固定值。
 - 临床使用前仍需验证测量值、晶体常数、目标屈光度和公式选择。
 
-## 8. 主要文献
+## 9. 主要文献
 
 - Barrett GD. Intraocular lens calculation formulas for new intraocular lens
   implants. J Cataract Refract Surg. 1987;13(4):389-396.

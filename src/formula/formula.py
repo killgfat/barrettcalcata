@@ -15,6 +15,7 @@ from . import (
     barrett_online,
     barrett_toric,
     common,
+    constants,
     haigis,
     haigis_toric,
     hoffer_q,
@@ -190,13 +191,18 @@ def list_formulas():
     return [CAPABILITIES[name].to_dict() for name in FORMULA_NAMES]
 
 
-def _used_inputs(formula, eye, request, solved):
-    """只列出实际参与该公式计算的输入；默认值明确标记。"""
+def _used_inputs(formula, eye, request, solved, overrides=None):
+    """只列出实际参与该公式计算的输入；默认值与覆盖值明确标记。
+
+    overrides 是 ULIB 映射带来的常数替换，这里必须反映替换后的真实值，
+    否则 used_inputs 会显示与实际计算不一致的常数。
+    """
+    overrides = overrides or {}
     used = {
         "AL": eye.al,
         "K": eye.k_mean,
         "Refraction": eye.target_refraction,
-        "a_constant": request.a_constant,
+        "a_constant": overrides.get("a_constant", request.a_constant),
         "k_index": request.k_index,
         "step": request.step,
     }
@@ -220,7 +226,13 @@ def _used_inputs(formula, eye, request, solved):
                 "WTW": None,
             }
         )
-        if request.haigis_constants is not None:
+        haigis_source = overrides.get("constants")
+        if haigis_source is not None:
+            used["a_constant"] = None
+            used["a0"] = haigis_source["a0"]
+            used["a1"] = haigis_source["a1"]
+            used["a2"] = haigis_source["a2"]
+        elif request.haigis_constants is not None:
             used["a_constant"] = None
             used["a0"] = request.haigis_constants.a0
             used["a1"] = request.haigis_constants.a1
@@ -229,8 +241,10 @@ def _used_inputs(formula, eye, request, solved):
             used.update(solved["used_toric_inputs"])
     else:
         used.update({"ACD": None, "LenThickness": None, "WTW": None})
-        if formula == "hoffer_q" and request.hoffer_q_pacd is not None:
-            used["pACD"] = request.hoffer_q_pacd
+        if formula == "hoffer_q":
+            pacd_value = overrides.get("pacd", request.hoffer_q_pacd)
+            if pacd_value is not None:
+                used["pACD"] = pacd_value
     return used
 
 
@@ -255,7 +269,7 @@ def _online_used_inputs(eye, request):
     return used
 
 
-def _build_eye_result(formula, eye, request, solved):
+def _build_eye_result(formula, eye, request, solved, overrides=None):
     """把一个公式的原始结果映射为 API 的单眼结构。"""
     predicted = solved["predicted_refraction"]
     iol_options = sorted(solved["iol_options"], key=lambda row: float(row["iol_power"]))
@@ -281,7 +295,7 @@ def _build_eye_result(formula, eye, request, solved):
         "low_confidence": solved["low_confidence"],
         "warnings": solved["warnings"],
         "provided_inputs": eye.provided_inputs(),
-        "used_inputs": _used_inputs(formula, eye, request, solved),
+        "used_inputs": _used_inputs(formula, eye, request, solved, overrides),
         "ignored_inputs": ignored_inputs,
     }
     if formula == "haigis-toric":
@@ -309,8 +323,95 @@ def _build_eye_result(formula, eye, request, solved):
     return result
 
 
+def _resolve_offline_constants(request, formula):
+    """按公式决定常数来源。
+
+    - Barrett 走自己的 Lens Factor 换算，不读 ULIB（ULIB 表内没有 LF 列）；
+    - 其余本地公式在「型号能映射到 ULIB」且「调用方没显式给 a_constant」时，
+      用 ULIB 的优化常数替换 A 常数：SRK/T 用优化 A，Hoffer Q 补 pACD，
+      Haigis 补 a0/a1/a2。
+
+    返回 (calculate_kwargs 的常数部分, 说明信息 dict 或 None)。
+    """
+    if formula == "barrett":
+        return {}, None
+
+    # 型号无法映射时给出警告：此时 A 常数走的是厂商标准关系换算，
+    # 不是晶体优化常数，两种来源的差异可达 0.5 D 以上。
+    # 型号可能来自两条路径：API 传的 Barrett 型号名，或 Web UI 的 ULIB
+    # 选择器传的 ULIB 原始型号名。两者都要能识别，否则会把 UI 选中的
+    # ULIB 晶体误判成「未映射」，给出错误的说明。
+    mapped = constants.resolve_model_constants(request.iol_model)
+    if mapped is None:
+        model_name = (
+            str(request.iol_model).strip()
+            if request.iol_model and request.iol_model != "Personal Constant"
+            else ""
+        )
+        fallback = {
+            "source": "a_constant_conversion",
+            "barrett_model": model_name or None,
+            "applied": [],
+            "warnings": [],
+            "note": (
+                f"型号 {model_name!r} 未映射到 ULIB 条目，常数由 A 常数按厂商"
+                "标准关系换算得到，不是晶体优化常数"
+                if model_name
+                else "未选择晶体型号，常数由 A 常数按厂商标准关系换算得到，"
+                "不是晶体优化常数"
+            ),
+        }
+        return {}, fallback
+
+    info = {
+        "source": "ulib",
+        "source_revision": constants.ULIB_SOURCE_REVISION,
+        "barrett_model": mapped["barrett_model"],
+        "ulib_name": mapped["ulib_name"],
+        "match": mapped["match"],
+        "matched_by": mapped["matched_by"],
+        "samples": mapped["samples"],
+        "preliminary": mapped["preliminary"],
+        "note": mapped["note"],
+        "applied": [],
+        "warnings": list(mapped["warnings"]),
+    }
+    overrides = {}
+
+    # 调用方显式给的 A 常数优先，不擅自替换。
+    if not request.a_constant_provided and mapped.get("a_constant") is not None:
+        overrides["a_constant"] = mapped["a_constant"]
+        info["applied"].append("a_constant")
+
+    if (
+        formula == "hoffer_q"
+        and request.hoffer_q_pacd is None
+        and mapped.get("hoffer_q_pacd") is not None
+    ):
+        overrides["pacd"] = mapped["hoffer_q_pacd"]
+        info["applied"].append("hoffer_q_pacd")
+
+    haigis_values = mapped.get("haigis_constants")
+    if (
+        formula in {"haigis", "haigis-toric"}
+        and request.haigis_constants is None
+        and haigis_values
+    ):
+        overrides["constants"] = {
+            "a0": haigis_values[0],
+            "a1": haigis_values[1],
+            "a2": haigis_values[2],
+        }
+        info["applied"].append("haigis_constants")
+
+    # applied 为空时 overrides 也是空 dict：调用方显式给了常数，不做覆盖，
+    # 但仍把映射信息返回，便于前端提示「ULIB 有这条，但你用自己的值」。
+    return overrides, info
+
+
 def _calculate_offline(request, formula):
     """本地公式单/双眼计算与结果组装。"""
+    constant_overrides, constants_info = _resolve_offline_constants(request, formula)
     eyes = {}
     solved_eyes = {}
     for eye_name, eye in (
@@ -356,10 +457,17 @@ def _calculate_offline(request, formula):
         solved = _MODULES[formula].calculate(
             eye.al,
             eye.k_mean,
-            **calculate_kwargs,
+            **{**calculate_kwargs, **constant_overrides},
         )
+        if constants_info is not None:
+            solved["warnings"] = list(solved["warnings"]) + constants_info["warnings"]
+            if constants_info["warnings"]:
+                solved["low_confidence"] = True
+                solved["confidence"] = "LOW_CONFIDENCE"
         solved_eyes[eye_name] = solved
-        eyes[eye_name] = _build_eye_result(formula, eye, request, solved)
+        eyes[eye_name] = _build_eye_result(
+            formula, eye, request, solved, constant_overrides
+        )
 
     reference = next(iter(solved_eyes.values()))
     caps = CAPABILITIES[formula]
@@ -375,6 +483,8 @@ def _calculate_offline(request, formula):
     }
     if formula == "barrett":
         result["calibration_report"] = "docs/calibration_report.md"
+    if constants_info is not None:
+        result["constants_source"] = constants_info
     return result
 
 
@@ -479,6 +589,26 @@ def fetch_iol_model_list():
     return iol_models.fetch_iol_model_list()
 
 
+def fetch_model_constants(model_name):
+    """按型号查询常数：优先内置 ULIB 快照，未收录再回退 Barrett 官网。"""
+    return iol_models.fetch_model_constants(model_name)
+
+
+def lookup_ulib_constants(model_name):
+    """只查内置 ULIB 快照，未收录返回 None，不发网络请求。"""
+    return iol_models.lookup_ulib_constants(model_name)
+
+
+def list_ulib_models():
+    """返回内置 ULIB 快照收录的型号名（按名称排序）。"""
+    return iol_models.list_ulib_models()
+
+
+def list_ulib_model_details():
+    """返回带常数的 ULIB 型号列表，供 Web UI 选择器使用。"""
+    return iol_models.list_ulib_model_details()
+
+
 def fetch_model_a_constant(model_name):
     """兼容单个 IOL 型号 A 常数查询。"""
     return iol_models.fetch_model_a_constant(model_name)
@@ -495,11 +625,15 @@ __all__ = [
     "calculation_model_for",
     "fetch_iol_model_list",
     "fetch_model_a_constant",
+    "fetch_model_constants",
     "get_calculation_model_label",
     "get_formula_capabilities",
     "get_formula_label",
     "get_hello_message",
     "list_formulas",
+    "list_ulib_model_details",
+    "list_ulib_models",
+    "lookup_ulib_constants",
     "normalize_calculation_model",
     "normalize_formula",
     "normalize_mode",

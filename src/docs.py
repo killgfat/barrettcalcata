@@ -14,7 +14,7 @@ def get_openapi_spec():
         "info": {
             "title": "Barretcalcata IOL Calculator API",
             "description": "基于Cloudflare Workers的IOL（人工晶体）度数计算API，提交JSON参数即可获取Barrett Universal II公式计算结果",
-            "version": "1.0.0",
+            "version": "2.0.0",
             "contact": {
                 "name": "API Support",
                 "url": "https://barrettcalcata.killgfat.com",

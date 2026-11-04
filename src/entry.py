@@ -28,6 +28,8 @@ class Default(WorkerEntrypoint):
             return await self.handle_barrett_toric_calculate(request)
         elif path == "/api/iol-models":
             return await self.handle_barrett_iol_models(request)
+        elif path == "/api/ulib-models":
+            return await self.handle_ulib_models(request)
         elif path == "/docs":
             return await self.handle_docs()
         elif path == "/openapi.json":
@@ -41,6 +43,7 @@ class Default(WorkerEntrypoint):
                     "available_endpoints": [
                         "GET / - Web UI界面",
                         "GET /hello - 返回问候消息",
+                        "GET /api/ulib-models - ULIB晶体列表与常数",
                         "POST /api/extract - 从图片提取IOL数据",
                         "POST /api/calculate - 执行IOL计算",
                         "POST /api/calculate-toric - 执行Barrett Universal II散光计算",
@@ -57,7 +60,7 @@ class Default(WorkerEntrypoint):
             {
                 "message": get_hello_message(),
                 "service": "IOL Calculator API",
-                "version": "1.0.0",
+                "version": "2.0.0",
             }
         )
 
@@ -90,6 +93,12 @@ class Default(WorkerEntrypoint):
         result, status_code = await api_handler.handle_barrett_iol_models(
             request, model_name=model_name
         )
+        return Response.json(result, status=status_code)
+
+    async def handle_ulib_models(self, request):
+        """处理内置 ULIB 晶体列表请求"""
+        api_handler = APIHandler(self.env)
+        result, status_code = await api_handler.handle_ulib_models(request)
         return Response.json(result, status=status_code)
 
     async def handle_docs(self):

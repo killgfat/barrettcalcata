@@ -158,6 +158,9 @@ class CalculationRequest:
     right_eye: EyeInput | None
     left_eye: EyeInput | None
     a_constant: float = 119.30
+    # 区分「调用方显式给了 A 常数」与「用了默认值」。型号已映射到 ULIB
+    # 且调用方没给 A 常数时，才用 ULIB 的优化 A 替换默认值。
+    a_constant_provided: bool = False
     k_index: float = common.K_INDEX_REF
     formula: str = "barrett"
     mode: str = "offline"
@@ -237,10 +240,12 @@ class CalculationRequest:
                     "haigis_constants 只适用于 formula=haigis/haigis-toric"
                 )
             haigis_constants = HaigisConstants.from_mapping(raw_constants)
+        raw_a_constant = body.get("a_constant")
         return cls(
             right_eye=right_eye,
             left_eye=left_eye,
-            a_constant=common.parse_a_constant(body.get("a_constant")),
+            a_constant=common.parse_a_constant(raw_a_constant),
+            a_constant_provided=raw_a_constant not in (None, ""),
             k_index=common.normalize_k_index(body.get("k_index")),
             formula=formula,
             mode=mode,

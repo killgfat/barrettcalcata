@@ -1,18 +1,17 @@
-import base64
+import asyncio
 import json
 import re
-import asyncio
+
 import httpx
-from typing import Optional, Dict, Any
 
 
 class WorkerAI:
     def __init__(
         self,
         api_base_url: str = "https://api.openai.com/v1",
-        api_key: str = None,
+        api_key: str | None = None,
         model: str = "gpt-4-vision-preview",
-        config_params: dict = None,
+        config_params: dict | None = None,
     ):
         """
         初始化 WorkerAI，使用 OpenAI 兼容的 API
@@ -108,7 +107,7 @@ class WorkerAI:
             # 处理每个任务的结果
             for extract_num, extract_result in enumerate(gathered_results, 1):
                 if isinstance(extract_result, Exception):
-                    update_status(f"第{extract_num}次识别失败: {str(extract_result)}")
+                    update_status(f"第{extract_num}次识别失败: {extract_result!s}")
                     extraction_results.append(
                         {
                             "attempt": extract_num,
@@ -175,9 +174,9 @@ class WorkerAI:
                 "total_extractions": extraction_count,
             }
 
-        except Exception as e:
-            update_status(f"处理过程中发生异常: {str(e)}")
-            print(f"WorkerAI处理图片时发生异常: {str(e)}")
+        except Exception as e:  # noqa: BLE001 - 顶层兜底，返回结构化错误
+            update_status(f"处理过程中发生异常: {e!s}")
+            print(f"WorkerAI处理图片时发生异常: {e!s}")
             import traceback
 
             print(f"异常堆栈: {traceback.format_exc()}")
@@ -395,10 +394,8 @@ class WorkerAI:
                 raise ValueError("API响应格式不正确：缺少choices字段")
 
             # 有时候 LLM 会返回 ```json ... ``` 格式，把可能的 Markdown code block 去掉
-            if response_text.startswith("```json"):
-                response_text = response_text[7:]
-            if response_text.endswith("```"):
-                response_text = response_text[:-3]
+            response_text = response_text.removeprefix("```json")
+            response_text = response_text.removesuffix("```")
             response_text = response_text.strip()
 
             # 移除思考标签及其内容
@@ -430,8 +427,8 @@ class WorkerAI:
                 "success": False,
                 "error": error_msg,
             }
-        except Exception as e:
-            print(f"WorkerAI处理图片时发生异常: {str(e)}")
+        except Exception as e:  # noqa: BLE001 - 顶层兜底，返回结构化错误
+            print(f"WorkerAI处理图片时发生异常: {e!s}")
             import traceback
 
             print(f"异常堆栈: {traceback.format_exc()}")
@@ -702,7 +699,7 @@ class WorkerAI:
             consensus_threshold = total_fields * 2 / 3
             consensus_reached = consensus_fields >= consensus_threshold
 
-            print(f"=== 多数决分析完成 ===")
+            print("=== 多数决分析完成 ===")
             print(f"总字段数: {total_fields}, 达成共识字段数: {consensus_fields}")
             print(f"共识阈值: {consensus_threshold:.1f}, 达成共识: {consensus_reached}")
             print(
@@ -718,8 +715,8 @@ class WorkerAI:
                 "consensus_threshold": consensus_threshold,
             }
 
-        except Exception as e:
-            print(f"多数决分析时发生异常: {str(e)}")
+        except Exception as e:  # noqa: BLE001 - 顶层兜底，返回结构化错误
+            print(f"多数决分析时发生异常: {e!s}")
             import traceback
 
             print(f"异常堆栈: {traceback.format_exc()}")
@@ -882,7 +879,7 @@ class WorkerAI:
                 else:
                     raise ValueError("验证API响应格式不正确：缺少choices字段")
 
-            print(f"=== 二次校验结果 ===")
+            print("=== 二次校验结果 ===")
             print(f"校验响应: {validation_response}")
 
             is_correct = validation_response.startswith("正确")
@@ -892,12 +889,12 @@ class WorkerAI:
                 "validation_response": validation_response,
             }
 
-        except Exception as e:
-            print(f"二次校验时发生异常: {str(e)}")
+        except Exception as e:  # noqa: BLE001 - 顶层兜底，返回结构化错误
+            print(f"二次校验时发生异常: {e!s}")
             # 如果校验失败，默认认为第一次结果正确，避免无限重试
             return {
                 "is_correct": True,
-                "validation_response": f"校验失败，默认使用第一次结果: {str(e)}",
+                "validation_response": f"校验失败，默认使用第一次结果: {e!s}",
             }
 
     async def _fallback_text_extraction(self, image_base64: str, initial_response: str):
@@ -1011,10 +1008,8 @@ class WorkerAI:
                 else:
                     raise ValueError("Fallback API响应格式不正确：缺少choices字段")
 
-                if resp_text2.startswith("```json"):
-                    resp_text2 = resp_text2[7:]
-                if resp_text2.endswith("```"):
-                    resp_text2 = resp_text2[:-3]
+                resp_text2 = resp_text2.removeprefix("```json")
+                resp_text2 = resp_text2.removesuffix("```")
                 resp_text2 = resp_text2.strip()
 
                 # 移除思考标签及其内容
@@ -1056,7 +1051,7 @@ class WorkerAI:
                 "error": error_msg,
                 "raw_response": initial_response,
             }
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - 顶层兜底，返回结构化错误
             return {
                 "success": False,
                 "error": f"备用提取失败: {e}",
@@ -1183,18 +1178,21 @@ class WorkerAI:
             if nums:
                 try:
                     return float(nums[0])
-                except:
+                except (TypeError, ValueError):
                     return None
             else:
                 return None
         # 如果是数字 (int / float)
         try:
             return float(value)
-        except:
+        except (TypeError, ValueError):
             return None
 
     def set_api_config(
-        self, api_base_url: str = None, api_key: str = None, model: str = None
+        self,
+        api_base_url: str | None = None,
+        api_key: str | None = None,
+        model: str | None = None,
     ):
         """
         更新 API 配置
@@ -1262,47 +1260,43 @@ class WorkerAI:
             if env:
                 # 眼轴长度限制
                 if hasattr(env, "AL_MIN"):
-                    config_params["al_min"] = getattr(env, "AL_MIN")
+                    config_params["al_min"] = env.AL_MIN
                 if hasattr(env, "AL_MAX"):
-                    config_params["al_max"] = getattr(env, "AL_MAX")
+                    config_params["al_max"] = env.AL_MAX
                 if hasattr(env, "AL_NORMAL_MIN"):
-                    config_params["al_normal_min"] = getattr(env, "AL_NORMAL_MIN")
+                    config_params["al_normal_min"] = env.AL_NORMAL_MIN
                 if hasattr(env, "AL_NORMAL_MAX"):
-                    config_params["al_normal_max"] = getattr(env, "AL_NORMAL_MAX")
+                    config_params["al_normal_max"] = env.AL_NORMAL_MAX
 
                 # 角膜曲率限制
                 if hasattr(env, "K_MIN"):
-                    config_params["k_min"] = getattr(env, "K_MIN")
+                    config_params["k_min"] = env.K_MIN
                 if hasattr(env, "K_MAX"):
-                    config_params["k_max"] = getattr(env, "K_MAX")
+                    config_params["k_max"] = env.K_MAX
                 if hasattr(env, "K_NORMAL_MIN"):
-                    config_params["k_normal_min"] = getattr(env, "K_NORMAL_MIN")
+                    config_params["k_normal_min"] = env.K_NORMAL_MIN
                 if hasattr(env, "K_NORMAL_MAX"):
-                    config_params["k_normal_max"] = getattr(env, "K_NORMAL_MAX")
+                    config_params["k_normal_max"] = env.K_NORMAL_MAX
 
                 # 前房深度限制
                 if hasattr(env, "ACD_MIN"):
-                    config_params["acd_min"] = getattr(env, "ACD_MIN")
+                    config_params["acd_min"] = env.ACD_MIN
                 if hasattr(env, "ACD_MAX"):
-                    config_params["acd_max"] = getattr(env, "ACD_MAX")
+                    config_params["acd_max"] = env.ACD_MAX
                 if hasattr(env, "ACD_NORMAL_MIN"):
-                    config_params["acd_normal_min"] = getattr(env, "ACD_NORMAL_MIN")
+                    config_params["acd_normal_min"] = env.ACD_NORMAL_MIN
                 if hasattr(env, "ACD_NORMAL_MAX"):
-                    config_params["acd_normal_max"] = getattr(env, "ACD_NORMAL_MAX")
+                    config_params["acd_normal_max"] = env.ACD_NORMAL_MAX
 
                 # A常数限制
                 if hasattr(env, "A_CONST_MIN"):
-                    config_params["a_const_min"] = getattr(env, "A_CONST_MIN")
+                    config_params["a_const_min"] = env.A_CONST_MIN
                 if hasattr(env, "A_CONST_MAX"):
-                    config_params["a_const_max"] = getattr(env, "A_CONST_MAX")
+                    config_params["a_const_max"] = env.A_CONST_MAX
                 if hasattr(env, "A_CONST_COMMON_MIN"):
-                    config_params["a_const_common_min"] = getattr(
-                        env, "A_CONST_COMMON_MIN"
-                    )
+                    config_params["a_const_common_min"] = env.A_CONST_COMMON_MIN
                 if hasattr(env, "A_CONST_COMMON_MAX"):
-                    config_params["a_const_common_max"] = getattr(
-                        env, "A_CONST_COMMON_MAX"
-                    )
+                    config_params["a_const_common_max"] = env.A_CONST_COMMON_MAX
 
             update_status("API和参数配置完成")
 
@@ -1322,10 +1316,10 @@ class WorkerAI:
             update_status("图片提取流程完成")
             return result
 
-        except Exception as e:
-            update_status(f"完整图片提取流程发生异常: {str(e)}")
-            print(f"完整图片提取流程发生异常: {str(e)}")
+        except Exception as e:  # noqa: BLE001 - 顶层兜底，返回结构化错误
+            update_status(f"完整图片提取流程发生异常: {e!s}")
+            print(f"完整图片提取流程发生异常: {e!s}")
             import traceback
 
             print(f"异常堆栈: {traceback.format_exc()}")
-            return {"success": False, "error": f"图片分析失败: {str(e)}"}
+            return {"success": False, "error": f"图片分析失败: {e!s}"}
