@@ -160,6 +160,32 @@ ACD_defaulted、LOW_CONFIDENCE；默认值不能解释为患者的真实 ACD。
 球镜 SE、ELP 和球镜候选表直接复用 `haigis.calculate`，无新运行时依赖、
 网络请求、患者数据持久化或校准数据文件。
 
+Web 页面：切换到「散光」后，可选择 **Barrett Toric · 在线** 或
+**Haigis-T · 本地**。两种散光公式各自保留参数，非散光公式选择独立保留；
+Haigis 三常数与非散光 Haigis 共用，支持报告识别回填。
+
+Haigis-T 必须填写完整 a0/a1/a2、AL、前表面 K1/K2 及正交轴位、
+**术前实测 ACD**。实测 ACD 使用独立输入，不采用 Barrett 表单的默认 3.00。
+LT、WTW、A 常数和正负柱镜符号控件在该模式隐藏，且不提交给求解器。
+后表面参数按所选 none/measured/total/estimated 模式显示，仅提交当前模式
+字段；估算模式明确显示未验证的固定 PCA 代理说明。可供档位填写真实
+IOL 平面柱镜，用逗号分隔；留空不猜测厂商档位。任一启用眼缺少必填值、
+轴位不正交或柱镜档位无效时，页面禁用计算并提示具体问题。
+
+结果分别显示拟植入方案的角膜平面残余（光学强子午线与等效负柱镜轴位）、
+ELP 相关换算、连续柱镜解、可供档位推荐及 Haigis 球镜 SE 候选。
+档位推荐按最佳轴位比较，与拟植入轴位的残余预测分开展示。
+
+浏览器回归测试（所有网络请求被拦截，Haigis-T 使用真实本地计算结果）：
+
+```bash
+uv run --with playwright playwright install chromium
+uv run --with playwright pytest tests/test_webui_toric_browser.py
+```
+
+可通过 `PLAYWRIGHT_CHROMIUM_EXECUTABLE` 指定已有的 Chromium 路径；
+未安装 Playwright 的普通 `uv run pytest` 会跳过该浏览器测试模块。
+
 ### 6.1 来源与可确认范围
 
 本模块是**公开框架近轴实现**，完整商用 Haigis-T 一手算法尚未核实，

@@ -41,6 +41,7 @@ INDEX_PAGE = """
         .haigis-constants { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px; margin-top: 8px; }
         .haigis-constants-label { color: #475569; font-size: 14px; font-weight: bold; }
         .haigis-constants input { width: 88px; padding: 6px 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; }
+        .haigis-constant-field { display: flex; align-items: center; gap: 4px; color: #475569; font-size: 14px; }
         .haigis-constants-note { color: #64748b; font-size: 12px; }
         .mode-button { flex: 1; min-height: 44px; border: 0; border-radius: 6px; background: transparent; color: #475569; font-size: 15px; font-weight: bold; cursor: pointer; transition: background 0.2s, color 0.2s, box-shadow 0.2s; }
         .mode-button:hover { color: #0f172a; }
@@ -72,6 +73,23 @@ INDEX_PAGE = """
         .toric-section .section-title { border-bottom-color: #0f766e; }
         .toric-eye-params { display: none; }
         .toric-eye-params.show { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; }
+        .toric-form-note { margin-bottom: 18px; line-height: 1.6; }
+        .toric-haigis-fields { grid-column: 1 / -1; min-width: 0; padding: 18px 0 0; border: 0; border-top: 1px solid #cbd5e1; }
+        .toric-haigis-fields legend { padding-right: 10px; font-weight: bold; color: #115e59; }
+        .toric-extra-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; }
+        .toric-pca-hint { align-self: center; line-height: 1.6; }
+        .toric-validation { line-height: 1.6; color: #9f1239; }
+        .toric-table-scroll { max-width: 100%; overflow-x: auto; }
+        .toric-result-details { line-height: 1.8; overflow-wrap: anywhere; }
+        .toric-result-details dt { font-weight: bold; margin-top: 10px; }
+        .toric-result-details dd { margin: 0; }
+        .formula-button:focus-visible, .mode-button:focus-visible { outline: 2px solid #0f766e; outline-offset: 2px; }
+        @media (max-width: 600px) {
+            .toric-eye-params.show, .toric-extra-grid { grid-template-columns: minmax(0, 1fr); }
+            .toric-section { padding: 14px; }
+            .toric-section .eye-section { padding: 12px; }
+            .toric-section .form-group, .toric-haigis-fields { min-width: 0; }
+        }
         .axis-result { margin-top: 20px; padding: 16px; border: 1px solid #99f6e4; border-radius: 8px; background: #f0fdfa; }
         .axis-result h5 { margin-bottom: 12px; color: #115e59; font-size: 1.05em; }
         .axis-layout { display: grid; grid-template-columns: minmax(220px, 360px) 1fr; gap: 20px; align-items: center; }
@@ -149,6 +167,11 @@ INDEX_PAGE = """
                 <button type="button" class="formula-button" data-formula="srkt" aria-pressed="false">SRK/T</button>
                 <button type="button" class="formula-button" data-formula="haigis" aria-pressed="false">Haigis</button>
             </div>
+            <div class="formula-switch" id="toricFormulaSwitch" role="group" aria-label="散光计算公式" hidden>
+                <button type="button" class="formula-button active" data-toric-formula="barrett" aria-pressed="true">Barrett Toric · 在线</button>
+                <button type="button" class="formula-button" data-toric-formula="haigis-toric" aria-pressed="false">Haigis-T · 本地</button>
+            </div>
+            <div id="toricFormulaHint" class="param-hint formula-input-hint" hidden></div>
             <div class="execution-mode-row" id="executionModeControls">
                 <span class="execution-mode-label">执行方式</span>
                 <button type="button" class="toggle-switch" id="executionModeSwitch" role="switch" aria-checked="true" aria-label="切换在线或本地执行">
@@ -160,10 +183,10 @@ INDEX_PAGE = """
             <div id="formulaInputHint" class="param-hint formula-input-hint"></div>
             <div class="haigis-constants" id="haigisConstants" hidden>
                 <span class="haigis-constants-label">Haigis 常数</span>
-                <input type="number" id="haigisA0" step="0.001" placeholder="a0">
-                <input type="number" id="haigisA1" step="0.001" placeholder="a1">
-                <input type="number" id="haigisA2" step="0.001" placeholder="a2">
-                <span class="haigis-constants-note">照抄 IOL Master 的 a0/a1/a2；不填则用 A 常数近似</span>
+                <label class="haigis-constant-field" for="haigisA0">a0 <input type="number" id="haigisA0" aria-label="Haigis a0" min="-10" max="10" step="0.001" placeholder="a0"></label>
+                <label class="haigis-constant-field" for="haigisA1">a1 <input type="number" id="haigisA1" aria-label="Haigis a1" min="-2" max="2" step="0.001" placeholder="a1"></label>
+                <label class="haigis-constant-field" for="haigisA2">a2 <input type="number" id="haigisA2" aria-label="Haigis a2" min="-1" max="1" step="0.001" placeholder="a2"></label>
+                <span class="haigis-constants-note" id="haigisConstantsNote">照抄 IOL Master 的 a0/a1/a2；不填则用 A 常数近似</span>
             </div>
             <div class="haigis-constants" id="hofferQPacdControls" hidden>
                 <label class="haigis-constants-label" for="hofferQPacd">Hoffer Q pACD</label>
@@ -187,7 +210,7 @@ INDEX_PAGE = """
                         </select>
                         <div class="param-hint" id="iolModelHint">选择晶体型号可自动填充A常数</div>
                     </div>
-                    <div class="form-group">
+                    <div class="form-group" id="aConstantGroup">
                         <label for="aConstant">A常数</label>
                         <input type="number" id="aConstant" name="aConstant" value="119.30" step="0.01" required>
                         <div class="param-hint" id="aConstantHint">默认值：119.30（可根据晶体类型调整）</div>
@@ -300,11 +323,9 @@ INDEX_PAGE = """
             </form>
 
             <section class="form-section toric-section" id="toricSection" hidden>
-                <h2 class="section-title">Barrett Universal II 散光晶体</h2>
-                <div class="param-hint" style="margin-bottom: 15px;">
-                    散光计算使用上方患者、晶体型号、A常数和K-index设置；请为至少一只眼睛填写平坦/陡峭子午线、轴位及晶体几何参数。
-                </div>
-                <div class="form-group" style="max-width: 260px;">
+                <h2 class="section-title" id="toricSectionTitle">Barrett Universal II 散光晶体</h2>
+                <p class="param-hint toric-form-note" id="toricInputHint">使用上方患者、晶体型号、A 常数和 K-index 设置；请至少启用一眼。标有 * 的参数必填。</p>
+                <div class="form-group" data-toric-only="barrett" style="max-width: 260px;">
                     <label for="toricCylinderMode">散光符号</label>
                     <select id="toricCylinderMode" name="toricCylinderMode">
                         <option value="-ve" selected>负柱镜（-ve Cylinder）</option>
@@ -318,17 +339,35 @@ INDEX_PAGE = """
                         <label for="toricRightEyeEnabled">右眼 (OD)</label>
                     </div>
                     <div class="toric-eye-params" id="toricRightEyeParams">
-                        <div class="form-group"><label for="toricRightAL">眼轴长度 (AL) mm</label><input type="number" id="toricRightAL" step="0.01" min="12" max="38"></div>
-                        <div class="form-group"><label for="toricRightFlatK">角膜曲率 K1 D</label><input type="number" id="toricRightFlatK" step="0.01" min="30" max="60"></div>
-                        <div class="form-group"><label for="toricRightFlatAxis">K1 轴位 °</label><input type="number" id="toricRightFlatAxis" step="1" min="0" max="180"></div>
-                        <div class="form-group"><label for="toricRightSteepK">角膜曲率 K2 D</label><input type="number" id="toricRightSteepK" step="0.01" min="30" max="60"></div>
-                        <div class="form-group"><label for="toricRightSteepAxis">K2 轴位 °</label><input type="number" id="toricRightSteepAxis" step="1" min="0" max="180"></div>
-                        <div class="form-group"><label for="toricRightACD">ACD mm（可选）</label><input type="number" id="toricRightACD" value="3.00" step="0.01" min="0" max="6"></div>
+                        <div class="form-group"><label for="toricRightAL">眼轴长度 (AL) mm *</label><input type="number" id="toricRightAL" step="0.01" min="12" max="38"></div>
+                        <div class="form-group"><label for="toricRightFlatK">角膜曲率 K1 D *</label><input type="number" id="toricRightFlatK" step="0.01" min="30" max="60"></div>
+                        <div class="form-group"><label for="toricRightFlatAxis">K1 轴位 ° *</label><input type="number" id="toricRightFlatAxis" step="any" min="0" max="180"></div>
+                        <div class="form-group"><label for="toricRightSteepK">角膜曲率 K2 D *</label><input type="number" id="toricRightSteepK" step="0.01" min="30" max="60"></div>
+                        <div class="form-group"><label for="toricRightSteepAxis">K2 轴位 ° *</label><input type="number" id="toricRightSteepAxis" step="any" min="0" max="180"></div>
+                        <div class="form-group" data-toric-only="barrett"><label for="toricRightACD">ACD mm（可选）</label><input type="number" id="toricRightACD" value="3.00" step="0.01" min="0" max="6"></div>
+                        <div class="form-group" data-toric-only="haigis-toric" hidden><label for="toricRightMeasuredACD">术前实测 ACD (mm) *</label><input type="number" id="toricRightMeasuredACD" step="0.01" min="0.5" max="8" placeholder="填写实测值，不使用默认 ACD"></div>
                         <div class="form-group"><label for="toricRightRefraction">目标屈光度 D（可选）</label><input type="number" id="toricRightRefraction" value="0" step="0.01"></div>
                         <div class="form-group"><label for="toricRightSIA">切口 SIA (D)</label><input type="number" id="toricRightSIA" value="0" step="0.01" min="0" max="2"></div>
-                        <div class="form-group"><label for="toricRightIncision">切口位置 (°)</label><input type="number" id="toricRightIncision" value="135" step="1" min="0" max="360"></div>
-                        <div class="form-group"><label for="toricRightLT">晶体厚度 LT (mm)</label><input type="number" id="toricRightLT" step="0.01" min="2" max="8"></div>
-                        <div class="form-group"><label for="toricRightWTW">WTW (mm)</label><input type="number" id="toricRightWTW" step="0.01" min="8" max="14"></div>
+                        <div class="form-group" data-toric-only="haigis-toric" hidden><label for="toricRightHaigisIncision">切口位置 (°；SIA 非零时必填)</label><input type="number" id="toricRightHaigisIncision" step="any" min="0" max="360" placeholder="填写实际切口位置"></div>
+                        <div class="form-group" data-toric-only="barrett"><label for="toricRightIncision">切口位置 (°)</label><input type="number" id="toricRightIncision" value="135" step="1" min="0" max="360"></div>
+                        <fieldset class="toric-haigis-fields" data-toric-only="haigis-toric" hidden>
+                            <legend>Haigis-T 散光参数</legend>
+                            <div class="toric-extra-grid">
+                                <div class="form-group"><label for="toricRightPosteriorMode">后表面散光 / 总散光</label><select id="toricRightPosteriorMode"><option value="none">不计入 PCA</option><option value="measured">实测后表面散光</option><option value="total">实测总散光（TK / TCRP）</option><option value="estimated">估算 PCA（未验证）</option></select></div>
+                                <p class="param-hint toric-pca-hint" id="toricRightPosteriorHint"></p>
+                                <div class="form-group" data-posterior-mode="measured" hidden><label for="toricRightPosteriorCylinder">后表面光学散光 (D) *</label><input type="number" id="toricRightPosteriorCylinder" step="0.01" min="0"><div class="param-hint">角膜平面非负量值；使用光学强子午线，非后表面曲率陡轴。</div></div>
+                                <div class="form-group" data-posterior-mode="measured" hidden><label for="toricRightPosteriorAxis">后表面光学强子午线 (°) *</label><input type="number" id="toricRightPosteriorAxis" step="any" min="0" max="180"></div>
+                                <div class="form-group" data-posterior-mode="total" hidden><label for="toricRightTotalSource">总散光来源 *</label><select id="toricRightTotalSource"><option value="TK">TK</option><option value="TCRP">TCRP</option></select></div>
+                                <div class="form-group" data-posterior-mode="total" hidden><label for="toricRightTotalCylinder">总散光 (D) *</label><input type="number" id="toricRightTotalCylinder" step="0.01" min="0"></div>
+                                <div class="form-group" data-posterior-mode="total" hidden><label for="toricRightTotalAxis">总散光光学强子午线 (°) *</label><input type="number" id="toricRightTotalAxis" step="any" min="0" max="180"></div>
+                                <div class="form-group"><label for="toricRightIolCylinder">拟植入 IOL 柱镜 (D)</label><input type="number" id="toricRightIolCylinder" value="0" step="0.01" min="0"><div class="param-hint">IOL 平面非负量值；默认 0 表示尚未矫正，用于残余预测。</div></div>
+                                <div class="form-group"><label for="toricRightIolAxis">拟植入轴位 (°)</label><input type="number" id="toricRightIolAxis" step="any" min="0" max="180"><div class="param-hint">IOL 光学弱子午线对齐方向；柱镜非零时必填。</div></div>
+                                <div class="form-group"><label for="toricRightIolSE">拟植入 IOL 球镜等效 SE (D)</label><input type="number" id="toricRightIolSE" step="0.01" min="-10" max="45" placeholder="留空使用 Haigis 推荐 SE"></div>
+                                <div class="form-group"><label for="toricRightCylinderPowers">可供 IOL 柱镜档位 (D)</label><input type="text" id="toricRightCylinderPowers" placeholder="例如：0, 1.5, 2.25, 3"><div class="param-hint">填写实际可供的 IOL 平面档位，用逗号分隔；留空只给连续解。</div></div>
+                            </div>
+                        </fieldset>
+                        <div class="form-group" data-toric-only="barrett"><label for="toricRightLT">晶体厚度 LT (mm) *</label><input type="number" id="toricRightLT" step="0.01" min="2" max="8"></div>
+                        <div class="form-group" data-toric-only="barrett"><label for="toricRightWTW">WTW (mm) *</label><input type="number" id="toricRightWTW" step="0.01" min="8" max="14"></div>
                     </div>
                 </div>
 
@@ -338,20 +377,39 @@ INDEX_PAGE = """
                         <label for="toricLeftEyeEnabled">左眼 (OS)</label>
                     </div>
                     <div class="toric-eye-params" id="toricLeftEyeParams">
-                        <div class="form-group"><label for="toricLeftAL">眼轴长度 (AL) mm</label><input type="number" id="toricLeftAL" step="0.01" min="12" max="38"></div>
-                        <div class="form-group"><label for="toricLeftFlatK">角膜曲率 K1 D</label><input type="number" id="toricLeftFlatK" step="0.01" min="30" max="60"></div>
-                        <div class="form-group"><label for="toricLeftFlatAxis">K1 轴位 °</label><input type="number" id="toricLeftFlatAxis" step="1" min="0" max="180"></div>
-                        <div class="form-group"><label for="toricLeftSteepK">角膜曲率 K2 D</label><input type="number" id="toricLeftSteepK" step="0.01" min="30" max="60"></div>
-                        <div class="form-group"><label for="toricLeftSteepAxis">K2 轴位 °</label><input type="number" id="toricLeftSteepAxis" step="1" min="0" max="180"></div>
-                        <div class="form-group"><label for="toricLeftACD">ACD mm（可选）</label><input type="number" id="toricLeftACD" value="3.00" step="0.01" min="0" max="6"></div>
+                        <div class="form-group"><label for="toricLeftAL">眼轴长度 (AL) mm *</label><input type="number" id="toricLeftAL" step="0.01" min="12" max="38"></div>
+                        <div class="form-group"><label for="toricLeftFlatK">角膜曲率 K1 D *</label><input type="number" id="toricLeftFlatK" step="0.01" min="30" max="60"></div>
+                        <div class="form-group"><label for="toricLeftFlatAxis">K1 轴位 ° *</label><input type="number" id="toricLeftFlatAxis" step="any" min="0" max="180"></div>
+                        <div class="form-group"><label for="toricLeftSteepK">角膜曲率 K2 D *</label><input type="number" id="toricLeftSteepK" step="0.01" min="30" max="60"></div>
+                        <div class="form-group"><label for="toricLeftSteepAxis">K2 轴位 ° *</label><input type="number" id="toricLeftSteepAxis" step="any" min="0" max="180"></div>
+                        <div class="form-group" data-toric-only="barrett"><label for="toricLeftACD">ACD mm（可选）</label><input type="number" id="toricLeftACD" value="3.00" step="0.01" min="0" max="6"></div>
+                        <div class="form-group" data-toric-only="haigis-toric" hidden><label for="toricLeftMeasuredACD">术前实测 ACD (mm) *</label><input type="number" id="toricLeftMeasuredACD" step="0.01" min="0.5" max="8" placeholder="填写实测值，不使用默认 ACD"></div>
                         <div class="form-group"><label for="toricLeftRefraction">目标屈光度 D（可选）</label><input type="number" id="toricLeftRefraction" value="0" step="0.01"></div>
                         <div class="form-group"><label for="toricLeftSIA">切口 SIA (D)</label><input type="number" id="toricLeftSIA" value="0" step="0.01" min="0" max="2"></div>
-                        <div class="form-group"><label for="toricLeftIncision">切口位置 (°)</label><input type="number" id="toricLeftIncision" value="135" step="1" min="0" max="360"></div>
-                        <div class="form-group"><label for="toricLeftLT">晶体厚度 LT (mm)</label><input type="number" id="toricLeftLT" step="0.01" min="2" max="8"></div>
-                        <div class="form-group"><label for="toricLeftWTW">WTW (mm)</label><input type="number" id="toricLeftWTW" step="0.01" min="8" max="14"></div>
+                        <div class="form-group" data-toric-only="haigis-toric" hidden><label for="toricLeftHaigisIncision">切口位置 (°；SIA 非零时必填)</label><input type="number" id="toricLeftHaigisIncision" step="any" min="0" max="360" placeholder="填写实际切口位置"></div>
+                        <div class="form-group" data-toric-only="barrett"><label for="toricLeftIncision">切口位置 (°)</label><input type="number" id="toricLeftIncision" value="135" step="1" min="0" max="360"></div>
+                        <fieldset class="toric-haigis-fields" data-toric-only="haigis-toric" hidden>
+                            <legend>Haigis-T 散光参数</legend>
+                            <div class="toric-extra-grid">
+                                <div class="form-group"><label for="toricLeftPosteriorMode">后表面散光 / 总散光</label><select id="toricLeftPosteriorMode"><option value="none">不计入 PCA</option><option value="measured">实测后表面散光</option><option value="total">实测总散光（TK / TCRP）</option><option value="estimated">估算 PCA（未验证）</option></select></div>
+                                <p class="param-hint toric-pca-hint" id="toricLeftPosteriorHint"></p>
+                                <div class="form-group" data-posterior-mode="measured" hidden><label for="toricLeftPosteriorCylinder">后表面光学散光 (D) *</label><input type="number" id="toricLeftPosteriorCylinder" step="0.01" min="0"><div class="param-hint">角膜平面非负量值；使用光学强子午线，非后表面曲率陡轴。</div></div>
+                                <div class="form-group" data-posterior-mode="measured" hidden><label for="toricLeftPosteriorAxis">后表面光学强子午线 (°) *</label><input type="number" id="toricLeftPosteriorAxis" step="any" min="0" max="180"></div>
+                                <div class="form-group" data-posterior-mode="total" hidden><label for="toricLeftTotalSource">总散光来源 *</label><select id="toricLeftTotalSource"><option value="TK">TK</option><option value="TCRP">TCRP</option></select></div>
+                                <div class="form-group" data-posterior-mode="total" hidden><label for="toricLeftTotalCylinder">总散光 (D) *</label><input type="number" id="toricLeftTotalCylinder" step="0.01" min="0"></div>
+                                <div class="form-group" data-posterior-mode="total" hidden><label for="toricLeftTotalAxis">总散光光学强子午线 (°) *</label><input type="number" id="toricLeftTotalAxis" step="any" min="0" max="180"></div>
+                                <div class="form-group"><label for="toricLeftIolCylinder">拟植入 IOL 柱镜 (D)</label><input type="number" id="toricLeftIolCylinder" value="0" step="0.01" min="0"><div class="param-hint">IOL 平面非负量值；默认 0 表示尚未矫正，用于残余预测。</div></div>
+                                <div class="form-group"><label for="toricLeftIolAxis">拟植入轴位 (°)</label><input type="number" id="toricLeftIolAxis" step="any" min="0" max="180"><div class="param-hint">IOL 光学弱子午线对齐方向；柱镜非零时必填。</div></div>
+                                <div class="form-group"><label for="toricLeftIolSE">拟植入 IOL 球镜等效 SE (D)</label><input type="number" id="toricLeftIolSE" step="0.01" min="-10" max="45" placeholder="留空使用 Haigis 推荐 SE"></div>
+                                <div class="form-group"><label for="toricLeftCylinderPowers">可供 IOL 柱镜档位 (D)</label><input type="text" id="toricLeftCylinderPowers" placeholder="例如：0, 1.5, 2.25, 3"><div class="param-hint">填写实际可供的 IOL 平面档位，用逗号分隔；留空只给连续解。</div></div>
+                            </div>
+                        </fieldset>
+                        <div class="form-group" data-toric-only="barrett"><label for="toricLeftLT">晶体厚度 LT (mm) *</label><input type="number" id="toricLeftLT" step="0.01" min="2" max="8"></div>
+                        <div class="form-group" data-toric-only="barrett"><label for="toricLeftWTW">WTW (mm) *</label><input type="number" id="toricLeftWTW" step="0.01" min="8" max="14"></div>
                     </div>
                 </div>
                 <div class="btn-container">
+                    <p class="param-hint toric-validation" id="toricValidationHint" aria-live="polite"></p>
                     <button type="button" class="btn" id="toricCalculateBtn" style="background: #0f766e;" disabled>计算散光晶体</button>
                 </div>
             </section>
@@ -511,6 +569,7 @@ INDEX_PAGE = """
                     '默认值：119.30（可根据晶体类型调整）';
                 document.getElementById('iolModelHint').textContent =
                     '选择晶体型号可自动填充A常数';
+                validateToricForm();
                 return;
             }
 
@@ -538,6 +597,8 @@ INDEX_PAGE = """
                 aConstantInput.value = '119.30';
                 document.getElementById('iolModelHint').textContent =
                     '获取失败，请手动输入A常数';
+            } finally {
+                validateToricForm();
             }
         });
 
@@ -794,7 +855,7 @@ INDEX_PAGE = """
 
             // 清除散光表单中由图片识别负责填充的字段，保留手工输入的 LT、WTW 和切口参数。
             ['Right', 'Left'].forEach(eye => {
-                ['AL', 'FlatK', 'FlatAxis', 'SteepK', 'SteepAxis', 'ACD']
+                ['AL', 'FlatK', 'FlatAxis', 'SteepK', 'SteepAxis', 'ACD', 'MeasuredACD']
                     .forEach(field => {
                         document.getElementById('toric' + eye + field).value = '';
                     });
@@ -830,6 +891,7 @@ INDEX_PAGE = """
             
             // 验证表单状态
             validateForm();
+            validateToricForm();
         }
 
         // 将文件转换为base64（带压缩）
@@ -892,7 +954,8 @@ INDEX_PAGE = """
                     SteepK: eyeData.K2,
                     SteepAxis: eyeData.K2Axis,
                     AL: eyeData.AL,
-                    ACD: eyeData.ACD
+                    ACD: eyeData.ACD,
+                    MeasuredACD: eyeData.ACD
                 };
                 let hasValue = false;
                 Object.entries(values).forEach(([field, value]) => {
@@ -939,6 +1002,7 @@ INDEX_PAGE = """
 
             // 验证表单
             validateForm();
+            validateToricForm();
             
             // 延迟触发建议显示，确保数据填充完成
             setTimeout(() => {
@@ -1100,7 +1164,7 @@ INDEX_PAGE = """
         const resultsSection = document.getElementById('resultsSection');
         const toricResultsSection = document.getElementById('toricResultsSection');
         const formulaSwitch = document.getElementById('formulaSwitch');
-        const formulaButtons = Array.from(document.querySelectorAll('.formula-button'));
+        const formulaButtons = Array.from(document.querySelectorAll('#formulaSwitch .formula-button'));
         const executionModeControls = document.getElementById('executionModeControls');
         const executionModeSwitch = document.getElementById('executionModeSwitch');
         const executionModeState = document.getElementById('executionModeState');
@@ -1126,6 +1190,8 @@ INDEX_PAGE = """
             haigis: 'Haigis 使用实测 ACD；a0/a1/a2 请照抄 IOL Master（不填则用 A 常数近似，可能差 1–3 D）；LT/WTW 会被忽略。'
         };
 
+        let selectedToricFormula = 'barrett';
+        let toricCalculating = false;
         let selectedFormula = 'barrett';
         let selectedExecutionMode = 'online';
 
@@ -1222,6 +1288,8 @@ INDEX_PAGE = """
             resultsSection.hidden = isToric;
             toricResultsSection.hidden = !isToric;
             formulaSwitch.hidden = isToric;
+            document.getElementById('toricFormulaSwitch').hidden = !isToric;
+            document.getElementById('toricFormulaHint').hidden = !isToric;
             executionModeHint.hidden = isToric;
             formulaInputHint.hidden = isToric;
             haigisConstants.hidden = isToric;
@@ -1231,8 +1299,11 @@ INDEX_PAGE = """
             }
 
             if (isToric) {
-                validateToricForm();
+                syncToricFormulaControls();
             } else {
+                document.getElementById('aConstantGroup').hidden = false;
+                aConstantInput.required = true;
+                document.getElementById('haigisConstantsNote').textContent = '照抄 IOL Master 的 a0/a1/a2；不填则用 A 常数近似';
                 syncFormulaControls();
                 validateForm();
             }
@@ -1248,70 +1319,184 @@ INDEX_PAGE = """
         });
         updateFormulaButtons();
         updateExecutionToggle();
-        setCalculationMode('spherical');
 
-        function toricEyeFieldIds(eye) {
-            const prefix = eye === 'right' ? 'toricRight' : 'toricLeft';
-            return [
-                prefix + 'FlatK', prefix + 'FlatAxis', prefix + 'SteepK',
-                prefix + 'SteepAxis', prefix + 'AL', prefix + 'ACD',
-                prefix + 'Refraction', prefix + 'SIA', prefix + 'Incision',
-                prefix + 'LT', prefix + 'WTW'
-            ];
+        function toricPrefix(eye) {
+            return eye === 'right' ? 'toricRight' : 'toricLeft';
         }
 
-        function toricEyeIsValid(eye) {
-            const ids = toricEyeFieldIds(eye);
-            const requiredIds = ids.slice(0, 5).concat(ids.slice(9));
-            return requiredIds.every(id => {
-                const input = document.getElementById(id);
-                const value = Number(input.value);
-                return input.value !== '' && Number.isFinite(value);
+        function syncToricFormulaControls() {
+            const isHaigis = selectedToricFormula === 'haigis-toric';
+            document.querySelectorAll('[data-toric-formula]').forEach(button => {
+                const active = button.dataset.toricFormula === selectedToricFormula;
+                button.classList.toggle('active', active);
+                button.setAttribute('aria-pressed', String(active));
             });
+            document.querySelectorAll('[data-toric-only]').forEach(group => {
+                group.hidden = group.dataset.toricOnly !== selectedToricFormula;
+            });
+            document.getElementById('toricSectionTitle').textContent = isHaigis
+                ? 'Haigis-T 散光晶体' : 'Barrett Universal II 散光晶体';
+            document.getElementById('toricFormulaHint').textContent = isHaigis
+                ? '本地公开框架近轴实现；完整商用算法未核实，结果为低置信度。'
+                : '在线调用 Barrett Toric 官网，不保证稳定性。';
+            document.getElementById('toricInputHint').textContent = isHaigis
+                ? '必填：完整 a0/a1/a2、AL、前表面 K1/K2 及正交轴位、术前实测 ACD。标有 * 的参数必填；LT、WTW、A 常数不参与计算。切口 SIA 表示沿切口方向的扁平化量。'
+                : '使用上方患者、晶体型号、A 常数和 K-index 设置；请至少启用一眼。标有 * 的参数必填。';
+            haigisConstants.hidden = !isHaigis;
+            document.getElementById('haigisConstantsNote').textContent = isHaigis
+                ? 'a0/a1/a2 全部必填；请核对晶体型号，不使用 A 常数近似。'
+                : '照抄 IOL Master 的 a0/a1/a2；不填则用 A 常数近似';
+            document.getElementById('aConstantGroup').hidden = isHaigis;
+            aConstantInput.required = !isHaigis;
+            ['right', 'left'].forEach(syncToricPosteriorControls);
+            validateToricForm();
+        }
+
+        function syncToricPosteriorControls(eye) {
+            const prefix = toricPrefix(eye);
+            const mode = document.getElementById(prefix + 'PosteriorMode').value;
+            document.querySelectorAll('#' + prefix + 'EyeParams [data-posterior-mode]').forEach(group => {
+                group.hidden = group.dataset.posteriorMode !== mode;
+            });
+            const hints = {
+                none: 'PCA 未计入：WTR 可能过矫，ATR 可能欠矫。',
+                measured: '填写角膜平面的后表面光学散光与光学强子午线。',
+                total: '总散光替换前表面与 PCA 矢量；球镜仍使用前表面平均 K。',
+                estimated: 'UNVERIFIED-PENDING-PRIMARY：固定 0.30 D @0° ATR 代理，并非已核实的 Haigis-T 个体化系数。'
+            };
+            document.getElementById(prefix + 'PosteriorHint').textContent = hints[mode];
+        }
+
+        function readCylinderPowers(eye) {
+            const raw = document.getElementById(toricPrefix(eye) + 'CylinderPowers').value.trim();
+            if (!raw) return undefined;
+            const tokens = raw.split(/[,，;；]/).map(token => token.trim());
+            if (tokens.some(token => !token || !Number.isFinite(Number(token)) || Number(token) < 0)) {
+                throw new Error('可供柱镜档位须为非负数，请用逗号分隔，勿留空档位。');
+            }
+            return tokens.map(Number);
+        }
+
+        function toricEyeValidationError(eye) {
+            const prefix = toricPrefix(eye);
+            const isHaigis = selectedToricFormula === 'haigis-toric';
+            const required = ['AL', 'FlatK', 'FlatAxis', 'SteepK', 'SteepAxis'];
+            if (isHaigis) {
+                required.push('MeasuredACD');
+                const mode = document.getElementById(prefix + 'PosteriorMode').value;
+                if (mode === 'measured') required.push('PosteriorCylinder', 'PosteriorAxis');
+                if (mode === 'total') required.push('TotalCylinder', 'TotalAxis');
+                if (Number(document.getElementById(prefix + 'IolCylinder').value) > 0) required.push('IolAxis');
+                if (Number(document.getElementById(prefix + 'SIA').value) > 0) required.push('HaigisIncision');
+            } else {
+                required.push('LT', 'WTW');
+            }
+            const inputs = Array.from(document.querySelectorAll('#' + prefix + 'EyeParams input')).filter(input => !input.closest('[hidden]'));
+            inputs.forEach(input => input.required = required.includes(input.id.slice(prefix.length)));
+            for (const input of inputs) {
+                if (!input.checkValidity()) {
+                    const label = document.querySelector('label[for="' + input.id + '"]');
+                    return '请填写或检查' + label.textContent + '。';
+                }
+            }
+            const value = suffix => Number(document.getElementById(prefix + suffix).value);
+            if (isHaigis) {
+                if (value('SteepK') < value('FlatK')) return 'K2 必须不小于 K1。';
+                const difference = ((value('SteepAxis') - value('FlatAxis')) % 180 + 180) % 180;
+                if (Math.abs(difference - 90) > 0.000001) return 'K1 与 K2 轴位必须正交（相差 90°）。';
+                try { readCylinderPowers(eye); } catch (error) { return error.message; }
+            }
+            return '';
         }
 
         function validateToricForm() {
-            const hasRight = toricRightEyeEnabled.checked && toricEyeIsValid('right');
-            const hasLeft = toricLeftEyeEnabled.checked && toricEyeIsValid('left');
-            toricCalculateBtn.disabled = !(hasRight || hasLeft);
+            const enabled = ['right', 'left'].filter(eye => document.getElementById(toricPrefix(eye) + 'EyeEnabled').checked);
+            let error = enabled.length ? '' : '请至少启用一只眼睛并填写参数。';
+            if (selectedToricFormula === 'haigis-toric') {
+                const constantsValid = [haigisA0, haigisA1, haigisA2].every(input => input.value !== '' && input.checkValidity());
+                if (!constantsValid) error = '请完整填写有效的 Haigis a0、a1、a2 常数。';
+            } else if (!aConstantInput.value || !aConstantInput.checkValidity()) {
+                error = '请填写有效的 A 常数。';
+            }
+            // 任一启用眼无效都禁止提交，避免把另一只眼的缺失值送入 API。
+            for (const eye of enabled) {
+                const eyeError = toricEyeValidationError(eye);
+                if (!error && eyeError) error = (eye === 'right' ? '右眼：' : '左眼：') + eyeError;
+            }
+            document.getElementById('toricValidationHint').textContent = error;
+            toricCalculateBtn.disabled = toricCalculating || Boolean(error);
+            return !error;
         }
 
         function setToricEyeState(eye, enabled) {
-            const prefix = eye === 'right' ? 'toricRight' : 'toricLeft';
+            const prefix = toricPrefix(eye);
             document.getElementById(prefix + 'EyeParams').classList.toggle('show', enabled);
             document.getElementById(prefix + 'EyeSection').classList.toggle('active', enabled);
             validateToricForm();
         }
 
+        document.querySelectorAll('[data-toric-formula]').forEach(button => {
+            button.addEventListener('click', () => {
+                selectedToricFormula = button.dataset.toricFormula;
+                toricResultsSection.classList.remove('show');
+                syncToricFormulaControls();
+            });
+        });
         toricRightEyeEnabled.addEventListener('change', function() {
             setToricEyeState('right', this.checked);
         });
         toricLeftEyeEnabled.addEventListener('change', function() {
             setToricEyeState('left', this.checked);
         });
-        document.querySelectorAll('#toricSection input').forEach(input => {
-            input.addEventListener('input', validateToricForm);
+        ['right', 'left'].forEach(eye => {
+            document.getElementById(toricPrefix(eye) + 'PosteriorMode').addEventListener('change', () => {
+                syncToricPosteriorControls(eye);
+                validateToricForm();
+            });
         });
+        document.querySelectorAll('#toricSection input, #toricSection select, #haigisConstants input, #aConstant').forEach(input => {
+            input.addEventListener('input', validateToricForm);
+            input.addEventListener('change', validateToricForm);
+        });
+        setCalculationMode('spherical');
 
         function readToricEyeData(eye) {
-            const prefix = eye === 'right' ? 'toricRight' : 'toricLeft';
-            const number = id => {
-                const value = document.getElementById(id).value;
+            const prefix = toricPrefix(eye);
+            const number = suffix => {
+                const value = document.getElementById(prefix + suffix).value;
                 return value === '' ? undefined : Number(value);
             };
-            return {
-                K1: number(prefix + 'FlatK'),
-                K1Axis: number(prefix + 'FlatAxis'),
-                K2: number(prefix + 'SteepK'),
-                K2Axis: number(prefix + 'SteepAxis'),
-                AL: number(prefix + 'AL'),
-                ACD: number(prefix + 'ACD'),
-                target_refraction: number(prefix + 'Refraction'),
-                incision_sia: number(prefix + 'SIA'),
-                incision_location: number(prefix + 'Incision'),
-                lens_thickness: number(prefix + 'LT'),
-                WTW: number(prefix + 'WTW')
+            const data = {
+                K1: number('FlatK'), K1Axis: number('FlatAxis'),
+                K2: number('SteepK'), K2Axis: number('SteepAxis'),
+                AL: number('AL'),
+                incision_sia: number('SIA') ?? 0,
+                incision_location: number('Incision')
             };
+            if (selectedToricFormula === 'haigis-toric') {
+                data.incision_location = number('HaigisIncision');
+                data.ACD = roundToTwoDecimals(number('MeasuredACD'));
+                data.Refraction = number('Refraction') ?? 0;
+                data.iol_cylinder = number('IolCylinder') ?? 0;
+                data.iol_axis = number('IolAxis');
+                data.iol_spherical_equivalent = number('IolSE');
+                data.cylinder_powers = readCylinderPowers(eye);
+                data.posterior_mode = document.getElementById(prefix + 'PosteriorMode').value;
+                if (data.posterior_mode === 'measured') {
+                    data.posterior_cylinder = number('PosteriorCylinder');
+                    data.posterior_axis = number('PosteriorAxis');
+                } else if (data.posterior_mode === 'total') {
+                    data.total_cylinder = number('TotalCylinder');
+                    data.total_axis = number('TotalAxis');
+                    data.total_source = document.getElementById(prefix + 'TotalSource').value;
+                }
+            } else {
+                data.ACD = number('ACD');
+                data.target_refraction = number('Refraction');
+                data.lens_thickness = number('LT');
+                data.WTW = number('WTW');
+            }
+            return data;
         }
 
         function escapeHtml(value) {
@@ -1321,6 +1506,9 @@ INDEX_PAGE = """
         }
 
         toricCalculateBtn.addEventListener('click', async function() {
+            if (toricCalculating || !validateToricForm()) return;
+            const requestFormula = selectedToricFormula;
+            toricCalculating = true;
             const errorMessage = document.getElementById('errorMessage');
             const loading = document.getElementById('loading');
             const toricResultsSection = document.getElementById('toricResultsSection');
@@ -1334,20 +1522,30 @@ INDEX_PAGE = """
                     patient_name: document.getElementById('patientName').value || null,
                     a_constant: roundToTwoDecimals(document.getElementById('aConstant').value),
                     iol_model: document.getElementById('iolModel').value,
-                    k_index: parseFloat(document.getElementById('kIndex').value),
-                    cylinder_mode: document.getElementById('toricCylinderMode').value
+                    k_index: parseFloat(document.getElementById('kIndex').value)
                 };
+                if (requestFormula === 'haigis-toric') {
+                    formData.model = 'haigis-toric';
+                    formData.haigis_constants = readHaigisConstants();
+                    delete formData.a_constant;
+                } else {
+                    formData.cylinder_mode = document.getElementById('toricCylinderMode').value;
+                }
                 if (toricRightEyeEnabled.checked) formData.right_eye = readToricEyeData('right');
                 if (toricLeftEyeEnabled.checked) formData.left_eye = readToricEyeData('left');
 
-                const response = await fetch('/api/calculate-toric', {
+                const options = {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(formData)
-                });
+                };
+                const response = requestFormula === 'haigis-toric'
+                    ? await fetch('/api/calculate', options)
+                    : await fetch('/api/calculate-toric', options);
                 const result = await response.json();
                 if (response.ok && result.success) {
-                    displayToricResults(result.data);
+                    // 等待时若切换了公式，不展示旧公式的返回结果。
+                    if (selectedToricFormula === requestFormula) displayToricResults(result.data, requestFormula);
                 } else {
                     throw new Error(result.message || '散光计算失败');
                 }
@@ -1356,17 +1554,21 @@ INDEX_PAGE = """
                 errorMessage.classList.add('show');
             } finally {
                 loading.classList.remove('show');
+                toricCalculating = false;
                 validateToricForm();
             }
         });
 
-        function displayToricResults(data) {
+        function displayToricResults(data, formula) {
             const resultsContent = document.getElementById('toricResultsContent');
             resultsContent.innerHTML = '';
+            if (formula === 'haigis-toric') resultsContent.appendChild(createFormulaSummary(data));
             let hasResult = false;
             [['right_eye', '右眼 (OD)'], ['left_eye', '左眼 (OS)']].forEach(([key, title]) => {
                 if (data[key]) {
-                    resultsContent.appendChild(createToricResultCard(title, data[key], key));
+                    resultsContent.appendChild(formula === 'haigis-toric'
+                        ? createHaigisToricResultCard(title, data[key])
+                        : createToricResultCard(title, data[key], key));
                     hasResult = true;
                 }
             });
@@ -1374,6 +1576,37 @@ INDEX_PAGE = """
                 resultsContent.innerHTML = '<p style="text-align: center; color: #666; padding: 20px;">暂无散光计算结果</p>';
             }
             document.getElementById('toricResultsSection').classList.add('show');
+        }
+
+        function createHaigisToricResultCard(title, eyeData) {
+            const card = document.createElement('div');
+            card.className = 'result-card';
+            const format = (value, unit = ' D') => value === null || value === undefined
+                ? '—' : escapeHtml(Number(value).toFixed(2)) + unit;
+            const axis = value => format(value, '°');
+            const residual = eyeData.residual_astigmatism || {};
+            let html = '<h4>' + escapeHtml(title) + ' · Haigis-T</h4>';
+            html += '<dl class="toric-result-details">';
+            html += '<dt>拟植入方案的预期残余散光（角膜平面）</dt><dd>' + format(residual.cylinder) + '；光学强子午线 ' + axis(residual.axis) + '；等效负柱镜轴位 ' + axis(residual.minus_cylinder_axis) + '</dd>';
+            html += '<dt>本次残余预测使用的植入参数</dt><dd>IOL SE ' + format(eyeData.iol_spherical_equivalent) + '；柱镜 ' + format(eyeData.iol_cylinder) + '；植入轴位 ' + axis(eyeData.iol_axis) + '</dd>';
+            html += '<dt>IOL 柱镜在角膜平面的等效矫正</dt><dd>' + format(eyeData.corneal_correction) + '（ELP 相关乘数 ' + format(eyeData.corneal_factor, '') + '）</dd>';
+            html += '<dt>推荐 IOL 柱镜与轴位</dt><dd>连续解 ' + format(eyeData.recommended_iol_cylinder_exact) + '；可供档位 ' + (eyeData.recommended_iol_cylinder == null ? '未提供档位，不作离散推荐' : format(eyeData.recommended_iol_cylinder)) + '；建议轴位 ' + axis(eyeData.recommended_axis) + '</dd></dl>';
+            const toricOptions = eyeData.toric_options || [];
+            if (toricOptions.length) {
+                html += '<div class="toric-table-scroll"><table class="result-table"><caption>可供档位按各自最佳轴位比较（角膜平面残余）</caption><thead><tr><th>IOL 柱镜</th><th>建议轴位</th><th>等效矫正</th><th>残余量值</th></tr></thead><tbody>';
+                toricOptions.forEach(option => {
+                    html += '<tr class="' + (option.recommended ? 'recommended' : '') + '"><td>' + format(option.iol_cylinder) + (option.recommended ? '（推荐）' : '') + '</td><td>' + axis(option.axis) + '</td><td>' + format(option.corneal_correction) + '</td><td>' + format(option.residual_astigmatism.cylinder) + '</td></tr>';
+                });
+                html += '</tbody></table></div>';
+            }
+            html += '<p class="param-hint toric-form-note">植入轴位表示 IOL 光学弱子午线的对齐方向。上方残余对应拟植入方案；档位表按最佳轴位比较。零散光无定义轴位时显示 —。</p>';
+            html += '<div class="toric-table-scroll"><table class="result-table"><caption>Haigis 球镜 SE 候选（非完整术后球柱镜处方）</caption><thead><tr><th>IOL 球镜等效 SE</th><th>球镜预期屈光度</th></tr></thead><tbody>';
+            (eyeData.iol_options || []).forEach(option => {
+                html += '<tr class="' + (option.recommended ? 'recommended' : '') + '"><td>' + escapeHtml(option.iol_power) + ' D</td><td>' + escapeHtml(option.refraction) + ' D</td></tr>';
+            });
+            html += '</tbody></table></div>';
+            card.innerHTML = html;
+            return card;
         }
 
         function createToricResultCard(title, eyeData, eyeKey) {
