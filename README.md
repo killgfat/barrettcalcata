@@ -34,52 +34,16 @@ Cursor 等编码代理直接调用本 API。
 
 技能内含 `scripts/iol.py`（仅标准库的 CLI）与 304 款 ULIB 型号的静态常数表。
 
-## API
+## 使用
 
-| 方法 | 路径 | 用途 |
-|---|---|---|
-| GET | / | Web UI |
-| POST | /api/calculate | IOL 计算 |
-| POST | /api/calculate-toric | Barrett Toric 在线计算 |
-| POST | /api/extract | AI 识别 IOL Master 报告 |
-| GET | /api/iol-models?formula= | 按公式列出候选晶体型号 |
-| GET | /api/iol-models?model= | 查询单个型号的常数 |
-| GET | /docs | Swagger UI |
-| GET | /openapi.json | OpenAPI 规范 |
+浏览器打开首页即可使用：选择非散光或散光模式与计算公式，填写眼部参数后计算。
+结果会给出推荐度数、候选表、实际使用的常数、置信度与警告。
 
-`POST /api/calculate` 计算示例：
+晶体型号搜索框的候选随公式变化：Barrett 用官网型号（18 项），其余公式用内置
+ULIB 快照（304 项）。**留空表示不指定型号**，直接用下方的 A 常数；选中型号后
+由型号决定常数，请求里同类的 A 常数 / Haigis 三常数 / Hoffer Q pACD 不再生效。
 
-    {
-      "model": "barrett_ii_offline",
-      "iol_model": "Alcon SN60WF",
-      "k_index": 1.3375,
-      "right_eye": {"AL": 23.5, "K1": 43.5, "K2": 44.0, "ACD": 3.2, "Refraction": 0}
-    }
-
-`model` 必填，可选 `barrett_ii_offline`、`barrett_ii`、`srkt`、
-`hoffer_q`、`haigis`、`haigis-toric`。每眼必填 `AL`、`K1`、`K2`，
-其余字段按公式取用。完整字段、响应结构与 Toric 参数见 `/docs`。
-
-### 常数优先级
-
-声明了能命中内置 ULIB 的 `iol_model` 时，**请求里的 `a_constant`、
-`hoffer_q_pacd`、`haigis_constants` 会被屏蔽**，改用该型号的优化常数；
-被忽略的字段列在 `constants_source.ignored_request` 与每眼的
-`ignored_inputs`。未声明型号时才按请求给的常数计算。Barrett 系列不读 ULIB
-（ULIB 没有 Lens Factor 列），始终用 `a_constant`。
-
-### 晶体型号列表
-
-`GET /api/iol-models?formula=` 的候选来源随公式变化：
-
-| formula | 来源 | 条目 |
-|---|---|---|
-| `barrett`（或不传） | Barrett 官网型号清单 | 18 |
-| `srkt` / `hoffer_q` / `haigis` / `haigis-toric` | 内置 ULIB 快照 | 304 |
-
-Barrett 官网不可达时降级到内置映射表，响应的 `source` 变为
-`barrett_local_map` 并在 `warnings` 中说明。未映射到 ULIB 的型号
-`a_constant` 为 `null` 并附原因，不做近似替代。
+需要程序化调用时见站点的 `/docs`。
 
 ## AI 配置
 
