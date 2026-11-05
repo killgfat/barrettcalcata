@@ -14,7 +14,11 @@ SRK/T、Hoffer Q、Haigis 的球镜计算，Barrett Toric 的散光计算，以�
     uv run pytest tests/        # 测试
     ruff check src tests
 
-部署，或点[一键部署](https://deploy.workers.cloudflare.com/?url=https://github.com/killgfat/barrettcalcata)：
+### 部署
+
+[![Deploy to Cloudflare Workers](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/killgfat/barrettcalcata)
+
+或手动部署：
 
     npx wrangler secret put OPENAI_API_KEY   # 可选，仅 AI 识图需要
     npm run deploy
