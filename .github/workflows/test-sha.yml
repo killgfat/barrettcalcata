@@ -1,0 +1,11 @@
+# 临时调试：用完整 SHA 引用可复用 workflow
+name: Test SHA Ref
+
+on:
+  workflow_dispatch:
+
+jobs:
+  call:
+    uses: openclaw/clawhub/.github/workflows/skill-publish.yml@0ac21d37b3a63592b5088afffb0b455094fd23a5
+    with:
+      dry_run: true
