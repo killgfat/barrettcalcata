@@ -1,5 +1,20 @@
 ---
 name: iol-calculator
+version: 1.0.0
+slug: iol-calculator
+displayName: IOL 人工晶体度数计算
+summary: 调用 IOL 计算服务计算人工晶体度数：Barrett Universal II、SRK/T、Hoffer Q、Haigis 球镜，Barrett Toric / Haigis-T 柱镜与轴位，并按 ULIB 型号查优化常数。
+license: Apache-2.0
+homepage: https://github.com/killgfat/barrettcalcata
+metadata:
+  openclaw:
+    requires:
+      bins:
+        - python3
+    envVars:
+      - name: IOL_API_BASE
+        required: false
+        description: 可选的自部署实例地址；未设置时使用默认公共实例
 description: 调用 IOL 计算服务（HTTP API）来产出人工晶体度数的具体数值——Barrett Universal II、SRK/T、Hoffer Q、Haigis 的球镜计算，Barrett Toric 的柱镜与轴位，以及按晶体型号查优化常数。在下列情形使用：用户给出具体生物测量值（眼轴 AL、角膜曲率 K1/K2、前房深度 ACD、散光轴位、白到白 WTW）并问晶体该放多少度、柱镜选哪档、轴位定在哪；指定了晶体型号要查它的 A 常数 / Haigis a0a1a2 / Hoffer Q pACD；要把计算结果在几个公式之间对比或解释为什么差一档；提到自己部署了一份实例（自定义域名、IOL_API_BASE）想拿它算度数；拿着报告上的某个读数问它该怎么填进计算、会不会影响结果。反过来不需要本技能的场景：纯粹问公式原理、为什么 K 值要用 1.3375 折射率、Haigis 与 Haigis-L 的文献差异、PubMed 上有哪些研究，只是想打开 ULIB 网站看看，或者想让本技能从报告图片里 OCR 出数值——本服务不做图片识别，只接受用户已经读出的数值。
 ---
 

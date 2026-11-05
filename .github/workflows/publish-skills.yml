@@ -1,0 +1,31 @@
+# ClawHub 技能自动发布
+# PR 触碰 skills/ 时只做 dry-run 预检（无需 token）；
+# 打 skill-v* 标签或手动触发时真实发布（需要仓库 secret CLAWHUB_TOKEN，
+# 在 ClawHub 网页 Settings -> API tokens 创建）。
+name: Skill Publish
+
+on:
+  pull_request:
+    paths:
+      - "skills/**"
+  push:
+    tags:
+      - "skill-v*"
+  workflow_dispatch:
+
+jobs:
+  dry-run:
+    if: github.event_name == 'pull_request'
+    uses: openclaw/clawhub/.github/workflows/skill-publish.yml@v1
+    with:
+      owner: killgfat
+      dry_run: true
+
+  publish:
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    uses: openclaw/clawhub/.github/workflows/skill-publish.yml@v1
+    with:
+      owner: killgfat
+      dry_run: false
+    secrets:
+      clawhub_token: ${{ secrets.CLAWHUB_TOKEN }}
