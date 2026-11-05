@@ -1,0 +1,102 @@
+[
+  {
+    "id": 1,
+    "query": "患者右眼 AL 24.1，K1 42.8，K2 43.6，打算植入 Alcon SN60WF，帮我算一下该放多少度",
+    "should_trigger": true
+  },
+  {
+    "id": 2,
+    "query": "我这有个白内障病人 眼轴26mm 曲率44 前房3.2 该放多少度？",
+    "should_trigger": true
+  },
+  {
+    "id": 3,
+    "query": "用 Barrett Universal II 算下双眼，左眼 AL 23.3 K1 43.8 K2 44.2 ACD 3.0",
+    "should_trigger": true
+  },
+  {
+    "id": 4,
+    "query": "toric 的病人 K1 43.5@180 K2 44.5@90，柱镜选多少、轴位定在哪",
+    "should_trigger": true
+  },
+  {
+    "id": 5,
+    "query": "AMO ZCB00 这款晶体的 Haigis 常数 a0/a1/a2 分别是多少",
+    "should_trigger": true
+  },
+  {
+    "id": 6,
+    "query": "帮我把这张 IOL Master 报告截图里的数据提取出来",
+    "should_trigger": true
+  },
+  {
+    "id": 7,
+    "query": "同一个病人 SRK/T 算出 21.5，Hoffer Q 算出 20.5，差了一度，这正常吗",
+    "should_trigger": true
+  },
+  {
+    "id": 8,
+    "query": "我自己 deploy 了一份到 cloudflare workers，域名是 iol.mydomain.dev，想用它算度数",
+    "should_trigger": true
+  },
+  {
+    "id": 9,
+    "query": "散光 1.25D 的话 IOL 平面柱镜应该选哪个档",
+    "should_trigger": true
+  },
+  {
+    "id": 10,
+    "query": "IOLMaster 700 报告里的 WTW 11.9 这个值要怎么填进计算里",
+    "should_trigger": true
+  },
+  {
+    "id": 11,
+    "query": "帮我读一下这份手术记录的 PDF，把里面的用药列出来",
+    "should_trigger": false
+  },
+  {
+    "id": 12,
+    "query": "这个月的门诊量数据在 xlsx 里，帮我按科室做个汇总透视表",
+    "should_trigger": false
+  },
+  {
+    "id": 13,
+    "query": "解释一下角膜曲率和角膜屈光力的物理关系，为什么 K 值要用 1.3375 换算",
+    "should_trigger": false
+  },
+  {
+    "id": 14,
+    "query": "写个 Python 函数算 BMI，输入身高体重返回数值和分级",
+    "should_trigger": false
+  },
+  {
+    "id": 15,
+    "query": "wrangler deploy 的时候报 python_workers 兼容标志不支持，怎么排查",
+    "should_trigger": false
+  },
+  {
+    "id": 16,
+    "query": "白内障手术知情同意书应该写哪些内容，帮我起草一份",
+    "should_trigger": false
+  },
+  {
+    "id": 17,
+    "query": "ULIB 那个网站现在还能打开吗，好像停更好多年了",
+    "should_trigger": false
+  },
+  {
+    "id": 18,
+    "query": "把这张 DICOM 转成 PNG，顺便把窗宽窗位调一下",
+    "should_trigger": false
+  },
+  {
+    "id": 19,
+    "query": "我这段 API 代码的 token 泄露了，帮我看看 git 历史里还有没有别的密钥",
+    "should_trigger": false
+  },
+  {
+    "id": 20,
+    "query": "Haigis 和 Haigis-L 这两个公式在文献里的区别是什么，各自适用什么人群",
+    "should_trigger": false
+  }
+]

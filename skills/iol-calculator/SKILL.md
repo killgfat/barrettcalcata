@@ -1,6 +1,6 @@
 ---
 name: iol-calculator
-description: 通过 HTTP API 计算人工晶体（IOL）度数、做 Barrett Toric 散光计算、查询晶体优化常数、或从 IOL Master 报告图片提取生物测量参数。当用户提到 IOL、人工晶体、晶体度数、Barrett Universal II、SRK/T、Hoffer Q、Haigis、Haigis-T、角膜散光、Toric 轴位、A 常数、ULIB 常数、IOL Master 报告识别、白到白 WTW、眼轴 AL、前房深度 ACD 等任何与白内障术前计算相关的内容时使用本技能。即使用户只是贴了一张 IOL Master 报告截图问「这个该放多少度」，也应使用。
+description: 调用 IOL 计算服务的 HTTP API 来产出具体数值——算人工晶体度数、做 Barrett Toric 散光计算、查某款晶体的优化常数，或从 IOL Master 报告图片提取生物测量参数。在下列情形使用：用户给出具体生物测量值（眼轴 AL、角膜曲率 K1/K2、前房深度 ACD、散光轴位、白到白 WTW）并问晶体该放多少度、柱镜选哪档、轴位定在哪；指定了晶体型号要查它的 A 常数 / Haigis a0a1a2 / Hoffer Q pACD；要给 IOL Master 报告截图做数据提取；要把计算结果在 SRK/T、Hoffer Q、Haigis、Barrett 之间对比或解释为什么差一档；提到自己部署了一份实例（自定义域名、IOL_API_BASE）想拿它算度数；拿着报告上的某个读数问它该怎么填进计算、会不会影响结果。即使用户只贴一张报告截图问「这个该放多少度」，也应使用。反过来，纯粹问公式原理、为什么 K 值要用 1.3375 折射率、Haigis 与 Haigis-L 的文献差异、PubMed 上有哪些研究，或只是想打开 ULIB 网站看看，这些不需要本技能。
 ---
 
 # IOL Calculator
@@ -16,14 +16,16 @@ description: 通过 HTTP API 计算人工晶体（IOL）度数、做 Barrett Tor
 
 单次覆盖用 `--base`，不要为了换实例去改脚本。
 
-脚本路径相对本技能目录。先确认实例可达再开始算：
-
-    python3 <skill-dir>/scripts/iol.py health
-
 ## 用脚本，不要手拼 curl
 
-`scripts/iol.py` 只用标准库，处理了 Cloudflare 对默认 Python UA 的拦截、错误码
-和结果摘要。手写 curl 容易漏 User-Agent 被 403，也容易把返回的 JSON 读错。
+调用 `scripts/iol.py`（相对本技能目录），它只用标准库，处理了 Cloudflare 对
+默认 Python UA 的拦截、错误码和结果摘要。手写 curl 容易漏 User-Agent 被 403，
+也容易把返回的 JSON 读错。
+
+下面的命令都在技能目录下执行；换了工作目录就把路径补全成绝对路径：
+
+    # 确认实例可达
+    python3 scripts/iol.py health
 
     # 普通计算
     python3 scripts/iol.py calculate --file payload.json
