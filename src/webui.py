@@ -1930,7 +1930,10 @@ INDEX_PAGE = """
             html += '<dt>本次残余预测使用的植入参数</dt><dd>IOL SE ' + format(eyeData.iol_spherical_equivalent) + '；柱镜 ' + format(eyeData.iol_cylinder) + '；植入轴位 ' + axis(eyeData.iol_axis) + '</dd>';
             html += '<dt>IOL 柱镜在角膜平面的等效矫正</dt><dd>' + format(eyeData.corneal_correction) + '（ELP 相关乘数 ' + format(eyeData.corneal_factor, '') + '）</dd>';
             html += '<dt>推荐 IOL 柱镜与轴位</dt><dd>连续解 ' + format(eyeData.recommended_iol_cylinder_exact) + '；可供档位 ' + (eyeData.recommended_iol_cylinder == null ? '未提供档位，不作离散推荐' : format(eyeData.recommended_iol_cylinder)) + '；建议轴位 ' + axis(eyeData.recommended_axis) + '</dd></dl>';
-            const toricOptions = eyeData.toric_options || [];
+            // 与普通结果一致：晶体度数从高到低显示。
+            const toricOptions = (eyeData.toric_options || []).slice().sort(
+                (a, b) => parseFloat(b.iol_cylinder) - parseFloat(a.iol_cylinder)
+            );
             if (toricOptions.length) {
                 html += '<div class="toric-table-scroll"><table class="result-table"><caption>可供档位按各自最佳轴位比较（角膜平面残余）</caption><thead><tr><th>IOL 柱镜</th><th>建议轴位</th><th>等效矫正</th><th>残余量值</th></tr></thead><tbody>';
                 toricOptions.forEach(option => {
@@ -1940,7 +1943,9 @@ INDEX_PAGE = """
             }
             html += '<p class="param-hint toric-form-note">植入轴位表示 IOL 光学弱子午线的对齐方向。上方残余对应拟植入方案；档位表按最佳轴位比较。零散光无定义轴位时显示 —。</p>';
             html += '<div class="toric-table-scroll"><table class="result-table"><caption>Haigis 球镜 SE 候选（非完整术后球柱镜处方）</caption><thead><tr><th>IOL 球镜等效 SE</th><th>球镜预期屈光度</th></tr></thead><tbody>';
-            (eyeData.iol_options || []).forEach(option => {
+            (eyeData.iol_options || []).slice().sort(
+                (a, b) => parseFloat(b.iol_power) - parseFloat(a.iol_power)
+            ).forEach(option => {
                 html += '<tr class="' + (option.recommended ? 'recommended' : '') + '"><td>' + escapeHtml(option.iol_power) + ' D</td><td>' + escapeHtml(option.refraction) + ' D</td></tr>';
             });
             html += '</tbody></table></div>';
@@ -2077,9 +2082,9 @@ INDEX_PAGE = """
             const card = document.createElement('div');
             card.className = 'result-card';
 
-            // 统一按晶体度数从低到高显示，避免不同公式返回顺序不一致
+            // 统一按晶体度数从高到低显示，避免不同公式返回顺序不一致
             const sortedOptions = (eyeData.iol_options || []).slice().sort(
-                (a, b) => parseFloat(a.iol_power) - parseFloat(b.iol_power)
+                (a, b) => parseFloat(b.iol_power) - parseFloat(a.iol_power)
             );
 
             // 根据目标屈光度找到最接近的晶体度数

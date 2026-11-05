@@ -136,7 +136,9 @@ def test_result_summary_shows_confidence_constants_and_input_usage():
     assert "常数：" in page
     assert "警告：" in page
     assert "sortedOptions" in page
-    assert "parseFloat(a.iol_power) - parseFloat(b.iol_power)" in page
+    # 晶体度数从高到低显示：比较函数必须是降序。
+    assert "parseFloat(b.iol_power) - parseFloat(a.iol_power)" in page
+    assert "parseFloat(a.iol_power) - parseFloat(b.iol_power)" not in page
 
 
 def test_calculate_payload_sends_calculation_model():
