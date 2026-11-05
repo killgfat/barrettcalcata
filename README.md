@@ -59,6 +59,23 @@ https://barrettcalcata.killgfat.com
 
 ## 使用方式
 
+### Agent Skill
+
+仓库内自带一个 [agent skill](skills/iol-calculator/SKILL.md)，让 Claude Code、
+Codex、Cursor 等编码代理直接调用本 API 做晶体度数计算。
+
+    npx skills add killgfat/barrettcalcata
+
+技能指向的实例由环境变量 `IOL_API_BASE` 决定，未设置时使用
+<https://barrettcalcata.killgfat.com>：
+
+    export IOL_API_BASE=https://your-own-worker.example.com
+
+技能自带 `scripts/iol.py`（仅标准库），也可以直接当命令行工具用：
+
+    python3 skills/iol-calculator/scripts/iol.py calculate --file payload.json
+    python3 skills/iol-calculator/scripts/iol.py models --model "AMO ZCB00"
+
 ### Web UI
 
 首页选择非散光或散光模式。非散光模式可选择计算公式；Barrett 支持在线和本地，
