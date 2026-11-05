@@ -1,0 +1,11 @@
+# 临时调试：验证能否调用 ClawHub 可复用 workflow
+name: Test Reusable
+
+on:
+  workflow_dispatch:
+
+jobs:
+  call:
+    uses: openclaw/clawhub/.github/workflows/skill-publish.yml@main
+    with:
+      dry_run: true
