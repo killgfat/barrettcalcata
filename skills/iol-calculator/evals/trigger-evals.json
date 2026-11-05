@@ -27,7 +27,7 @@
   {
     "id": 6,
     "query": "帮我把这张 IOL Master 报告截图里的数据提取出来",
-    "should_trigger": true
+    "should_trigger": false
   },
   {
     "id": 7,

@@ -628,6 +628,11 @@ def fetch_iol_model_list():
     return iol_models.fetch_iol_model_list()
 
 
+def list_iol_models(formula=None):
+    """按公式返回可选晶体列表与来源说明。"""
+    return iol_models.list_iol_models(formula)
+
+
 def fetch_model_constants(model_name):
     """按型号查询常数：优先内置 ULIB 快照，未收录再回退 Barrett 官网。"""
     return iol_models.fetch_model_constants(model_name)
@@ -636,16 +641,6 @@ def fetch_model_constants(model_name):
 def lookup_ulib_constants(model_name):
     """只查内置 ULIB 快照，未收录返回 None，不发网络请求。"""
     return iol_models.lookup_ulib_constants(model_name)
-
-
-def list_ulib_models():
-    """返回内置 ULIB 快照收录的型号名（按名称排序）。"""
-    return iol_models.list_ulib_models()
-
-
-def list_ulib_model_details():
-    """返回带常数的 ULIB 型号列表，供 Web UI 选择器使用。"""
-    return iol_models.list_ulib_model_details()
 
 
 def fetch_model_a_constant(model_name):
@@ -670,8 +665,7 @@ __all__ = [
     "get_formula_label",
     "get_hello_message",
     "list_formulas",
-    "list_ulib_model_details",
-    "list_ulib_models",
+    "list_iol_models",
     "lookup_ulib_constants",
     "normalize_calculation_model",
     "normalize_formula",

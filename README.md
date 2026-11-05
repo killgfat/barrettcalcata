@@ -74,7 +74,10 @@ Codex、Cursor 等编码代理直接调用本 API 做晶体度数计算。
 技能自带 `scripts/iol.py`（仅标准库），也可以直接当命令行工具用：
 
     python3 skills/iol-calculator/scripts/iol.py calculate --file payload.json
-    python3 skills/iol-calculator/scripts/iol.py models --model "AMO ZCB00"
+    python3 skills/iol-calculator/scripts/iol.py health
+
+技能内置 `references/iol-models.md`，是 304 款 ULIB 型号的静态常数表，
+查型号不必先调接口。
 
 ### Web UI
 
@@ -127,12 +130,23 @@ Codex、Cursor 等编码代理直接调用本 API 做晶体度数计算。
 | POST | /api/calculate | 普通 IOL 计算 |
 | POST | /api/calculate-toric | Barrett Toric 在线计算 |
 | POST | /api/extract | AI 识别 IOL Master 报告 |
-| GET | /api/iol-models | 晶体型号与常数查询 |
-| GET | /api/ulib-models | ULIB 晶体列表（供前端搜索选择） |
+| GET | /api/iol-models?formula= | 按公式列出候选晶体型号 |
+| GET | /api/iol-models?model= | 查询单个型号的常数 |
 | GET | /docs | Swagger UI |
 | GET | /openapi.json | OpenAPI 规范 |
 
-`/api/iol-models?model=<型号>` 的查询顺序：
+`/api/iol-models` 按 `formula` 参数决定列表来源：
+
+| formula | 列表来源 | 条目数 |
+|---|---|---|
+| `barrett`（或不传） | Barrett 官网型号清单 | 18 |
+| `srkt` / `hoffer_q` / `haigis` / `haigis-toric` | 内置 [ULIB 常数快照](#ulib-常数数据与署名) | 304 |
+
+也接受 `barrett_ii`、`barrett_ii_offline` 这类计算模型名。Barrett 官网
+不可达时自动降级到内置映射表，响应的 `source` 会变成
+`barrett_local_map` 并在 `warnings` 里说明，列表仍可用。
+
+带 `model=<型号>` 时返回单个型号的常数，查询顺序：
 
 1. Barrett 官网型号经手工映射表查 [ULIB 常数快照](#ulib-常数数据与署名)；
 2. ULIB 快照里的原始型号名；
@@ -252,7 +266,7 @@ Barrett 模式     -> Barrett 官网型号下拉（18 项）
 其他公式         -> 关键词搜索框 + ULIB 型号列表（304 项）
 ```
 
-- 列表由 `GET /api/ulib-models` 一次性返回（约 37 KB），前端本地过滤，
+- 列表由 `GET /api/iol-models?formula=<公式>` 一次性返回，前端本地过滤，
   切换公式时不再产生额外请求；
 - 支持空格分隔的多关键词（如 `tecnis zcb00` 唯一定位到一款）；
 - 选中型号后自动填入 A 常数、Haigis a0/a1/a2 与 Hoffer Q pACD，

@@ -1,6 +1,6 @@
 ---
 name: iol-calculator
-description: 调用 IOL 计算服务的 HTTP API 来产出具体数值——算人工晶体度数、做 Barrett Toric 散光计算、查某款晶体的优化常数，或从 IOL Master 报告图片提取生物测量参数。在下列情形使用：用户给出具体生物测量值（眼轴 AL、角膜曲率 K1/K2、前房深度 ACD、散光轴位、白到白 WTW）并问晶体该放多少度、柱镜选哪档、轴位定在哪；指定了晶体型号要查它的 A 常数 / Haigis a0a1a2 / Hoffer Q pACD；要给 IOL Master 报告截图做数据提取；要把计算结果在 SRK/T、Hoffer Q、Haigis、Barrett 之间对比或解释为什么差一档；提到自己部署了一份实例（自定义域名、IOL_API_BASE）想拿它算度数；拿着报告上的某个读数问它该怎么填进计算、会不会影响结果。即使用户只贴一张报告截图问「这个该放多少度」，也应使用。反过来，纯粹问公式原理、为什么 K 值要用 1.3375 折射率、Haigis 与 Haigis-L 的文献差异、PubMed 上有哪些研究，或只是想打开 ULIB 网站看看，这些不需要本技能。
+description: 调用 IOL 计算服务（HTTP API）来产出人工晶体度数的具体数值——Barrett Universal II、SRK/T、Hoffer Q、Haigis 的球镜计算，Barrett Toric 的柱镜与轴位，以及按晶体型号查优化常数。在下列情形使用：用户给出具体生物测量值（眼轴 AL、角膜曲率 K1/K2、前房深度 ACD、散光轴位、白到白 WTW）并问晶体该放多少度、柱镜选哪档、轴位定在哪；指定了晶体型号要查它的 A 常数 / Haigis a0a1a2 / Hoffer Q pACD；要把计算结果在几个公式之间对比或解释为什么差一档；提到自己部署了一份实例（自定义域名、IOL_API_BASE）想拿它算度数；拿着报告上的某个读数问它该怎么填进计算、会不会影响结果。反过来不需要本技能的场景：纯粹问公式原理、为什么 K 值要用 1.3375 折射率、Haigis 与 Haigis-L 的文献差异、PubMed 上有哪些研究，只是想打开 ULIB 网站看看，或者想让本技能从报告图片里 OCR 出数值——本服务不做图片识别，只接受用户已经读出的数值。
 ---
 
 # IOL Calculator
@@ -35,16 +35,20 @@ description: 调用 IOL 计算服务的 HTTP API 来产出具体数值——算�
     # Barrett Toric（在线，可能被官网拒绝）
     python3 scripts/iol.py toric --json '{...}'
 
-    # 查某款晶体的常数
-    python3 scripts/iol.py models --model "AMO ZCB00"
-
-    # 按关键词筛 ULIB 型号（多个关键词是 AND）
-    python3 scripts/iol.py ulib-models --search "alcon sn60"
-
-    # 从报告图片提取参数
-    python3 scripts/iol.py extract --image report.jpg
+    # 确认实例可达
+    python3 scripts/iol.py health
 
 加 `--raw` 输出原始 JSON。
+
+查晶体型号与常数不必调接口：`references/iol-models.md` 是内置的 304 款
+ULIB 型号表，直接查表就能填 `iol_model`。要拿服务端的结果（含 Barrett
+官网型号）也可以：
+
+    curl -s "$IOL_API_BASE/api/iol-models?formula=srkt"
+    curl -s "$IOL_API_BASE/api/iol-models?model=AMO%20ZCB00"
+
+本技能不做图片 OCR：用户只给截图时，请他们先读出 AL / K1 / K2 / ACD 等
+数值，再拿来计算。
 
 ## 计算请求的最小结构
 
@@ -114,3 +118,4 @@ Barrett 系列（`barrett_ii_offline` / `barrett_ii`）不读 ULIB，只用 `a_c
 
 - `references/api.md` — 端点、字段、响应结构的完整清单
 - `references/formulas.md` — 各公式的适用域与限制
+- `references/iol-models.md` — 304 款 ULIB 型号及其常数（静态表）

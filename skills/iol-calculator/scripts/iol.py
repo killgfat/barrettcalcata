@@ -6,9 +6,8 @@
     iol.py calculate --file payload.json
     iol.py calculate --json '{"model": "srkt", ...}'
     cat payload.json | iol.py calculate
-    iol.py models --model "AMO ZCB00"
-    iol.py ulib-models --search zcb
-    iol.py extract --image report.jpg
+    iol.py toric --json '{...}'
+    iol.py health
 
 目标实例由 IOL_API_BASE 决定，未设置时指向项目作者的部署。
 """
@@ -16,7 +15,6 @@
 from __future__ import annotations
 
 import argparse
-import base64
 import json
 import os
 import sys
@@ -178,86 +176,6 @@ def print_calculation(body: dict) -> None:
             print_eye(label, data[key])
 
 
-def print_models(body: dict, search: str | None) -> None:
-    """打印晶体型号与常数。"""
-    data = body.get("data") or {}
-    if "models" in data:
-        models = data["models"]
-        if search:
-            needle = search.lower()
-            models = [m for m in models if needle in m["name"].lower()]
-        print(f"{len(models)} 款晶体（来源 {data.get('source_revision')}）")
-        for model in models:
-            haigis = model.get("haigis")
-            haigis_text = " / ".join(f"{v:.3f}" for v in haigis) if haigis else "—"
-            print(
-                f"  {model['name']}\n"
-                f"    A={fmt(model.get('a_constant'))}  "
-                f"Haigis={haigis_text}  "
-                f"pACD={fmt(model.get('pacd'))}  "
-                f"n={fmt(model.get('samples'))}"
-            )
-        return
-
-    print(f"{data.get('name')}")
-    for key in (
-        "a_constant",
-        "lens_factor",
-        "haigis_constants",
-        "hoffer_q_pacd",
-        "srkt_a",
-        "nominal_a",
-        "samples",
-    ):
-        if key in data:
-            print(f"  {key}: {data[key]}")
-    if data.get("source"):
-        print(f"  source: {data['source']}")
-    for warning in data.get("warnings") or []:
-        print(f"  警告: {warning}")
-
-
-def print_ulib_models(body: dict, search: str | None) -> None:
-    """打印 ULIB 型号列表，可按关键词过滤。"""
-    data = body.get("data") or {}
-    models = data.get("models") or []
-    if search:
-        terms = search.lower().split()
-        models = [m for m in models if all(t in m["name"].lower() for t in terms)]
-    print(
-        f"{len(models)} 款 / 共 {len(data.get('models') or [])} 款"
-        f"（ULIB {data.get('source_revision')}）"
-    )
-    for model in models:
-        print(f"  {model['name']}")
-
-
-def print_extraction(body: dict) -> None:
-    """打印识图结果。"""
-    if not body.get("success"):
-        print(f"识别失败: {body.get('error')}")
-        return
-    data = body.get("data") or {}
-    print("识别完成")
-    if body.get("requires_manual_verification"):
-        print("  需要人工核对（多数决未达成）")
-    for key, label in (("right_eye", "右眼"), ("left_eye", "左眼")):
-        eye = data.get(key)
-        if not eye:
-            continue
-        values = " ".join(
-            f"{field}={fmt(eye.get(field))}"
-            for field in ("AL", "K1", "K1Axis", "K2", "K2Axis", "ACD")
-            if eye.get(field) is not None
-        )
-        print(f"  {label}: {values}")
-    for key in ("a_constant", "haigis_constants", "hoffer_q_pacd", "patient_name"):
-        if data.get(key) not in (None, ""):
-            print(f"  {key}: {data[key]}")
-    for field in body.get("failed_fields") or []:
-        print(f"  未达成共识: {field}")
-
-
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="IOL Calculator API 客户端",
@@ -282,19 +200,6 @@ def build_parser() -> argparse.ArgumentParser:
     toric.add_argument("--json", help="请求体 JSON 字符串")
     toric.add_argument("--file", "-f", help="请求体 JSON 文件，- 表示 stdin")
 
-    models = sub.add_parser("models", help="晶体型号常数查询")
-    models.add_argument("--model", "-m", help="型号名；省略时列出全部型号")
-    models.add_argument("--search", "-s", help="按关键词过滤型号列表")
-
-    ulib = sub.add_parser("ulib-models", help="内置 ULIB 型号列表")
-    ulib.add_argument("--search", "-s", help="空格分隔的多关键词，全部命中才保留")
-
-    extract = sub.add_parser("extract", help="从报告图片提取参数")
-    extract.add_argument("--image", "-i", required=True, help="图片路径")
-    extract.add_argument(
-        "--json", help="额外的请求体片段（JSON 字符串），与 image 合并"
-    )
-
     sub.add_parser("health", help="检查实例可达性")
     return parser
 
@@ -307,20 +212,6 @@ def main(argv: list[str] | None = None) -> int:
         status, body = request_json(f"{base}/api/calculate", read_payload(args))
     elif args.command == "toric":
         status, body = request_json(f"{base}/api/calculate-toric", read_payload(args))
-    elif args.command == "models":
-        url = f"{base}/api/iol-models"
-        if args.model:
-            url += "?model=" + urllib.parse.quote(args.model)
-        status, body = request_json(url)
-    elif args.command == "ulib-models":
-        status, body = request_json(f"{base}/api/ulib-models")
-    elif args.command == "extract":
-        with open(args.image, "rb") as fh:
-            encoded = base64.b64encode(fh.read()).decode("ascii")
-        payload = {"image": encoded}
-        if args.json:
-            payload.update(json.loads(args.json))
-        status, body = request_json(f"{base}/api/extract", payload)
     else:  # health
         status, body = request_json(f"{base}/hello")
 
@@ -330,12 +221,6 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command in {"calculate", "toric"}:
         print_calculation(body)
-    elif args.command == "models":
-        print_models(body, args.search)
-    elif args.command == "ulib-models":
-        print_ulib_models(body, args.search)
-    elif args.command == "extract":
-        print_extraction(body)
     else:
         print(f"实例可用: {base}")
         print(json.dumps(body, ensure_ascii=False))

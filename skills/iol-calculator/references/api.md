@@ -92,7 +92,33 @@ true` 表示多数决未达成，应当让用户核对而不是直接拿去计�
 
 ## GET /api/iol-models
 
-不带参数列出 Barrett 官网型号。带 `?model=<型号>` 查单款常数：
+一个端点两件事，靠查询参数区分。
+
+**`?formula=<公式>` 返回候选型号列表**（不传 `model` 时）：
+
+| formula | 来源 | 条目 |
+|---|---|---|
+| `barrett`（默认） | Barrett 官网清单 | 18 |
+| `srkt` / `hoffer_q` / `haigis` / `haigis-toric` | ULIB 快照 | 304 |
+
+也接受 `barrett_ii`、`barrett_ii_offline`。响应：
+
+    {"success": true,
+     "data": {
+       "formula": "barrett",
+       "source": "barrett" | "barrett_local_map" | "ulib",
+       "source_revision": "2016-10-31",
+       "warnings": [],
+       "models": [{"name": ..., "a_constant": ..., "haigis": [a0,a1,a2],
+                   "pacd": ..., "samples": ..., "preliminary": ...,
+                   "lens_factor": null, "ulib_name": ..., "match": ...,
+                   "note": ...}]}}
+
+Barrett 官网不可达时 `source` 变成 `barrett_local_map`，`warnings` 说明
+降级原因，列表仍可用。未映射到 ULIB 的型号 `a_constant` 为 `null`，
+`note` 给出原因——不要给它编一个常数。
+
+**`?model=<型号>` 查单个型号的常数**：
 
     {"name": "...", "a_constant": ..., "lens_factor": ...,
      "haigis_constants": [a0,a1,a2], "hoffer_q_pacd": ...,
@@ -101,10 +127,8 @@ true` 表示多数决未达成，应当让用户核对而不是直接拿去计�
 
 查询顺序：Barrett 型号映射 → ULIB 原始型号名 → Barrett 官网。
 
-## GET /api/ulib-models
-
-返回内置 ULIB 快照全部 304 款。每项含 `name`、`a_constant`、`haigis`、
-`pacd`、`samples`、`preliminary`。
+旧的 `/api/ulib-models` 已移除，改用
+`/api/iol-models?formula=<任意非 Barrett 公式>`。
 
 ## GET /openapi.json
 

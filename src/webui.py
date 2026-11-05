@@ -568,17 +568,28 @@ INDEX_PAGE = """
         const iolModelSelect = document.getElementById('iolModel');
         const aConstantInput = document.getElementById('aConstant');
 
+        let barrettModelsLoaded = false;
+
         async function loadIolModels() {
+            if (barrettModelsLoaded) return;
             try {
-                const response = await fetch('/api/iol-models');
+                const response = await fetch('/api/iol-models?formula=barrett');
                 const result = await response.json();
                 if (result.success && result.data.models) {
-                    result.data.models.forEach(model => {
+                    const models = result.data.models;
+                    models.forEach(model => {
                         const option = document.createElement('option');
-                        option.value = model;
-                        option.textContent = model;
+                        option.value = model.name;
+                        option.textContent = model.name;
                         iolModelSelect.appendChild(option);
                     });
+                    barrettModelsLoaded = true;
+                    // 官网不可达时列表来自内置映射表，要看得出这一点，
+                    // 否则用户会以为下拉里就是官网的全部型号。
+                    const warning = (result.data.warnings || [])[0];
+                    document.getElementById('iolModelHint').textContent = warning
+                        ? '官网列表不可用，已用内置 ' + models.length + ' 个型号'
+                        : '选择晶体型号可自动填充A常数';
                 }
             } catch (e) {
                 console.warn('加载晶体型号列表失败:', e);
@@ -1330,16 +1341,29 @@ INDEX_PAGE = """
 
         let selectedUlibModelName = '';
 
+        function activeUlibFormula() {
+            // 当前生效的本地公式；Barrett 不会走到 ULIB 选择器。
+            return currentCalculationMode === 'toric'
+                ? selectedToricFormula : selectedFormula;
+        }
+
         async function loadUlibModels() {
             if (ulibModelsLoaded || ulibLoading) return;
             ulibLoading = true;
             try {
-                const response = await fetch('/api/ulib-models');
+                // 与 Barrett 共用 /api/iol-models，只是把公式传过去让服务端
+                // 决定查 ULIB 还是查官网。
+                const response = await fetch(
+                    '/api/iol-models?formula=' +
+                    encodeURIComponent(activeUlibFormula() || 'srkt')
+                );
                 const result = await response.json();
                 if (result.success && result.data && Array.isArray(result.data.models)) {
                     ulibModels = result.data.models;
                     ulibModelsLoaded = true;
-                    ulibModelHint.textContent = '源自 ULIB Constants（2016-10-31）· '
+                    const info = result.data;
+                    ulibModelHint.textContent = '源自 ULIB Constants（' +
+                        (info.source_revision || '2016-10-31') + '）· '
                         + ulibModels.length + ' 款';
                 } else {
                     throw new Error(result.message || '返回结构异常');

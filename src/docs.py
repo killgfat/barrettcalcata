@@ -433,6 +433,43 @@ def get_openapi_spec():
                     },
                 }
             },
+            "/api/iol-models": {
+                "get": {
+                    "summary": "查询可选晶体型号与常数",
+                    "description": (
+                        "带 formula 时返回该公式的候选型号列表：Barrett 系列用"
+                        "官网型号清单（官网不可达时降级到内置映射表并用 "
+                        "source=barrett_local_map 与 warnings 标明），"
+                        "其余公式直接读内置 ULIB 快照。"
+                        "带 model 时返回单个型号的常数。两者同时给出时以 model "
+                        "优先。都不给时按 Barrett 返回列表，保持向后兼容。"
+                    ),
+                    "parameters": [
+                        {
+                            "name": "formula",
+                            "in": "query",
+                            "required": False,
+                            "description": (
+                                "barrett / srkt / hoffer_q / haigis / "
+                                "haigis-toric；也接受 barrett_ii 与 "
+                                "barrett_ii_offline 这类计算模型名"
+                            ),
+                            "schema": {"type": "string"},
+                        },
+                        {
+                            "name": "model",
+                            "in": "query",
+                            "required": False,
+                            "description": "晶体型号名，返回该型号的常数",
+                            "schema": {"type": "string"},
+                        },
+                    ],
+                    "responses": {
+                        "200": {"description": "查询成功"},
+                        "405": {"description": "请求方法不允许（仅支持GET）"},
+                    },
+                }
+            },
         },
         "components": {
             "schemas": {

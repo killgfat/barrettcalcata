@@ -11,12 +11,15 @@ from bs4 import BeautifulSoup
 
 from . import constants as ulib_constants
 from .config import DEFAULT_K_INDEX, to_barrett_k_index_value
+from .data_model_map import BARRETT_TO_ULIB
 
 # 内置 ULIB 快照只覆盖 ULIB 收录的型号，且 ULIB 已于 2016-10-31 停更。
 # 查询顺序：先本地快照（零网络），未收录再走 Barrett 官网，官网失败时
 # 放宽到 ULIB 的模糊匹配，并在结果里标记 source。
 ULIB_SOURCE = "ulib"
 BARRETT_SOURCE = "barrett"
+# 官网清单取不到时回退到内置映射表，用这个值标明来源，便于调用方区分。
+LOCAL_MAP_SOURCE = "barrett_local_map"
 
 
 class IOLModelError(RuntimeError):
@@ -45,6 +48,19 @@ _A_CONSTANT_TTL = 604800  # 7天
 
 _model_list_cache = {"data": None, "ts": 0}
 _a_constant_cache = {}
+# 官网上一次失败的时刻。被 Cloudflare 拦截时每次重试都要等连接超时，
+# 这里设一个冷却窗口，冷却期内直接用内置映射表，避免每个请求都卡住。
+_model_list_failure = {"ts": 0, "error": None}
+_FAILURE_COOLDOWN = 600  # 10 分钟
+
+
+def _recent_failure(now):
+    """返回冷却期内的失败信息，没有则返回 None。"""
+    if _model_list_failure["error"] is None:
+        return None
+    if now - _model_list_failure["ts"] >= _FAILURE_COOLDOWN:
+        return None
+    return _model_list_failure["error"]
 
 
 def _extract_hidden_fields(html):
@@ -76,22 +92,33 @@ def fetch_iol_model_list():
     ):
         return _model_list_cache["data"]
 
+    cooldown = _recent_failure(now)
+    if cooldown is not None:
+        raise IOLModelError(f"{cooldown}（冷却期内不再重试）")
+
     session = requests.Session()
     session.headers.update(_HEADERS)
-    response = session.get(BARRETT_CALCULATE_URL)
-    response.raise_for_status()
+    try:
+        response = session.get(BARRETT_CALCULATE_URL, timeout=8)
+        response.raise_for_status()
 
-    soup = BeautifulSoup(response.text, "html.parser")
-    select = soup.find("select", {"id": "MainContent_IOLModel"})
-    if not select:
-        raise IOLModelError("无法找到IOL型号下拉列表")
+        soup = BeautifulSoup(response.text, "html.parser")
+        select = soup.find("select", {"id": "MainContent_IOLModel"})
+        if not select:
+            raise IOLModelError("无法找到IOL型号下拉列表")
 
-    models = []
-    for option in select.find_all("option"):
-        name = option.get_text(strip=True)
-        if name and name != "Personal Constant":
-            models.append(name)
+        models = []
+        for option in select.find_all("option"):
+            name = option.get_text(strip=True)
+            if name and name != "Personal Constant":
+                models.append(name)
+    except Exception as exc:  # 记录失败供后续请求降级
+        _model_list_failure["ts"] = now
+        _model_list_failure["error"] = str(exc)
+        raise
 
+    _model_list_failure["ts"] = 0
+    _model_list_failure["error"] = None
     _model_list_cache["data"] = models
     _model_list_cache["ts"] = now
     return models
@@ -131,6 +158,127 @@ def fetch_model_constants(model_name):
     return result
 
 
+def _barrett_entry(model_name, mapped=None, note=""):
+    """把一条 Barrett 型号整理成与 ULIB 列表同构的条目。
+
+    ULIB 有对应条目时带上可计算常数；没有对应条目时只保留型号名，
+    并把原因写进 note —— 前端据此禁用选中，而不是给用户一个假的常数。
+    """
+    if mapped is None:
+        mapped = ulib_constants.lookup_for_barrett_model(model_name)
+    base = {
+        "name": model_name,
+        "source": ULIB_SOURCE if mapped else BARRETT_SOURCE,
+        "a_constant": None,
+        "haigis": None,
+        "pacd": None,
+        "samples": None,
+        "preliminary": False,
+        "lens_factor": None,
+        "ulib_name": None,
+        "match": None,
+        "note": "",
+    }
+    if mapped is None:
+        base["note"] = note
+        return base
+
+    haigis = mapped.get("haigis_constants")
+    base.update(
+        {
+            "a_constant": mapped.get("a_constant"),
+            "haigis": list(haigis) if haigis else None,
+            "pacd": mapped.get("hoffer_q_pacd"),
+            "samples": mapped.get("samples"),
+            "preliminary": mapped.get("preliminary", False),
+            "ulib_name": mapped.get("ulib_name"),
+            "match": mapped.get("match"),
+            "note": mapped.get("note") or "",
+        }
+    )
+    return base
+
+
+def list_iol_models(formula=None):
+    """按公式返回可选晶体列表。
+
+    Barrett 系列走官网型号清单（含 Lens Factor 语义），其余公式走内置
+    ULIB 快照。官网不可达时退回本地的人工映射表 —— 那张表本身就是从
+    官网清单整理来的，能保证下拉框至少有 18 个型号可选，不会因为外部
+    站点拒绝请求而整体失败。
+
+    返回 (条目列表, 附加信息 dict)。附加信息里的 source 标明列表主体来自
+    哪里，warnings 记录降级原因。
+    """
+    normalized = resolve_model_formula(formula)
+    if normalized != "barrett":
+        models = ulib_constants.list_models()
+        return models, {
+            "formula": normalized,
+            "source": ULIB_SOURCE,
+            "source_url": ulib_constants.ULIB_SOURCE_URL,
+            "source_revision": ulib_constants.ULIB_SOURCE_REVISION,
+            "warnings": [],
+        }
+
+    # 本地映射表已经记录每个 Barrett 型号对应的 ULIB 条目和未映射原因，
+    # 官网清单只是它的超集校验；先建好索引，两种来源都用同一套组装逻辑。
+    local_notes = {row[0]: row[3] for row in BARRETT_TO_ULIB}
+    warnings = []
+    try:
+        names = fetch_iol_model_list()
+        source = BARRETT_SOURCE
+    except Exception as exc:  # noqa: BLE001 - 外部站点失败要能降级
+        names = [row[0] for row in BARRETT_TO_ULIB]
+        source = LOCAL_MAP_SOURCE
+        warnings.append(
+            f"Barrett 官网型号列表不可用（{exc}），"
+            f"改用内置映射表的 {len(names)} 个型号；"
+            "映射表未覆盖的型号不会出现在列表中"
+        )
+    models = [
+        _barrett_entry(name, note=local_notes.get(name, "")) for name in names
+    ]
+    return models, {
+        "formula": "barrett",
+        "source": source,
+        "source_url": BARRETT_CALCULATE_URL,
+        "source_revision": ulib_constants.ULIB_SOURCE_REVISION,
+        "warnings": warnings,
+    }
+
+
+# 公式名与计算模型名的对照；两个入口都接受，避免调用方记两套名字。
+FORMULA_NAMES = ("barrett", "srkt", "hoffer_q", "haigis", "haigis-toric")
+CALCULATION_MODELS = {
+    "barrett_ii_offline": ("barrett", "offline"),
+    "barrett_ii": ("barrett", "online"),
+    "srkt": ("srkt", "offline"),
+    "hoffer_q": ("hoffer_q", "offline"),
+    "haigis": ("haigis", "offline"),
+    "haigis-toric": ("haigis-toric", "offline"),
+}
+
+
+def resolve_model_formula(formula=None):
+    """把 model 名或 formula 名统一成公式名。
+
+    接受 `barrett`、`srkt`、`hoffer_q`、`haigis`、`haigis-toric`，
+    也接受 `barrett_ii` / `barrett_ii_offline` 这类计算模型名。空值或无法
+    识别的值一律按 Barrett 处理：那是唯一一套依赖官网型号清单的公式，
+    退回它的列表比报 400 更有用。
+    """
+    if formula is None:
+        return "barrett"
+    name = str(formula).strip().lower()
+    if not name:
+        return "barrett"
+    if name in FORMULA_NAMES:
+        return name
+    mapped = CALCULATION_MODELS.get(name)
+    return mapped[0] if mapped else "barrett"
+
+
 def lookup_ulib_constants(model_name):
     """只查内置 ULIB 快照与型号映射；未收录返回 None，不发网络请求。"""
     mapped = ulib_constants.lookup_for_barrett_model(model_name)
@@ -140,16 +288,6 @@ def lookup_ulib_constants(model_name):
     if entry is None:
         return None
     return entry.to_model_result()
-
-
-def list_ulib_models():
-    """返回内置 ULIB 快照收录的型号名（按名称排序）。"""
-    return sorted(entry.name for entry in ulib_constants.iter_entries())
-
-
-def list_ulib_model_details():
-    """返回带常数的 ULIB 型号列表，供前端选择器与关键词搜索使用。"""
-    return ulib_constants.list_models()
 
 
 def fetch_model_a_constant(model_name):

@@ -8,9 +8,8 @@ from formula import (
     ToricCalculationRequest,
     calculate,
     calculate_toric,
-    fetch_iol_model_list,
     fetch_model_constants,
-    list_ulib_model_details,
+    list_iol_models,
 )
 from worker_ai import WorkerAI
 
@@ -138,17 +137,21 @@ class APIHandler:
                 "message": f"图片处理过程中发生错误: {e!s}",
             }, 500
 
-    async def handle_barrett_iol_models(self, request, model_name=None):
-        """处理IOL晶体型号查询请求"""
+    async def handle_barrett_iol_models(self, request, model_name=None, formula=None):
+        """晶体型号查询：按公式返回可选列表，或查询单个型号的常数。
+
+        列表：Barrett 系列用官网型号清单（官网不可达时退回内置映射表），
+        其余公式直接用内置 ULIB 快照。这是获取型号列表的唯一入口。
+        单型号：先查 ULIB 快照（零网络），未收录才回退 Barrett 官网。
+        """
         if request.method != "GET":
             return {
                 "error": "Method Not Allowed",
                 "message": "此端点只支持GET请求",
             }, 405
 
-        try:
-            if model_name:
-                # 先查内置 ULIB 快照（零网络），未收录才回退 Barrett 官网。
+        if model_name:
+            try:
                 # 返回结构在原有 a_constant / lens_factor 之外补充 ULIB 的
                 # Haigis、Hoffer Q、Holladay 1、SRK II 常数，供上层按晶体
                 # 型号直接选取，而不是用 A 常数近似换算。
@@ -161,44 +164,24 @@ class APIHandler:
                     },
                     "message": "查询成功",
                 }, 200
+            except Exception as e:  # noqa: BLE001 - HTTP 边界
+                return {
+                    "error": "Internal Server Error",
+                    "message": f"获取晶体型号数据失败: {e!s}",
+                }, 500
 
-            models = fetch_iol_model_list()
-            return {
-                "success": True,
-                "data": {"models": models},
-                "message": "获取晶体型号列表成功",
-            }, 200
-
-        except Exception as e:  # noqa: BLE001 - HTTP 边界
-            return {
-                "error": "Internal Server Error",
-                "message": f"获取晶体型号数据失败: {e!s}",
-            }, 500
-
-    async def handle_ulib_models(self, request):
-        """返回内置 ULIB 晶体列表，供前端做关键词搜索与常数填充。"""
-        if request.method != "GET":
-            return {
-                "error": "Method Not Allowed",
-                "message": "此端点只支持GET请求",
-            }, 405
-        try:
-            models = list_ulib_model_details()
-            return {
-                "success": True,
-                "data": {
-                    "models": models,
-                    "source": "ulib",
-                    "source_url": "http://www.ocusoft.de/ulib/c1.htm",
-                    "source_revision": "2016-10-31",
-                },
-                "message": "获取ULIB晶体列表成功",
-            }, 200
-        except Exception as e:  # noqa: BLE001 - HTTP 边界
-            return {
-                "error": "Internal Server Error",
-                "message": f"获取ULIB晶体列表失败: {e!s}",
-            }, 500
+        # 列表查询不因外部站点失败而整体 500：Barrett 有内置映射表兜底，
+        # ULIB 是本地快照，两条路径都能给出可用的型号清单。
+        models, info = list_iol_models(formula)
+        return {
+            "success": True,
+            "data": {"models": models, **info},
+            "message": (
+                "获取晶体型号列表成功（已降级到内置映射表）"
+                if info.get("warnings")
+                else "获取晶体型号列表成功"
+            ),
+        }, 200
 
     async def handle_barrett_calculate(self, request):
         """处理IOL计算请求。"""
