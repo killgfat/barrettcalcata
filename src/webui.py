@@ -267,13 +267,6 @@ INDEX_PAGE = """
                             <label for="rightEyeEnabled">右眼 (OD)</label>
                         </div>
                         <div class="eye-params" id="rightEyeParams">
-                            <div class="form-group" style="margin-bottom: 10px;">
-                                <div style="display: flex; align-items: center;">
-                                    <input type="checkbox" id="rightSiliconeOil" name="rightSiliconeOil" style="width: 13px; margin-right: 8px; transform: scale(1.2);">
-                                    <label for="rightSiliconeOil" style="margin: 0; font-weight: normal;">硅油眼</label>
-                                </div>
-                                <div class="param-hint" style="margin-top: 2px; margin-left: 20px;">*勾选后会使用硅油眼轴校正，如输入结果已经校正则无需勾选。该功能未完善。</div>
-                            </div>
                             <div class="form-group">
                                 <label for="rightAL">眼轴长度 (AL) mm</label>
                                 <input type="number" id="rightAL" name="rightAL" step="0.01" min="12" max="38">
@@ -303,13 +296,6 @@ INDEX_PAGE = """
                             <label for="leftEyeEnabled">左眼 (OS)</label>
                         </div>
                         <div class="eye-params" id="leftEyeParams">
-                            <div class="form-group" style="margin-bottom: 10px;">
-                                <div style="display: flex; align-items: center;">
-                                    <input type="checkbox" id="leftSiliconeOil" name="leftSiliconeOil" style="width: 13px; margin-right: 8px; transform: scale(1.2);">
-                                    <label for="leftSiliconeOil" style="margin: 0; font-weight: normal;">硅油眼</label>
-                                </div>
-                                <div class="param-hint" style="margin-top: 2px; margin-left: 20px;">*勾选后会使用硅油眼轴校正，如输入结果已经校正则无需勾选。该功能未完善。</div>
-                            </div>
                             <div class="form-group">
                                 <label for="leftAL">眼轴长度 (AL) mm</label>
                                 <input type="number" id="leftAL" name="leftAL" step="0.01" min="12" max="38">
@@ -1021,29 +1007,6 @@ INDEX_PAGE = """
             }
         }
 
-        // 硅油眼矫正函数
-        function applySiliconeOilCorrection(eyeData) {
-            if (!eyeData || !eyeData.SiliconeOil) {
-                return eyeData;
-            }
-            
-            const AL = eyeData.AL;
-            const ACD = eyeData.ACD || 3; // 如果ACD未输入，使用默认值3
-            
-            // 实际眼轴长 = (硅油存在时的眼轴测量长度 - 前房深度) × 990 / 1532 + 前房深度
-            const correctedAL = (AL - ACD) * 990 / 1532 + ACD;
-            
-            // 创建新的眼数据对象，应用矫正
-            const correctedEyeData = {
-                ...eyeData,
-                original_AL: AL, // 保存原始眼轴值
-                AL: correctedAL, // 应用矫正后的眼轴
-                silicone_correction: correctedAL - AL // 保存矫正值
-            };
-            
-            return correctedEyeData;
-        }
-
         document.getElementById('iolForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             
@@ -1075,18 +1038,13 @@ INDEX_PAGE = """
                         document.getElementById('rightACD').value
                     );
 
-                    let rightEyeData = {
+                    formData.right_eye = {
                         AL: parseFloat(document.getElementById('rightAL').value),
                         K1: parseFloat(document.getElementById('rightK1').value),
                         K2: parseFloat(document.getElementById('rightK2').value),
                         ACD: rightACDValue === null ? undefined : rightACDValue,
-                        Refraction: document.getElementById('rightRefraction').value ? parseFloat(document.getElementById('rightRefraction').value) : undefined,
-                        SiliconeOil: document.getElementById('rightSiliconeOil').checked
+                        Refraction: document.getElementById('rightRefraction').value ? parseFloat(document.getElementById('rightRefraction').value) : undefined
                     };
-                    
-                    // 应用硅油眼矫正
-                    rightEyeData = applySiliconeOilCorrection(rightEyeData);
-                    formData.right_eye = rightEyeData;
                 }
 
                 if (leftEyeEnabled.checked) {
@@ -1094,18 +1052,13 @@ INDEX_PAGE = """
                         document.getElementById('leftACD').value
                     );
 
-                    let leftEyeData = {
+                    formData.left_eye = {
                         AL: parseFloat(document.getElementById('leftAL').value),
                         K1: parseFloat(document.getElementById('leftK1').value),
                         K2: parseFloat(document.getElementById('leftK2').value),
                         ACD: leftACDValue === null ? undefined : leftACDValue,
-                        Refraction: document.getElementById('leftRefraction').value ? parseFloat(document.getElementById('leftRefraction').value) : undefined,
-                        SiliconeOil: document.getElementById('leftSiliconeOil').checked
+                        Refraction: document.getElementById('leftRefraction').value ? parseFloat(document.getElementById('leftRefraction').value) : undefined
                     };
-                    
-                    // 应用硅油眼矫正
-                    leftEyeData = applySiliconeOilCorrection(leftEyeData);
-                    formData.left_eye = leftEyeData;
                 }
 
                 const calculationModel = resolveCalculationModel();
@@ -2135,27 +2088,6 @@ INDEX_PAGE = """
                 tableHTML += '</div>';
             }
             
-            // 显示硅油眼矫正信息
-            const eye = title.includes('右眼') ? 'right' : 'left';
-            const siliconeOilCheckbox = document.getElementById(eye + 'SiliconeOil');
-            if (siliconeOilCheckbox && siliconeOilCheckbox.checked) {
-                const originalAL = document.getElementById(eye + 'AL').value;
-                const ACD = document.getElementById(eye + 'ACD').value || 3;
-                const Ns = 1.4034;
-                const Nv = 1.336;
-                const correction = ((Ns - Nv) / (parseFloat(originalAL) - parseFloat(ACD))) * 1000;
-                const correctedAL = parseFloat(originalAL) + correction;
-                
-                tableHTML += '<div style="margin-top: 10px; padding: 10px; background: #fff3cd; border-radius: 5px;">';
-                tableHTML += '<strong>硅油眼矫正信息：</strong><br>';
-                tableHTML += '原始眼轴：' + originalAL + 'mm<br>';
-                tableHTML += 'ACD：' + formatToTwoDecimals(ACD) + 'mm<br>';
-                tableHTML += '矫正值：' + correction.toFixed(4) + 'mm<br>';
-                tableHTML += '矫正后眼轴：' + correctedAL.toFixed(4) + 'mm<br>';
-                tableHTML += '<small>公式：[(1.4034-1.336) / (AL-ACD)] × 1000</small>';
-                tableHTML += '</div>';
-            }
-
             card.innerHTML = tableHTML;
             return card;
         }

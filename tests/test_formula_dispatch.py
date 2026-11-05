@@ -368,7 +368,6 @@ def test_web_payload_with_only_model_works_for_every_formula(model):
             "K2": 44.0,
             "ACD": 3.2,
             "Refraction": 0.0,
-            "SiliconeOil": False,
         },
         "model": model,
     }
