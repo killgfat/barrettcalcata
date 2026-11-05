@@ -1,0 +1,9 @@
+# 临时调试：本地自调用可复用 workflow
+name: Test Self Reusable
+
+on:
+  workflow_dispatch:
+
+jobs:
+  call:
+    uses: ./.github/workflows/reusable-echo.yml

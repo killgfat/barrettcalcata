@@ -1,0 +1,11 @@
+# 临时调试：本仓库内的可复用 workflow
+name: Reusable Echo
+
+on:
+  workflow_call:
+
+jobs:
+  echo:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "reusable called"
