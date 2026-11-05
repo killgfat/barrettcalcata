@@ -16,14 +16,14 @@ on:
 jobs:
   dry-run:
     if: github.event_name == 'pull_request'
-    uses: openclaw/clawhub/.github/workflows/skill-publish.yml@v1
+    uses: openclaw/clawhub/.github/workflows/skill-publish.yml@main
     with:
       owner: killgfat
       dry_run: true
 
   publish:
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
-    uses: openclaw/clawhub/.github/workflows/skill-publish.yml@v1
+    uses: openclaw/clawhub/.github/workflows/skill-publish.yml@main
     with:
       owner: killgfat
       dry_run: false
