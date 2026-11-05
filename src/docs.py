@@ -58,7 +58,7 @@ def get_openapi_spec():
             "/api/calculate": {
                 "post": {
                     "summary": "执行IOL计算",
-                    "description": "提交眼睛参数JSON，计算人工晶体度数。model 为必填的计算模型：barrett_ii_offline（Barrett 离线）、barrett_ii（Barrett 在线）、srkt、hoffer_q、haigis、haigis-toric（本地实现）。haigis-toric 是公开框架近轴实现，完整一手算法尚未核实；每眼额外要求 K1Axis/K2Axis、实测 ACD 及请求级 haigis_constants，输出角膜平面残余散光。参数详见 HaigisToricEye。旧的 formula/mode 字段仅作兼容保留，model 存在时优先。至少提供右眼或左眼其中一组参数。k_index使用真实角膜等效折射率表示。",
+                    "description": "提交眼睛参数JSON，计算人工晶体度数。model 为必填的计算模型：barrett_ii_offline（Barrett 离线）、barrett_ii（Barrett 在线）、srkt、hoffer_q、haigis、haigis-toric（本地实现）。haigis-toric 是公开框架近轴实现，完整一手算法尚未核实；每眼额外要求 K1Axis/K2Axis、实测 ACD，常数由请求级 haigis_constants 或命中 ULIB 的 iol_model 提供，输出角膜平面残余散光。参数详见 HaigisToricEye。旧的 formula/mode 字段仅作兼容保留，model 存在时优先。至少提供右眼或左眼其中一组参数。k_index使用真实角膜等效折射率表示。",
                     "requestBody": {
                         "required": True,
                         "content": {
@@ -101,12 +101,20 @@ def get_openapi_spec():
                                                     "example": 0,
                                                 },
                                                 "LenThickness": {
-                                                    "type": "string",
-                                                    "description": "晶体厚度（可选）",
+                                                    "type": "number",
+                                                    "format": "float",
+                                                    "minimum": 0,
+                                                    "maximum": 15,
+                                                    "description": "晶体厚度（mm，可选）",
+                                                    "example": 4.6,
                                                 },
                                                 "WTW": {
-                                                    "type": "string",
-                                                    "description": "白到白距离（可选）",
+                                                    "type": "number",
+                                                    "format": "float",
+                                                    "minimum": 5,
+                                                    "maximum": 25,
+                                                    "description": "白到白距离（mm，可选）",
+                                                    "example": 11.9,
                                                 },
                                             },
                                             "required": ["AL", "K1", "K2"],
@@ -146,12 +154,20 @@ def get_openapi_spec():
                                                     "example": 0,
                                                 },
                                                 "LenThickness": {
-                                                    "type": "string",
-                                                    "description": "晶体厚度（可选）",
+                                                    "type": "number",
+                                                    "format": "float",
+                                                    "minimum": 0,
+                                                    "maximum": 15,
+                                                    "description": "晶体厚度（mm，可选）",
+                                                    "example": 4.6,
                                                 },
                                                 "WTW": {
-                                                    "type": "string",
-                                                    "description": "白到白距离（可选）",
+                                                    "type": "number",
+                                                    "format": "float",
+                                                    "minimum": 5,
+                                                    "maximum": 25,
+                                                    "description": "白到白距离（mm，可选）",
+                                                    "example": 11.9,
                                                 },
                                             },
                                             "required": ["AL", "K1", "K2"],
@@ -412,6 +428,27 @@ def get_openapi_spec():
                                         "left_eye": {
                                             "$ref": "#/components/schemas/ToricEye"
                                         },
+                                        # 兼容别名：from_mapping 会优先读这两个字段。
+                                        # OpenAPI 3.0 的 Reference Object 不能带兄弟字段，
+                                        # 这里用 allOf 包裹后再补充说明。
+                                        "toric_right_eye": {
+                                            "allOf": [
+                                                {
+                                                    "$ref": "#/components/schemas/ToricEye"
+                                                }
+                                            ],
+                                            "deprecated": True,
+                                            "description": "right_eye 的兼容别名，两者同时给出时以本字段为准",
+                                        },
+                                        "toric_left_eye": {
+                                            "allOf": [
+                                                {
+                                                    "$ref": "#/components/schemas/ToricEye"
+                                                }
+                                            ],
+                                            "deprecated": True,
+                                            "description": "left_eye 的兼容别名，两者同时给出时以本字段为准",
+                                        },
                                         "a_constant": {
                                             "type": "number",
                                             "default": 119.3,
@@ -434,6 +471,8 @@ def get_openapi_spec():
                                     "anyOf": [
                                         {"required": ["right_eye"]},
                                         {"required": ["left_eye"]},
+                                        {"required": ["toric_right_eye"]},
+                                        {"required": ["toric_left_eye"]},
                                     ],
                                 }
                             }
@@ -592,6 +631,47 @@ def get_openapi_spec():
     }
     for eye in ("right_eye", "left_eye"):
         schema["properties"][eye]["properties"].update(toric_properties)
+    # OpenAPI 3.0 没有 if/then，用互斥的 oneOf 表达「条件必填」：
+    # 前一个分支命中该取值并强制附带字段，后一个分支覆盖其余取值。
+    toric_conditional_rules = [
+        {
+            "oneOf": [
+                {
+                    "required": [
+                        "posterior_mode",
+                        "posterior_cylinder",
+                        "posterior_axis",
+                    ],
+                    "properties": {"posterior_mode": {"enum": ["measured"]}},
+                },
+                {"properties": {"posterior_mode": {"not": {"enum": ["measured"]}}}},
+            ]
+        },
+        {
+            "oneOf": [
+                {
+                    "required": [
+                        "posterior_mode",
+                        "total_cylinder",
+                        "total_axis",
+                        "total_source",
+                    ],
+                    "properties": {"posterior_mode": {"enum": ["total"]}},
+                },
+                {"properties": {"posterior_mode": {"not": {"enum": ["total"]}}}},
+            ]
+        },
+        # OpenAPI 3.0 的 exclusiveMinimum 是布尔值，这里改用「非 0」等价表达。
+        {
+            "oneOf": [
+                {
+                    "required": ["iol_cylinder", "iol_axis"],
+                    "properties": {"iol_cylinder": {"not": {"enum": [0]}}},
+                },
+                {"properties": {"iol_cylinder": {"enum": [0]}}},
+            ]
+        },
+    ]
     specification["components"]["schemas"]["HaigisToricEye"] = {
         "type": "object",
         "description": (
@@ -611,6 +691,7 @@ def get_openapi_spec():
                 "description": "术前实测 ACD（mm），无默认值",
             },
         },
+        "allOf": toric_conditional_rules,
     }
     schema["allOf"] = [
         {

@@ -1,4 +1,5 @@
 import importlib
+import json
 import sys
 from pathlib import Path
 from types import SimpleNamespace
@@ -372,3 +373,35 @@ def test_openapi_documents_image_extraction_endpoint():
 def test_openapi_toric_uses_canonical_k_names():
     schema = docs.get_openapi_spec()["components"]["schemas"]["ToricEye"]
     assert schema["required"][:4] == ["K1", "K1Axis", "K2", "K2Axis"]
+
+
+def test_openapi_eye_optional_biometry_is_numeric():
+    """LenThickness / WTW 在实现里按浮点解析，文档不能声明成字符串。"""
+    schema = docs.get_openapi_spec()["paths"]["/api/calculate"]["post"]["requestBody"][
+        "content"
+    ]["application/json"]["schema"]
+    for eye_name in ("right_eye", "left_eye"):
+        props = schema["properties"][eye_name]["properties"]
+        for field in ("LenThickness", "WTW"):
+            assert props[field]["type"] == "number", (eye_name, field)
+            assert "string" not in str(props[field])
+
+
+def test_openapi_documents_toric_alias_and_conditional_requirements():
+    """散光别名与 Haigis-T 的条件必填都要在规范里有表达。"""
+    specification = docs.get_openapi_spec()
+    schema = specification["paths"]["/api/calculate-toric"]["post"]["requestBody"][
+        "content"
+    ]["application/json"]["schema"]
+    assert "toric_right_eye" in schema["properties"]
+    assert schema["properties"]["toric_right_eye"]["deprecated"] is True
+    assert {"required": ["toric_right_eye"]} in schema["anyOf"]
+
+    eye_schema = specification["components"]["schemas"]["HaigisToricEye"]
+    rules = json.dumps(eye_schema["allOf"], ensure_ascii=False)
+    for field in (
+        "posterior_cylinder",
+        "total_source",
+        "iol_axis",
+    ):
+        assert field in rules
