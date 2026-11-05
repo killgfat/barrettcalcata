@@ -258,19 +258,21 @@ ULIB 数据只经由下面这条链路被读取，没有其他入口：
 
 ### Web UI 中的晶体选择
 
-非 Barrett 公式（SRK/T、Hoffer Q、Haigis、Haigis-T）在 Web UI 里使用
-**ULIB 晶体选择器**，与 Barrett 模式下的 Barrett 型号下拉相互独立：
+所有公式共用同一个**晶体型号搜索框**，只是候选列表跟着公式换来源：
 
 ```text
-Barrett 模式     -> Barrett 官网型号下拉（18 项）
-其他公式         -> 关键词搜索框 + ULIB 型号列表（304 项）
+Barrett 模式     -> Barrett 官网型号（18 项）
+其他公式         -> 内置 ULIB 型号（304 项）
 ```
 
-- 列表由 `GET /api/iol-models?formula=<公式>` 一次性返回，前端本地过滤，
-  切换公式时不再产生额外请求；
+- 列表由 `GET /api/iol-models?formula=<公式>` 一次性返回，前端本地过滤；
+  在 Barrett 与其他公式之间切换时按来源重新拉取；
 - 支持空格分隔的多关键词（如 `tecnis zcb00` 唯一定位到一款）；
-- 选中型号后自动填入 A 常数、Haigis a0/a1/a2 与 Hoffer Q pACD，
-  这些值随请求显式提交，优先级高于后端的自动映射。
+- **留空表示不指定型号**，直接用下方的 A 常数（取代了原来的
+  「Personal Constant」选项）；
+- 选中型号后：Barrett 把该型号的 A 常数填入输入框（仍可修改，会随请求
+  提交）；其余公式锁定常数输入框，由服务端按型号查表，请求里不再上报
+  这些常数。
 
 ### 与 Barrett 型号的映射
 

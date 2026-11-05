@@ -78,6 +78,37 @@ def test_haigis_constants_inputs_exist_and_are_optional():
     assert "payload.haigis_constants" in page
 
 
+def test_iol_model_selector_is_a_single_combobox():
+    """Barrett 与其他公式共用一个搜索下拉，没有 Personal Constant 选项。"""
+    page = get_page()
+
+    assert 'id="iolModelGroup"' in page
+    assert 'id="iolModelSearch"' in page
+    assert 'id="iolModelList"' in page
+    # 旧的 <select> 与 Personal Constant 选项都应消失。
+    assert '<select id="iolModel"' not in page
+    assert "Personal Constant" not in page
+    assert "barrettModelGroup" not in page
+    assert "ulibModelGroup" not in page
+
+
+def test_empty_iol_model_means_custom_constant():
+    """留空时提交 undefined，让后端按 A 常数计算。"""
+    page = get_page()
+
+    assert "iol_model: selectedModelName || undefined" in page
+    assert "留空则使用下方的 A 常数" in page
+
+
+def test_model_list_source_follows_active_formula():
+    """Barrett 与其他公式的列表来源不同，切换时按来源重新拉取。"""
+    page = get_page()
+
+    assert "activeFormulaSource" in page
+    assert "loadedFormulaSource" in page
+    assert "'/api/iol-models?formula='" in page
+
+
 def test_formula_specific_input_hints_exist():
     page = get_page()
 
