@@ -58,7 +58,11 @@ def get_openapi_spec():
             "/api/calculate": {
                 "post": {
                     "summary": "执行IOL计算",
-                    "description": "提交眼睛参数JSON，计算人工晶体度数。model 为必填的计算模型：barrett_ii_offline（Barrett 离线）、barrett_ii（Barrett 在线）、srkt、hoffer_q、haigis、haigis-toric（本地实现）。haigis-toric 是公开框架近轴实现，完整一手算法尚未核实；每眼额外要求 K1Axis/K2Axis、实测 ACD，常数由请求级 haigis_constants 或命中 ULIB 的 iol_model 提供，输出角膜平面残余散光。参数详见 HaigisToricEye。旧的 formula/mode 字段仅作兼容保留，model 存在时优先。至少提供右眼或左眼其中一组参数。k_index使用真实角膜等效折射率表示。",
+                    "description": (
+                        "提交眼睛参数，计算人工晶体度数。model 必填，决定用哪套公式；"
+                        "至少提供一只眼的参数。iol_model 命中内置 ULIB 时由型号决定"
+                        "常数。各公式的算法、常数来源与适用域见 docs/formulas.md。"
+                    ),
                     "requestBody": {
                         "required": True,
                         "content": {
@@ -185,19 +189,12 @@ def get_openapi_spec():
                                         "iol_model": {
                                             "type": "string",
                                             "description": (
-                                                "IOL 晶体型号（可选），如 Alcon SN60WF 或"
-                                                " ULIB 原始型号名。声明且命中内置 ULIB "
-                                                "快照时，常数由型号查表决定："
-                                                "srkt 用优化 A 常数、hoffer_q 用 pACD、"
-                                                "haigis/haigis-toric 用 a0/a1/a2，"
-                                                "请求里同类的 a_constant / "
-                                                "hoffer_q_pacd / haigis_constants "
-                                                "会被屏蔽并在 ignored_inputs 与 "
-                                                "constants_source.ignored_request "
-                                                "中列出；ULIB 缺该项时回落到请求值并给出"
-                                                "警告。Barrett 系列不查 ULIB，仍用"
-                                                "请求中的 a_constant。未声明型号时"
-                                                "完全按请求给出的常数计算。"
+                                                "IOL 晶体型号（可选）。命中内置 ULIB 时"
+                                                "按型号取常数，请求里的 a_constant / "
+                                                "hoffer_q_pacd / haigis_constants 被屏蔽，"
+                                                "详见 constants_source.ignored_request。"
+                                                "未声明或未命中时按请求给的常数计算；"
+                                                "Barrett 系列不查 ULIB。"
                                             ),
                                             "example": "AMO ZCB00",
                                         },
@@ -308,88 +305,37 @@ def get_openapi_spec():
                             "description": "计算成功",
                             "content": {
                                 "application/json": {
+                                    # 只展示结构与关键字段；每眼完整候选表
+                                    # 与 used_inputs 已在字段说明中覆盖。
                                     "example": {
                                         "success": True,
                                         "data": {
                                             "calculation_model": "barrett_ii_offline",
                                             "calculation_model_label": "Barrett Universal II（离线）",
                                             "formula": "barrett",
-                                            "formula_label": "Barrett Universal II",
                                             "mode": "offline",
                                             "model": "BUII-ALK-offline-surrogate/1.0",
-                                            "calibration_report": "docs/calibration_report.md",
-                                            "formula_capabilities": {
-                                                "name": "barrett",
-                                                "label": "Barrett Universal II",
-                                                "modes": ["offline", "online"],
-                                                "required_inputs": ["AL", "K1", "K2"],
-                                                "optional_inputs": [
-                                                    "ACD",
-                                                    "LenThickness",
-                                                    "WTW",
-                                                ],
-                                                "ignored_inputs": [],
-                                                "constants": "A-constant / Lens Factor",
-                                                "supports_toric": True,
+                                            "constants_source": {
+                                                "source": "ulib",
+                                                "ulib_name": "AMO Tecnis 1 ZCB00",
+                                                "applied": ["a_constant"],
+                                                "ignored_request": ["a_constant"],
                                             },
                                             "right_eye": {
-                                                "provided_inputs": {
-                                                    "AL": 23.5,
-                                                    "K1": 43.5,
-                                                    "K2": 44.0,
-                                                    "ACD": 3.2,
-                                                    "Refraction": 0,
-                                                    "LenThickness": 4.6,
-                                                    "WTW": 11.9,
-                                                },
                                                 "used_inputs": {
                                                     "AL": 23.5,
                                                     "K": 43.75,
-                                                    "Refraction": 0,
                                                     "a_constant": 119.3,
-                                                    "k_index": 1.3375,
-                                                    "step": 0.5,
                                                     "ACD": 3.2,
-                                                    "LenThickness": 4.6,
-                                                    "WTW": 11.9,
                                                 },
                                                 "ignored_inputs": [],
+                                                "recommended_power": "20.0",
+                                                "predicted_refraction": -0.25,
                                                 "iol_options": [
                                                     {
                                                         "iol_power": "20.0",
                                                         "optic": None,
                                                         "refraction": "-0.25",
-                                                        "recommended": True,
-                                                    }
-                                                ],
-                                            },
-                                            "left_eye": {
-                                                "provided_inputs": {
-                                                    "AL": 23.3,
-                                                    "K1": 43.8,
-                                                    "K2": 44.2,
-                                                    "ACD": 3.2,
-                                                    "Refraction": 0,
-                                                    "LenThickness": 4.6,
-                                                    "WTW": 11.9,
-                                                },
-                                                "used_inputs": {
-                                                    "AL": 23.3,
-                                                    "K": 44.0,
-                                                    "Refraction": 0,
-                                                    "a_constant": 119.3,
-                                                    "k_index": 1.3375,
-                                                    "step": 0.5,
-                                                    "ACD": 3.2,
-                                                    "LenThickness": 4.6,
-                                                    "WTW": 11.9,
-                                                },
-                                                "ignored_inputs": [],
-                                                "iol_options": [
-                                                    {
-                                                        "iol_power": "20.5",
-                                                        "optic": None,
-                                                        "refraction": "-0.12",
                                                         "recommended": True,
                                                     }
                                                 ],
@@ -675,11 +621,10 @@ def get_openapi_spec():
     specification["components"]["schemas"]["HaigisToricEye"] = {
         "type": "object",
         "description": (
-            "model=haigis-toric 的每眼参数。ACD 必须实测；完整三常数放在"
-            "请求级 haigis_constants。球镜使用前表面平均 K，残余散光在"
-            "角膜平面，axis 为光学强子午线，负柱镜处方轴为 axis+90。"
-            "toric_options 使用推荐轴，residual_astigmatism 使用实际植入轴。"
-            "LT/WTW 不参与计算。完整来源及推导见 docs/formulas.md。"
+            "model=haigis-toric 的每眼参数。ACD 必须实测，三常数放在请求级 "
+            "haigis_constants 或由 iol_model 查表。axis 指光学强子午线，"
+            "负柱镜处方轴为 axis+90。LT/WTW 不参与计算，"
+            "完整约定见 docs/formulas.md。"
         ),
         "required": ["AL", "K1", "K2", "K1Axis", "K2Axis", "ACD"],
         "properties": {
