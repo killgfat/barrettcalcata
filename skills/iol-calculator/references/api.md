@@ -57,8 +57,8 @@
 
     data.calculation_model        实际使用的模型
     data.constants_source.source  "ulib" / "a_constant_conversion" /
-                                  "castrop_constants" / "castrop_elp" /
-                                  "paper_default"
+                                  "explicit_sf" / "castrop_constants" /
+                                  "castrop_elp" / "paper_default"
     data.constants_source.applied          型号提供的字段
     data.constants_source.ignored_request  被型号屏蔽的请求字段
     data.right_eye.recommended_power
@@ -146,6 +146,11 @@ Barrett 官网不可达时 `source` 变成 `barrett_local_map`，`warnings` 说�
      "warnings": [...]}
 
 查询顺序：Barrett 型号映射 → ULIB 原始型号名 → Barrett 官网。
+
+所以 `model=` 和 `iol_model` 都接受 Barrett 的短名：`AMO ZCB00` 会命中
+ULIB 的 `AMO Tecnis 1 ZCB00`，响应里 `name` 回显请求值、`ulib_name`
+给出命中的 ULIB 条目。要确认实际用的是哪条，看 `ulib_name` 和
+`source`；两个都对不上才回落 Barrett 官网。
 
 旧的 `/api/ulib-models` 已移除，改用
 `/api/iol-models?formula=<任意非 Barrett 公式>`。

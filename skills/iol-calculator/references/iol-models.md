@@ -27,6 +27,12 @@ SKILL.md「Castrop 的常数怎么取」处理，从 IOLCon 现取后用
   详见 SKILL.md「常数优先级：型号赢」）。
 - 「备注」列标 `prelim` 的是 ULIB 标记为 preliminary 的条目——
   样本量偏小、参考性较低，用到时应如实告知用户。
+- **pACD 列有 3 款超出请求参数的 0~8 mm 校验**：`Alcon MA60MA (+diopters)`
+  15.94、`(-diopters)` -5.52、`MIRA HI-MY (****)` 9.61。它们能通过
+  `iol_model` 查表使用（服务端不做二次校验），但**手工抄成
+  `hoffer_q_pacd` 传会被 400 拒绝**。这 3 款都超出薄透镜模型适用范围，
+  实际算下去通常报「无法生成 IOL 度数表」；遇到时如实说明，不要硬凑。
+  Holladay 1 的 SF 边界已放宽到 -10~12，正好容得下同批型号的 -7.08/+10.29。
 - **Barrett 系列**（`barrett_ii_offline` / `barrett_ii`）不读本表，
   只用 `a_constant`；表里的 A 常数对 Barrett 仅作换算起点。
 - 公式与常数的对应：SRK/T 用 A 常数；Hoffer Q 用 pACD；

@@ -50,9 +50,6 @@ description: 调用 IOL 计算服务（HTTP API）来产出人工晶体度数的
     # Barrett Toric（在线，可能被官网拒绝）
     python3 scripts/iol.py toric --json '{...}'
 
-    # 确认实例可达
-    python3 scripts/iol.py health
-
 加 `--raw` 输出原始 JSON。
 
 查晶体型号与常数不必调接口：`references/iol-models.md` 是内置的 304 款
@@ -93,11 +90,14 @@ ULIB 型号表，直接查表就能填 `iol_model`。这张表是 2016 年的静
 
 ## 常数优先级：型号赢
 
-这是最容易搞错的地方。**声明了能命中内置 ULIB 的 `iol_model`，请求里的
-`a_constant` / `hoffer_q_pacd` / `holladay1_sf` / `haigis_constants`
-会被静默屏蔽**，
-改用该型号的优化常数。响应里 `constants_source.ignored_request` 和每眼的
-`ignored_inputs` 会列出被丢掉的值。
+这是最容易搞错的地方。**只要 `iol_model` 命中内置 ULIB，服务端就忽略
+请求里同类的 `a_constant` / `hoffer_q_pacd` / `holladay1_sf` /
+`haigis_constants`，改用该型号的内置常数——不会报错，只在响应的
+`constants_source.ignored_request` 和每眼 `ignored_inputs` 里体现。**
+
+「命中」指按 Barrett 型号映射或 ULIB 原始名查到条目，所以 Barrett 的短名
+也能用：`AMO ZCB00` 会命中 ULIB 的 `AMO Tecnis 1 ZCB00`。响应的
+`ulib_name` 会回显命中的 ULIB 条目，拿它核对最稳。
 
 所以：
 
