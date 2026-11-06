@@ -110,26 +110,35 @@ Barrett 系列（`barrett_ii_offline` / `barrett_ii`）不读 ULIB，只用 `a_c
 
 内置 ULIB 表是 2016-10-31 停更的快照。IOLCon（https://iolcon.org）是
 Langen-Bucher 团队持续维护的官方优化常数库，同一型号的常数往往已经
-更新过，更可靠。本技能刻意不内置它：IOLCon 条款禁止把数据复制、传播
-或转交第三方，但用户自己查来用于计算是允许的。
+更新过，更可靠。本技能刻意不内置它：IOLCon 条款只允许用户为自身
+计算目的使用数据，禁止复制、传播或转交第三方。
+
+IOLCon 的导出接口匿名可用，不用注册（约 1 MB，等几十秒）：
+
+    curl -s "https://iolcon.org/downloadLenses.php?action=download"
+
+返回 XML，646 款晶体，含 SRK/T A（`<SRKt>`）、Hoffer Q pACD、
+Haigis a0/a1/a2 和 Barrett 的 Lens Factor（`<Barrett><LF>`）。每款有
+nominal（厂商名义值）和 optimized（实测优化值）两组常数，优化的只有
+部分型号有数。接口没有按型号名过滤的参数——现场下载整个文件、用
+`grep` 定位目标型号、只取它的三四个数字，用完即弃。
 
 用 `srkt` / `hoffer_q` / `haigis` / `haigis-toric`（Barrett 系列需要
-`a_constant`）且报了晶体型号时，主动建议用户：
+`a_constant`）且报了晶体型号时，主动建议：
 
-1. 自己到 iolcon.org 免费注册登录，搜索该型号；
-2. 读出常数：SRK/T A、Hoffer Q pACD、Haigis a0/a1/a2、Barrett 的
-   Lens Factor；
-3. 用自定义参数传请求（`a_constant` / `hoffer_q_pacd` /
+1. 从上面接口取该型号常数（或让用户自己在 iolcon.org 网页查）；
+2. 用自定义参数传请求（`a_constant` / `hoffer_q_pacd` /
    `haigis_constants`），**不要同时声明 `iol_model`**——会被内置表
    静默屏蔽（见上一节）；
-4. 回复里注明常数来自 IOLCon、哪个型号、什么时候取的。
+3. 回复里注明常数来自 IOLCon、哪个型号、什么时候取的。
 
 用户拿不到 IOLCon 数据时再走内置表（声明 `iol_model`），但要如实
 说明这是 2016 年快照，与现行优化值可能差半档以上。用户手上有厂商
 手册等其他来源的常数，同样走自定义参数。
 
-合规红线：不要把 IOLCon 的表格批量复制进代码、文档或对话；一次
-计算只需要一个型号的三四个数字。
+合规红线：下载接口匿名可用不等于授权再分发——条款 8.1 只允许用户
+为自身计算目的使用数据。不要把导出文件、批量表格或常数快照写进代码、
+文档、缓存或对话；每次现取现用，一次只取一个型号的三四个数字。
 
 ## 读懂返回
 
