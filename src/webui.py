@@ -277,6 +277,7 @@ INDEX_PAGE = """
             <div class="formula-switch" id="formulaSwitch" role="group" aria-label="计算公式">
                 <button type="button" class="formula-button active" data-formula="barrett" aria-pressed="true">Barrett Universal II</button>
                 <button type="button" class="formula-button" data-formula="hoffer_q" aria-pressed="false">Hoffer Q</button>
+                <button type="button" class="formula-button" data-formula="holladay1" aria-pressed="false">Holladay 1</button>
                 <button type="button" class="formula-button" data-formula="srkt" aria-pressed="false">SRK/T</button>
                 <button type="button" class="formula-button" data-formula="haigis" aria-pressed="false">Haigis</button>
                 <button type="button" class="formula-button" data-formula="castrop" aria-pressed="false">Castrop</button>
@@ -325,6 +326,11 @@ INDEX_PAGE = """
                             <label class="inline-constant" for="haigisA2"><span>a2</span><input type="number" id="haigisA2" aria-label="Haigis a2" min="-1" max="1" step="0.001" placeholder="a2"></label>
                         </div>
                         <div class="param-hint formula-constant-hint" id="haigisConstantsNote">Haigis 三常数照抄 IOL Master；不填则由 A 常数近似 a0</div>
+                    </div>
+                    <div class="form-group" id="holladay1SfGroup" hidden>
+                        <label for="holladay1Sf">Holladay 1 SF</label>
+                        <input type="number" id="holladay1Sf" step="0.01" min="-10" max="12" placeholder="留空由 A 常数推导">
+                        <div class="param-hint" id="holladay1SfNote">单位 mm；Surgeon Factor 是公式常数，不是术前 ACD</div>
                     </div>
                     <div class="form-group" id="hofferQPacdGroup" hidden>
                         <label for="hofferQPacd">Hoffer Q pACD</label>
@@ -675,6 +681,7 @@ INDEX_PAGE = """
             'aConstant',
             'haigisA0', 'haigisA1', 'haigisA2',
             'hofferQPacd',
+            'holladay1Sf',
             'castropC', 'castropH', 'castropR', 'castropElp',
         ];
         const LOCKED_PLACEHOLDER = '由所选晶体决定';
@@ -887,7 +894,8 @@ INDEX_PAGE = """
                             patient_name: result.data.patient_name ?? result.data.extracted_data.patient_name,
                             a_constant: result.data.a_constant ?? result.data.extracted_data.a_constant,
                             haigis_constants: result.data.haigis_constants ?? result.data.extracted_data.haigis_constants,
-                            hoffer_q_pacd: result.data.hoffer_q_pacd ?? result.data.extracted_data.hoffer_q_pacd
+                            hoffer_q_pacd: result.data.hoffer_q_pacd ?? result.data.extracted_data.hoffer_q_pacd,
+                            holladay1_sf: result.data.holladay1_sf ?? result.data.extracted_data.holladay1_sf
                           })
                         : result.data;
                     fillFormData(fillData);
@@ -1047,6 +1055,9 @@ INDEX_PAGE = """
             if (data.hoffer_q_pacd !== null && data.hoffer_q_pacd !== undefined) {
                 hofferQPacd.value = formatToTwoDecimals(data.hoffer_q_pacd);
             }
+            if (data.holladay1_sf !== null && data.holladay1_sf !== undefined) {
+                holladay1Sf.value = formatToTwoDecimals(data.holladay1_sf);
+            }
 
             // 同时把 AI 识别出的 K1/K2 及轴位填入散光表单，保持两种计算模式一致。
             const fillToricEye = (eye, eyeData) => {
@@ -1199,6 +1210,8 @@ INDEX_PAGE = """
                     ? readHaigisConstants() : null;
                 const hofferQPacdValue = calculationModel === 'hoffer_q' && !usesModelConstants
                     ? parseFloat(hofferQPacd.value) : NaN;
+                const holladay1SfValue = calculationModel === 'holladay1' && !usesModelConstants
+                    ? parseFloat(holladay1Sf.value) : NaN;
 
                 const payload = {
                     ...formData,
@@ -1209,6 +1222,9 @@ INDEX_PAGE = """
                 }
                 if (Number.isFinite(hofferQPacdValue)) {
                     payload.hoffer_q_pacd = hofferQPacdValue;
+                }
+                if (Number.isFinite(holladay1SfValue)) {
+                    payload.holladay1_sf = holladay1SfValue;
                 }
                 if (calculationModel === 'castrop') {
                     // C/H/R 三项全空时交给后端用论文初值，避免传 null 覆盖。
@@ -1266,6 +1282,9 @@ INDEX_PAGE = """
         const haigisA0 = document.getElementById('haigisA0');
         const haigisA1 = document.getElementById('haigisA1');
         const haigisA2 = document.getElementById('haigisA2');
+        const holladay1SfGroup = document.getElementById('holladay1SfGroup');
+        const holladay1SfNote = document.getElementById('holladay1SfNote');
+        const holladay1Sf = document.getElementById('holladay1Sf');
         const hofferQPacdGroup = document.getElementById('hofferQPacdGroup');
         const hofferQPacdNote = document.getElementById('hofferQPacdNote');
         const haigisConstantsNote = document.getElementById('haigisConstantsNote');
@@ -1290,6 +1309,7 @@ INDEX_PAGE = """
             barrett: 'Barrett 本地/在线均使用 ACD（可选）；本地还使用 LT/WTW（可选），缺失时会警告并降置信度。',
             srkt: 'SRK/T 由 A 常数和 K 自行推导 ACD；填写的 ACD、LT、WTW 会被忽略。',
             hoffer_q: 'Hoffer Q 可使用报告中的 pACD；留空则由 A 常数推导。填写的 ACD、LT、WTW 会被忽略。',
+            holladay1: 'Holladay 1 可使用报告中的 SF；留空则由 A 常数换算（偏差可达 0.5 D）。填写的 ACD、LT、WTW 会被忽略。',
             haigis: 'Haigis 使用实测 ACD；a0/a1/a2 请照抄 IOL Master（不填则用 A 常数近似，可能差 1–3 D）；LT/WTW 会被忽略。',
             castrop: 'Castrop 需要术前 ACD 和晶状体厚度 LT；C/H/R 照抄 IOLCon（留空用论文初值 0.40/0/0）；也可直接填 ELP。A 常数与 WTW 会被忽略。'
         };
@@ -1586,6 +1606,9 @@ INDEX_PAGE = """
             if (model.pacd !== null && model.pacd !== undefined) {
                 parts.push('pACD ' + Number(model.pacd).toFixed(2));
             }
+            if (model.sf !== null && model.sf !== undefined) {
+                parts.push('SF ' + Number(model.sf).toFixed(2));
+            }
             return parts;
         }
 
@@ -1701,10 +1724,13 @@ INDEX_PAGE = """
             // 三常数/单常数跟在 A 常数下方同一个 form-group 里，一起显隐。
             const isHaigis = selectedFormula === 'haigis';
             const isHofferQ = selectedFormula === 'hoffer_q';
+            const isHolladay1 = selectedFormula === 'holladay1';
             haigisConstants.hidden = !isHaigis;
             haigisConstantsNote.hidden = !isHaigis;
             hofferQPacdGroup.hidden = !isHofferQ;
             hofferQPacdNote.hidden = !isHofferQ;
+            holladay1SfGroup.hidden = !isHolladay1;
+            holladay1SfNote.hidden = !isHolladay1;
             castropConstants.hidden = selectedFormula !== 'castrop';
             // Castrop 不用 A 常数，隐藏并解除 required，否则表单无法提交。
             const isCastrop = selectedFormula === 'castrop';
@@ -1809,6 +1835,8 @@ INDEX_PAGE = """
             haigisConstantsNote.hidden = isToric;
             hofferQPacdGroup.hidden = isToric;
             hofferQPacdNote.hidden = isToric;
+            holladay1SfGroup.hidden = isToric;
+            holladay1SfNote.hidden = isToric;
             castropConstants.hidden = isToric;
             syncModelSelectors();
             if (isToric) {
@@ -2199,6 +2227,7 @@ INDEX_PAGE = """
             if (used.a0 !== null && used.a0 !== undefined) parts.push('a0=' + used.a0);
             if (used.a1 !== null && used.a1 !== undefined) parts.push('a1=' + used.a1);
             if (used.a2 !== null && used.a2 !== undefined) parts.push('a2=' + used.a2);
+            if (used.SF !== null && used.SF !== undefined) parts.push('SF=' + used.SF + ' mm');
             // Castrop 的常数与 ELP 来源单独列出，方便与 IOLCon 对照。
             if (used.C !== null && used.C !== undefined) {
                 parts.push('C=' + used.C + ', H=' + used.H + ', R=' + used.R);
@@ -2226,6 +2255,8 @@ INDEX_PAGE = """
                 lines.push('常数来源：论文优化初值 C=0.40/H=0.00/R=0.00（无晶体特异性）');
             } else if (source && source.source === 'a_constant_conversion') {
                 lines.push('常数来源：A 常数换算（非晶体优化常数）');
+            } else if (source && source.source === 'explicit_sf') {
+                lines.push('常数来源：请求中的 Holladay 1 SF（非晶体优化常数）');
             }
             [['右眼', 'right_eye'], ['左眼', 'left_eye']].forEach((item) => {
                 const label = item[0];

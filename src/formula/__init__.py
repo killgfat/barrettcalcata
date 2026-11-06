@@ -6,7 +6,15 @@ API 层不再直接 import 任何具体公式模块。
 
 from __future__ import annotations
 
-from . import barrett, haigis, haigis_toric, hoffer_q, srkt
+from . import (
+    barrett,
+    castrop,
+    haigis,
+    haigis_toric,
+    hoffer_q,
+    holladay1,
+    srkt,
+)
 from .formula import (
     CALCULATION_MODEL_LABELS,
     CALCULATION_MODELS,
@@ -33,6 +41,7 @@ from .formula import (
 from .types import (
     CalculationError,
     CalculationRequest,
+    CastropConstants,
     EyeInput,
     FormulaCapabilities,
     FormulaError,
@@ -47,7 +56,9 @@ _MODULES = {
     "barrett": barrett,
     "srkt": srkt,
     "hoffer_q": hoffer_q,
+    "holladay1": holladay1,
     "haigis": haigis,
+    "castrop": castrop,
     "haigis-toric": haigis_toric,
 }
 
@@ -93,6 +104,7 @@ __all__ = [
     "FORMULA_NAMES",
     "CalculationError",
     "CalculationRequest",
+    "CastropConstants",
     "EyeInput",
     "FormulaCapabilities",
     "FormulaError",

@@ -28,6 +28,7 @@ def extracted_data(**overrides):
         "a_constant": 118.7,
         "haigis_constants": None,
         "hoffer_q_pacd": None,
+        "holladay1_sf": None,
         "right_eye": eye_data(),
         "left_eye": eye_data(),
     }
@@ -46,6 +47,30 @@ def test_clean_data_preserves_haigis_constants_and_hoffer_q_pacd():
 
     assert cleaned["haigis_constants"] == {"a0": 1.8, "a1": 0.4, "a2": 0.1}
     assert cleaned["hoffer_q_pacd"] == 5.25
+
+
+def test_clean_data_preserves_holladay1_sf():
+    worker = WorkerAI(api_key="test")
+    cleaned = worker._validate_and_clean_data(extracted_data(holladay1_sf="2.02 mm"))
+
+    assert cleaned["holladay1_sf"] == 2.02
+
+
+def test_clean_data_accepts_ulib_sf_extremes():
+    """ULIB 实测跨度是 -7.08~10.29，清洗边界不能比它更窄。"""
+    worker = WorkerAI(api_key="test")
+
+    for sf in (-7.08, 10.29):
+        cleaned = worker._validate_and_clean_data(extracted_data(holladay1_sf=sf))
+        assert cleaned["holladay1_sf"] == sf
+
+
+def test_clean_data_drops_out_of_range_holladay1_sf():
+    worker = WorkerAI(api_key="test")
+
+    for bad in (12.5, -10.5, "abc", None):
+        cleaned = worker._validate_and_clean_data(extracted_data(holladay1_sf=bad))
+        assert cleaned["holladay1_sf"] is None
 
 
 def test_clean_data_rejects_incomplete_haigis_constants():

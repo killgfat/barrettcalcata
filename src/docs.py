@@ -191,7 +191,8 @@ def get_openapi_spec():
                                             "description": (
                                                 "IOL 晶体型号（可选）。命中内置 ULIB 时"
                                                 "按型号取常数，请求里的 a_constant / "
-                                                "hoffer_q_pacd / haigis_constants 被屏蔽，"
+                                                "hoffer_q_pacd / holladay1_sf / "
+                                                "haigis_constants 被屏蔽，"
                                                 "详见 constants_source.ignored_request。"
                                                 "未声明或未命中时按请求给的常数计算；"
                                                 "Barrett 系列不查 ULIB。"
@@ -213,7 +214,9 @@ def get_openapi_spec():
                                                 "barrett_ii",
                                                 "srkt",
                                                 "hoffer_q",
+                                                "holladay1",
                                                 "haigis",
+                                                "castrop",
                                                 "haigis-toric",
                                             ],
                                             "description": (
@@ -236,7 +239,9 @@ def get_openapi_spec():
                                                 "barrett",
                                                 "srkt",
                                                 "hoffer_q",
+                                                "holladay1",
                                                 "haigis",
+                                                "castrop",
                                                 "haigis-toric",
                                             ],
                                             "default": "barrett",
@@ -259,6 +264,21 @@ def get_openapi_spec():
                                             "minimum": 0.0,
                                             "maximum": 8.0,
                                         },
+                                        "holladay1_sf": {
+                                            "type": "number",
+                                            "format": "float",
+                                            "description": (
+                                                "仅 model=holladay1 可用的 Surgeon Factor"
+                                                "（SF，mm）。留空则由 A 常数按厂商标准关系"
+                                                " SF=0.5663*A-65.60 换算；声明命中 ULIB 的"
+                                                " iol_model 时由型号提供 SF，本字段被屏蔽。"
+                                                "给出 SF 时 a_constant 不再参与计算。"
+                                                "范围按 ULIB 实测跨度取 -10~12。"
+                                            ),
+                                            "minimum": -10.0,
+                                            "maximum": 12.0,
+                                            "example": 1.84,
+                                        },
                                         "haigis_constants": {
                                             "type": "object",
                                             "description": (
@@ -273,6 +293,90 @@ def get_openapi_spec():
                                                 "a2": {"type": "number"},
                                             },
                                             "required": ["a0", "a1", "a2"],
+                                        },
+                                        "castrop_constants": {
+                                            "type": "object",
+                                            "description": (
+                                                "仅 model=castrop 可用。C/H/R 取自 IOLCon 的 "
+                                                "Castrop(C / H / R) 列。ULIB 快照（2016-10-31 停更）"
+                                                "不含这三列，所以选了 iol_model 也不会覆盖本字段。"
+                                                "留空时用论文优化初值 C=0.40/H=0.00/R=0.00，"
+                                                "结果标记为低置信度。"
+                                            ),
+                                            "properties": {
+                                                "C": {
+                                                    "type": "number",
+                                                    "minimum": 0.2,
+                                                    "maximum": 0.6,
+                                                    "description": "晶状体厚度比例系数，典型 0.35~0.44",
+                                                },
+                                                "H": {
+                                                    "type": "number",
+                                                    "minimum": -1.0,
+                                                    "maximum": 1.0,
+                                                    "description": "IOL 主平面相对晶状体赤道面的轴向偏移（mm）",
+                                                },
+                                                "R": {
+                                                    "type": "number",
+                                                    "minimum": -1.0,
+                                                    "maximum": 1.0,
+                                                    "description": (
+                                                        "折算到屈光度的系统偏移（D），"
+                                                        "求解时以 target-R 进入光学链"
+                                                    ),
+                                                },
+                                            },
+                                            "required": ["C", "H", "R"],
+                                            "example": {"C": 0.424, "H": -0.312, "R": 0.077},
+                                        },
+                                        "castrop_elp": {
+                                            "type": "number",
+                                            "minimum": 2.0,
+                                            "maximum": 12.0,
+                                            "description": (
+                                                "仅 model=castrop 可用。直接给出 ELP（mm，自角膜前顶点"
+                                                "量到 IOL 主平面），给出后不再由 C/H 与 ACD/LT 推导；"
+                                                "R 仍按 castrop_constants 作用于目标屈光度。"
+                                            ),
+                                        },
+                                        "castrop_elp_model": {
+                                            "type": "string",
+                                            "enum": [
+                                                "acd_lt",
+                                                "regression",
+                                                "regression_no_r",
+                                            ],
+                                            "default": "acd_lt",
+                                            "description": (
+                                                "仅 model=castrop 且未给 castrop_elp 时生效，"
+                                                "对应 IOLCon 的 ELP calculation 三个选项："
+                                                "acd_lt = ACD + C·LT + H（论文 2021 原式）；"
+                                                "regression = 0.045·AL + 0.761·ACD - 0.042·r + C·LT + H；"
+                                                "regression_no_r = 0.036·AL + 0.753·ACD + C·LT + H。"
+                                            ),
+                                        },
+                                        "castrop_cct": {
+                                            "type": "number",
+                                            "minimum": 0.3,
+                                            "maximum": 0.9,
+                                            "description": "仅 model=castrop 可用。中央角膜厚度（mm），默认 0.55。",
+                                        },
+                                        "castrop_posterior_ratio": {
+                                            "type": "number",
+                                            "minimum": 0.6,
+                                            "maximum": 0.95,
+                                            "description": (
+                                                "仅 model=castrop 可用。角膜后/前表面半径比，"
+                                                "默认 6.4/7.77≈0.8237（论文给定值）。"
+                                            ),
+                                        },
+                                        "castrop_al_correction": {
+                                            "type": "boolean",
+                                            "default": True,
+                                            "description": (
+                                                "仅 model=castrop 可用。是否用 Cooke 回归把光学眼轴"
+                                                "换算为等效分段眼轴（默认开启，与论文一致）。"
+                                            ),
                                         },
                                     },
                                     "required": ["model"],
@@ -441,6 +545,10 @@ def get_openapi_spec():
                         "官网型号清单（官网不可达时降级到内置映射表并用 "
                         "source=barrett_local_map 与 warnings 标明），"
                         "其余公式直接读内置 ULIB 快照。"
+                        "formula=castrop 是例外：ULIB 快照（2016-10-31 停更）"
+                        "不含该 2021 年公式的 C/H/R，因此返回空 models、"
+                        "source=none 与 constants_available=false，常数请用 "
+                        "castrop_constants 或 castrop_elp 传入。"
                         "带 model 时返回单个型号的常数。两者同时给出时以 model "
                         "优先。都不给时按 Barrett 返回列表，保持向后兼容。"
                     ),
@@ -450,8 +558,9 @@ def get_openapi_spec():
                             "in": "query",
                             "required": False,
                             "description": (
-                                "barrett / srkt / hoffer_q / haigis / "
-                                "haigis-toric；也接受 barrett_ii 与 "
+                                "barrett / srkt / hoffer_q / holladay1 / "
+                                "haigis / castrop / haigis-toric；也接受 "
+                                "barrett_ii 与 "
                                 "barrett_ii_offline 这类计算模型名"
                             ),
                             "schema": {"type": "string"},

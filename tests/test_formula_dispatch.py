@@ -107,6 +107,144 @@ def test_hoffer_q_marks_measured_acd_as_ignored():
     assert eye["ignored_inputs"] == ["ACD", "LenThickness", "WTW"]
 
 
+def test_holladay1_marks_measured_acd_as_ignored():
+    body = reference_body()
+    body.pop("model", None)
+    body["formula"] = "holladay1"
+    data = run_calculation(body)
+
+    eye = data["right_eye"]
+    assert eye["used_inputs"]["ACD"] is None
+    assert eye["ignored_inputs"] == ["ACD", "LenThickness", "WTW"]
+    assert any("未提供晶体专属 SF" in warning for warning in eye["warnings"])
+
+
+def test_holladay1_uses_request_sf_and_ignores_a_constant():
+    body = reference_body()
+    body.pop("model", None)
+    body["formula"] = "holladay1"
+    body["holladay1_sf"] = 1.84
+    data = run_calculation(body)
+
+    eye = data["right_eye"]
+    assert eye["used_inputs"]["SF"] == 1.84
+    assert eye["used_inputs"]["a_constant"] is None
+    assert "a_constant" in eye["ignored_inputs"]
+    assert "SF=1.84 mm" in eye["constants"]
+    assert eye["warnings"] == []
+
+
+def test_holladay1_sf_is_rejected_for_other_formulas():
+    body = reference_body()
+    body["holladay1_sf"] = 1.84
+    with pytest.raises(InputValidationError, match="holladay1_sf"):
+        CalculationRequest.from_mapping(body)
+
+
+def test_holladay1_sf_out_of_range_is_rejected():
+    # 边界必须容得下 ULIB 的实测跨度（-7.08~10.29 mm），否则型号查表拿到的
+    # SF 会被自家校验拒掉；超高度数晶体正是那两条极值。
+    body = reference_body()
+    body.pop("model", None)
+    body["formula"] = "holladay1"
+    for bad in (12.5, -10.5):
+        body["holladay1_sf"] = bad
+        with pytest.raises(InputValidationError, match="holladay1_sf"):
+            CalculationRequest.from_mapping(body)
+
+
+@pytest.mark.parametrize("sf", [-7.08, 10.29])
+def test_holladay1_accepts_the_ulib_sf_extremes(sf):
+    """ULIB 里 Alcon MA60MA 正负度数两版的 SF 就是这两个极值。"""
+    body = reference_body()
+    body.pop("model", None)
+    body["formula"] = "holladay1"
+    body["holladay1_sf"] = sf
+
+    request = CalculationRequest.from_mapping(body)
+    assert request.holladay1_sf == sf
+
+
+def test_holladay1_model_reads_surgeon_factor_from_ulib_snapshot():
+    """型号命中 ULIB 时 SF 直接来自快照，与手工传 holladay1_sf 等价。"""
+    by_model = run_calculation(
+        {
+            "right_eye": {"AL": 23.5, "K1": 43.5, "K2": 44.0},
+            "model": "holladay1",
+            "iol_model": "AMO ZCB00",
+        }
+    )
+    by_value = run_calculation(
+        {
+            "right_eye": {"AL": 23.5, "K1": 43.5, "K2": 44.0},
+            "model": "holladay1",
+            "holladay1_sf": 2.02,
+        }
+    )
+
+    assert by_model["right_eye"]["used_inputs"]["SF"] == 2.02
+    assert (
+        by_model["right_eye"]["recommended_power"]
+        == by_value["right_eye"]["recommended_power"]
+    )
+    assert by_model["right_eye"]["elp"] == by_value["right_eye"]["elp"]
+    # 型号路径没有「未提供 SF」的兜底警告。
+    assert by_model["right_eye"]["warnings"] == []
+
+
+def test_holladay1_explicit_sf_reports_its_own_constant_source():
+    """显式 SF 既没查表也没换算，来源不能写成 A 常数换算。"""
+    data = run_calculation(
+        {
+            "right_eye": {"AL": 23.5, "K1": 43.5, "K2": 44.0},
+            "model": "holladay1",
+            "holladay1_sf": 1.84,
+        }
+    )
+
+    source = data["constants_source"]
+    assert source["source"] == "explicit_sf"
+    assert source["applied"] == ["holladay1_sf"]
+    assert "1.84" in source["note"]
+    # 有晶体专属 SF 时不应再降置信度。
+    assert data["right_eye"]["confidence"] == "OK"
+    assert data["right_eye"]["warnings"] == []
+
+
+def test_holladay1_without_sf_still_reports_a_constant_conversion():
+    """没给 SF 也没型号时，才是真正的 A 常数换算路径。"""
+    data = run_calculation(
+        {
+            "right_eye": {"AL": 23.5, "K1": 43.5, "K2": 44.0},
+            "model": "holladay1",
+            "a_constant": 118.7,
+        }
+    )
+
+    assert data["constants_source"]["source"] == "a_constant_conversion"
+    assert data["right_eye"]["confidence"] == "LOW_CONFIDENCE"
+    assert any("SF" in w for w in data["right_eye"]["warnings"])
+
+
+def test_holladay1_model_uses_ulib_surgeon_factor():
+    """声明命中 ULIB 的型号时，SF 由型号给出并屏蔽请求中的 A 常数。"""
+    body = reference_body()
+    body["model"] = "holladay1"
+    body["iol_model"] = "AMO ZCB00"
+    data = run_calculation(body)
+
+    source = data["constants_source"]
+    assert source["source"] == "ulib"
+    assert "holladay1_sf" in source["applied"]
+    assert "a_constant" in source["ignored_request"]
+
+    # AMO ZCB00 在 ULIB 中的优化 SF 为 2.02 mm。
+    eye = data["right_eye"]
+    assert eye["used_inputs"]["SF"] == 2.02
+    assert eye["used_inputs"]["a_constant"] is None
+    assert "a_constant" in eye["ignored_inputs"]
+
+
 def test_all_formula_tables_are_ascending_by_iol_power():
     for formula_name in formula.FORMULA_NAMES:
         body = reference_body()

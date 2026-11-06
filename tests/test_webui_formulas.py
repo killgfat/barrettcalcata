@@ -34,7 +34,7 @@ def test_formula_switch_is_a_segmented_control_under_mode_switch():
     assert 'class="formula-switch" id="formulaSwitch"' in page
     assert page.index('id="sphericalModeButton"') < page.index('id="formulaSwitch"')
     assert page.index('id="formulaSwitch"') < page.index('id="executionModeControls"')
-    for formula in ("barrett", "hoffer_q", "srkt", "haigis"):
+    for formula in ("barrett", "hoffer_q", "holladay1", "srkt", "haigis"):
         assert 'data-formula="' + formula + '"' in page
 
 
@@ -54,7 +54,7 @@ def test_default_formula_is_barrett_and_default_mode_is_online():
 def test_formula_options_cover_all_supported_formulas():
     page = get_page()
 
-    for label in ("Barrett Universal II", "Hoffer Q", "SRK/T", "Haigis"):
+    for label in ("Barrett Universal II", "Hoffer Q", "Holladay 1", "SRK/T", "Haigis"):
         assert label in page
 
 
@@ -85,7 +85,12 @@ def test_formula_constants_follow_a_constant_and_precede_k_index():
 
     between = page[page.index('id="aConstantHint"') :]
     between = between[: between.index('id="kIndex"')]
-    for group_id in ("haigisConstants", "hofferQPacdGroup", "castropConstants"):
+    for group_id in (
+        "haigisConstants",
+        "holladay1SfGroup",
+        "hofferQPacdGroup",
+        "castropConstants",
+    ):
         assert f'id="{group_id}"' in between
 
 
@@ -137,6 +142,7 @@ def test_locking_uses_shared_helper_for_a_constant_and_formula_constants():
     assert "'aConstant'," in page
     assert "'haigisA0', 'haigisA1', 'haigisA2'," in page
     assert "'hofferQPacd'," in page
+    assert "'holladay1Sf'," in page
     assert "'castropC', 'castropH', 'castropR', 'castropElp'," in page
     assert "const LOCKED_PLACEHOLDER = '由所选晶体决定';" in page
     assert "function setFormulaConstantsLocked(locked)" in page
@@ -178,6 +184,7 @@ def test_formula_specific_input_hints_exist():
 
     assert "SRK/T 由 A 常数和 K 自行推导 ACD" in page
     assert "Hoffer Q 可使用报告中的 pACD" in page
+    assert "Holladay 1 可使用报告中的 SF" in page
     assert "Haigis 使用实测 ACD" in page
     assert "Barrett 本地/在线均使用 ACD" in page
 
@@ -266,6 +273,45 @@ def test_ai_formula_constants_are_filled_and_submitted():
     assert "haigisA0.value = Number(constants.a0).toFixed(3)" in page
     assert "data.hoffer_q_pacd" in page
     assert "payload.hoffer_q_pacd = hofferQPacdValue" in page
+    assert "data.holladay1_sf" in page
+    assert "payload.holladay1_sf = holladay1SfValue" in page
+
+
+def test_holladay1_sf_input_mirrors_hoffer_q_pacd():
+    """SF 是单个公式常数，结构与 pACD 一致：标签在上、整行输入框在下。"""
+    page = get_page()
+
+    group = page[page.index('id="holladay1SfGroup"') :]
+    group = group[: group.index("</div>\n                    </div>")]
+    assert 'class="inline-constant"' not in group
+    assert '<label for="holladay1Sf">Holladay 1 SF</label>' in group
+    assert 'id="holladay1Sf"' in group
+    assert 'class="param-hint"' in group
+    # 边界与后端 holladay1.SF_MIN/SF_MAX 对齐，容得下 ULIB 的 -7.08~10.29。
+    assert 'step="0.01" min="-10" max="12"' in group
+
+
+def test_holladay1_sf_is_locked_and_hidden_like_other_constants():
+    """型号已声明时 SF 由后端查表；切到其它公式/散光模式时隐藏。"""
+    page = get_page()
+
+    assert "const holladay1Sf = document.getElementById('holladay1Sf');" in page
+    # 散光模式下隐藏
+    assert "holladay1SfGroup.hidden = isToric;" in page
+    # 非散光模式下按公式显隐
+    assert "holladay1SfGroup.hidden = !isHolladay1;" in page
+    # 型号常数摘要里要显示 SF，用户才知道查到了哪个值
+    assert "parts.push('SF ' + Number(model.sf).toFixed(2));" in page
+    # 结果摘要里也要能读出实际使用的 SF
+    assert "parts.push('SF=' + used.SF + ' mm');" in page
+
+
+def test_explicit_sf_source_is_rendered_in_summary():
+    """显式 SF 的来源与 A 常数换算不是一回事，摘要要分开写。"""
+    page = get_page()
+
+    assert "source.source === 'explicit_sf'" in page
+    assert "请求中的 Holladay 1 SF（非晶体优化常数）" in page
 
 
 def test_page_does_not_claim_official_paper_implementation():

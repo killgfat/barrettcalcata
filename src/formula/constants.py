@@ -228,6 +228,7 @@ def list_models():
                 ),
                 "haigis": list(entry.haigis) if entry.haigis else None,
                 "pacd": entry.pacd,
+                "sf": entry.sf,
                 "samples": entry.samples,
                 "preliminary": entry.preliminary,
             }

@@ -4,6 +4,8 @@ import re
 
 import httpx
 
+from formula.holladay1 import SF_MAX, SF_MIN
+
 
 class WorkerAI:
     def __init__(
@@ -274,6 +276,7 @@ class WorkerAI:
                 '  "a_constant": 数值或null,\\n'
                 '  "haigis_constants": {"a0": 数值或null, "a1": 数值或null, "a2": 数值或null},\\n'
                 '  "hoffer_q_pacd": 数值或null,\\n'
+                '  "holladay1_sf": 数值或null,\\n'
                 '  "right_eye": {\\n'
                 '    "AL": 数值或null,\\n'
                 '    "K1": 数值或null,\\n'
@@ -296,6 +299,7 @@ class WorkerAI:
                 '      "a_constant": 1-5,\\n'
                 '      "haigis_constants": {"a0": 1-5, "a1": 1-5, "a2": 1-5},\\n'
                 '      "hoffer_q_pacd": 1-5,\\n'
+                '      "holladay1_sf": 1-5,\\n'
                 '      "right_eye": {\\n'
                 '        "AL": 1-5,\\n'
                 '        "K1": 1-5,\\n'
@@ -485,6 +489,7 @@ class WorkerAI:
                 data["hoffer_q_pacd"] = format_to_two_decimal(
                     data.get("hoffer_q_pacd")
                 )
+                data["holladay1_sf"] = format_to_two_decimal(data.get("holladay1_sf"))
 
             def optional_value(name, valid):
                 """公式专属可选字段：只取多次识别一致的值，不纳入多数决统计。
@@ -530,6 +535,10 @@ class WorkerAI:
                 "hoffer_q_pacd",
                 lambda value: value is not None and 0.0 <= float(value) <= 8.0,
             )
+            holladay1_sf = optional_value(
+                "holladay1_sf",
+                lambda value: value is not None and SF_MIN <= float(value) <= SF_MAX,
+            )
             if haigis_constants is not None:
                 haigis_constants = {
                     name: round(float(haigis_constants[name]), 3)
@@ -537,6 +546,8 @@ class WorkerAI:
                 }
             if hoffer_q_pacd is not None:
                 hoffer_q_pacd = round(float(hoffer_q_pacd), 2)
+            if holladay1_sf is not None:
+                holladay1_sf = round(float(holladay1_sf), 2)
 
             # 执行多数决分析
             consensus_data = {
@@ -608,6 +619,7 @@ class WorkerAI:
 
             consensus_data["haigis_constants"] = haigis_constants
             consensus_data["hoffer_q_pacd"] = hoffer_q_pacd
+            consensus_data["holladay1_sf"] = holladay1_sf
 
             # 统计达成共识的字段数量
             total_fields = 0
@@ -921,6 +933,7 @@ class WorkerAI:
                 '  "a_constant": 数值或null,\n'
                 '  "haigis_constants": {"a0": 数值或null, "a1": 数值或null, "a2": 数值或null},\n'
                 '  "hoffer_q_pacd": 数值或null,\n'
+                '  "holladay1_sf": 数值或null,\n'
                 '  "right_eye": {\n'
                 '    "AL": 数值或null,\n'
                 '    "K1": 数值或null,\n'
@@ -943,6 +956,7 @@ class WorkerAI:
                 '      "a_constant": 1-5,\n'
                 '      "haigis_constants": {"a0": 1-5, "a1": 1-5, "a2": 1-5},\n'
                 '      "hoffer_q_pacd": 1-5,\n'
+                '      "holladay1_sf": 1-5,\n'
                 '      "right_eye": {\n'
                 '        "AL": 1-5,\n'
                 '        "K1": 1-5,\n'
@@ -1101,6 +1115,13 @@ class WorkerAI:
                 return None
             return round(number, 2)
 
+        def clean_holladay1_sf(value):
+            """SF 是可选的公式常数；边界与 holladay1.SF_MIN/SF_MAX 一致。"""
+            number = self._clean_number(value)
+            if number is None or not SF_MIN <= number <= SF_MAX:
+                return None
+            return round(number, 2)
+
         def eye_value(eye_data, *names):
             """从眼部结果读取规范字段，并兼容常见轴位别名。"""
             for name in names:
@@ -1118,6 +1139,7 @@ class WorkerAI:
                 data.get("haigis_constants")
             ),
             "hoffer_q_pacd": clean_hoffer_q_pacd(data.get("hoffer_q_pacd")),
+            "holladay1_sf": clean_holladay1_sf(data.get("holladay1_sf")),
             "right_eye": {
                 "AL": format_to_two_decimal(
                     self._clean_number(data.get("right_eye", {}).get("AL"))

@@ -100,11 +100,40 @@ def test_barrett_entries_share_shape_with_ulib_entries():
     """两种来源的条目字段一致，前端可以用同一套渲染逻辑。"""
     barrett_models, _ = list_iol_models("barrett")
     ulib_models, _ = list_iol_models("srkt")
-    common_keys = {"name", "a_constant", "haigis", "pacd", "samples", "preliminary"}
+    common_keys = {
+        "name",
+        "a_constant",
+        "haigis",
+        "pacd",
+        "sf",
+        "samples",
+        "preliminary",
+    }
     for entry in barrett_models:
         assert common_keys <= set(entry)
     for entry in ulib_models:
         assert common_keys <= set(entry)
+
+
+def test_list_exposes_holladay1_sf_for_every_entry():
+    """列表要带上 SF，前端才能在 Holladay 1 下显示型号常数。"""
+    models, info = list_iol_models("holladay1")
+    assert info["source"] == "ulib"
+    by_name = {m["name"]: m for m in models}
+
+    assert by_name["AMO Tecnis 1 ZCB00"]["sf"] == 2.02
+    # 304 款 ULIB 条目都有 SF，没有 null。
+    assert all(m["sf"] is not None for m in models)
+
+    barrett_models, _ = list_iol_models("barrett")
+    zcb00 = {m["name"]: m for m in barrett_models}["AMO ZCB00"]
+    assert zcb00["sf"] == 2.02
+
+
+def test_single_model_lookup_returns_holladay1_sf():
+    body, status = call(model_name="AMO ZCB00")
+    assert status == 200
+    assert body["data"]["holladay1_sf"] == 2.02
 
 
 def test_endpoint_returns_list_for_formula():

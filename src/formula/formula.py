@@ -14,11 +14,13 @@ from . import (
     barrett,
     barrett_online,
     barrett_toric,
+    castrop,
     common,
     constants,
     haigis,
     haigis_toric,
     hoffer_q,
+    holladay1,
     iol_models,
     srkt,
 )
@@ -35,7 +37,9 @@ FORMULA_LABELS = {
     "barrett": "Barrett Universal II",
     "srkt": "SRK/T",
     "hoffer_q": "Hoffer Q",
+    "holladay1": holladay1.LABEL,
     "haigis": "Haigis",
+    "castrop": castrop.LABEL,
     "haigis-toric": haigis_toric.LABEL,
 }
 
@@ -47,7 +51,9 @@ CALCULATION_MODELS = {
     "barrett_ii": ("barrett", "online"),
     "srkt": ("srkt", "offline"),
     "hoffer_q": ("hoffer_q", "offline"),
+    "holladay1": ("holladay1", "offline"),
     "haigis": ("haigis", "offline"),
+    "castrop": ("castrop", "offline"),
     "haigis-toric": ("haigis-toric", "offline"),
 }
 
@@ -56,7 +62,9 @@ CALCULATION_MODEL_LABELS = {
     "barrett_ii": "Barrett Universal II（在线）",
     "srkt": "SRK/T",
     "hoffer_q": "Hoffer Q",
+    "holladay1": holladay1.LABEL,
     "haigis": "Haigis",
+    "castrop": "Castrop",
     "haigis-toric": haigis_toric.LABEL,
 }
 
@@ -102,6 +110,15 @@ CAPABILITIES = {
         ignored_inputs=("ACD", "LenThickness", "WTW"),
         constants="A-constant（推导 pACD）；或 hoffer_q_pacd（报告中的 pACD）",
     ),
+    "holladay1": FormulaCapabilities(
+        name="holladay1",
+        label=holladay1.LABEL,
+        modes=("offline",),
+        required_inputs=("AL", "K1", "K2"),
+        optional_inputs=("holladay1_sf",),
+        ignored_inputs=("ACD", "LenThickness", "WTW"),
+        constants="Surgeon Factor（SF，mm）；或 A 常数按 SF=0.5663*A-65.60 换算",
+    ),
     "haigis": FormulaCapabilities(
         name="haigis",
         label="Haigis",
@@ -113,13 +130,37 @@ CAPABILITIES = {
             "A-constant（推导近似 a0）；a1=0.40，a2=0.10；或 haigis_constants(a0/a1/a2)"
         ),
     ),
+    "castrop": FormulaCapabilities(
+        name="castrop",
+        label=castrop.LABEL,
+        modes=("offline",),
+        # ACD/LT 缺失时有文档化默认值并降置信度（与 Haigis 一致），
+        # 但它们是 ELP 的核心输入，实际使用中应当提供。
+        required_inputs=("AL", "K1", "K2"),
+        optional_inputs=(
+            "ACD",
+            "LenThickness",
+            "castrop_elp",
+            "castrop_cct",
+            "castrop_posterior_ratio",
+        ),
+        # A 常数属于其它公式的 ELP 参数化方式，Castrop 完全不读它。
+        ignored_inputs=("WTW", "a_constant"),
+        constants=(
+            "castrop_constants(C/H/R)，取自 IOLCon；"
+            "或 castrop_elp（直接给出 ELP，mm）；"
+            "缺失时用论文优化初值 C=0.40/H=0.00/R=0.00"
+        ),
+    ),
 }
 
 _MODULES = {
     "barrett": barrett,
     "srkt": srkt,
     "hoffer_q": hoffer_q,
+    "holladay1": holladay1,
     "haigis": haigis,
+    "castrop": castrop,
     "haigis-toric": haigis_toric,
 }
 
@@ -191,6 +232,24 @@ def list_formulas():
     return [CAPABILITIES[name].to_dict() for name in FORMULA_NAMES]
 
 
+def hoffer_q_pacd_source(overrides, request):
+    """返回实际生效的 Hoffer Q pACD；None 表示要由 A 常数推导。
+
+    型号命中 ULIB 时 pACD 来自 overrides，否则用请求里显式给的值。
+    """
+    overrides = overrides or {}
+    return overrides.get("pacd", request.hoffer_q_pacd)
+
+
+def holladay1_sf_source(overrides, request):
+    """返回实际生效的 Holladay 1 SF；None 表示要由 A 常数换算。
+
+    型号命中 ULIB 时 SF 来自 overrides，否则用请求里显式给的值。
+    """
+    overrides = overrides or {}
+    return overrides.get("sf", request.holladay1_sf)
+
+
 def _used_inputs(formula, eye, request, solved, overrides=None):
     """只列出实际参与该公式计算的输入；默认值与覆盖值明确标记。
 
@@ -214,6 +273,38 @@ def _used_inputs(formula, eye, request, solved, overrides=None):
                 "WTW": eye.wtw,
             }
         )
+    elif formula == "castrop":
+        # Castrop 不使用 A 常数：常数是 C/H/R 或直接给出的 ELP。
+        detail = solved.get("castrop", {})
+        used["a_constant"] = None
+        used.update(
+            {
+                "ACD": detail.get("acd", eye.acd),
+                "LenThickness": detail.get("lt", eye.lt),
+                "WTW": None,
+                "C": detail.get("C"),
+                "H": detail.get("H"),
+                "R": detail.get("R"),
+                "ELP": (
+                    round(detail["elp"], 2) if detail.get("elp") is not None else None
+                ),
+                "ELP_source": detail.get("elp_source"),
+                "Pcornea": (
+                    round(detail["p_cornea"], 2)
+                    if detail.get("p_cornea") is not None
+                    else None
+                ),
+                "AL_corrected": (
+                    round(detail["al_corrected"], 2)
+                    if detail.get("al_corrected") is not None
+                    else None
+                ),
+            }
+        )
+        if detail.get("acd_defaulted"):
+            used["ACD_defaulted"] = True
+        if detail.get("lt_defaulted"):
+            used["LenThickness_defaulted"] = True
     elif formula in {"haigis", "haigis-toric"}:
         acd_value = eye.acd
         if acd_value is None:
@@ -242,9 +333,18 @@ def _used_inputs(formula, eye, request, solved, overrides=None):
     else:
         used.update({"ACD": None, "LenThickness": None, "WTW": None})
         if formula == "hoffer_q":
-            pacd_value = overrides.get("pacd", request.hoffer_q_pacd)
+            pacd_value = hoffer_q_pacd_source(overrides, request)
             if pacd_value is not None:
                 used["pACD"] = pacd_value
+                # pACD 与 A 常数是两条互斥的参数化路径：有 pACD 时
+                # A 常数不再参与（与 Haigis 给三常数的处理一致）。
+                used["a_constant"] = None
+        elif formula == "holladay1":
+            sf_value = holladay1_sf_source(overrides, request)
+            if sf_value is not None:
+                used["SF"] = sf_value
+                # 与 Hoffer Q 的 pACD 同理：SF 一旦给出，A 常数不再参与。
+                used["a_constant"] = None
     return used
 
 
@@ -283,6 +383,12 @@ def _build_eye_result(
         "constants" in overrides or request.haigis_constants is not None
     ):
         ignored_inputs.append("a_constant")
+    # Hoffer Q 同理：pACD 一旦给出，A 常数就不再进入计算。
+    if formula == "hoffer_q" and hoffer_q_pacd_source(overrides, request) is not None:
+        ignored_inputs.append("a_constant")
+    # Holladay 1 的 SF 与 A 常数同样是互斥的两条路径。
+    if formula == "holladay1" and holladay1_sf_source(overrides, request) is not None:
+        ignored_inputs.append("a_constant")
     # 型号常数优先时，请求里被屏蔽的同类常数也要如实列出。
     if constants_info is not None:
         ignored_inputs.extend(constants_info.get("ignored_request", []))
@@ -309,6 +415,8 @@ def _build_eye_result(
         "used_inputs": _used_inputs(formula, eye, request, solved, overrides),
         "ignored_inputs": ignored_inputs,
     }
+    if formula == "castrop" and "castrop" in solved:
+        result["castrop_details"] = dict(solved["castrop"])
     if formula == "haigis-toric":
         result["provided_inputs"] = {
             **dict(eye.raw),
@@ -348,6 +456,8 @@ def _resolve_offline_constants(request, formula):
     """
     if formula == "barrett":
         return {}, None
+    if formula == "castrop":
+        return {}, _castrop_constants_info(request)
 
     # 型号无法映射时给出警告：此时 A 常数走的是厂商标准关系换算，
     # 不是晶体优化常数，两种来源的差异可达 0.5 D 以上。
@@ -375,6 +485,16 @@ def _resolve_offline_constants(request, formula):
                 "不是晶体优化常数"
             ),
         }
+        # Holladay 1 的常数是 SF 而不是 A 常数：请求直接给了 SF 时，
+        # 既没有查表也没有换算，说明必须改成对应措辞，否则会误导用户
+        # 以为结果来自 A 常数推导。
+        if formula == "holladay1" and request.holladay1_sf is not None:
+            fallback["source"] = "explicit_sf"
+            fallback["applied"] = ["holladay1_sf"]
+            fallback["note"] = (
+                "未选择晶体型号，使用请求中的 Holladay 1 "
+                f"SF={request.holladay1_sf:.2f} mm（非晶体优化常数）"
+            )
         return {}, fallback
 
     info = {
@@ -405,6 +525,19 @@ def _resolve_offline_constants(request, formula):
         info["warnings"].append(
             f"ULIB 条目 {mapped['ulib_name']} 缺少 A 常数，沿用请求中的 a_constant"
         )
+
+    if formula == "holladay1":
+        ulib_sf = mapped.get("holladay1_sf")
+        if ulib_sf is not None:
+            overrides["sf"] = ulib_sf
+            info["applied"].append("holladay1_sf")
+            if request.holladay1_sf is not None:
+                ignored.append("holladay1_sf")
+        elif request.holladay1_sf is not None:
+            info["warnings"].append(
+                f"ULIB 条目 {mapped['ulib_name']} 缺少 Holladay 1 SF，"
+                "沿用请求中的 holladay1_sf"
+            )
 
     if formula == "hoffer_q":
         ulib_pacd = mapped.get("hoffer_q_pacd")
@@ -437,6 +570,56 @@ def _resolve_offline_constants(request, formula):
             )
 
     return overrides, info
+
+
+def _castrop_constants_info(request):
+    """Castrop 的常数来源说明。
+
+    ULIB 快照 2016-10-31 即停更，而 Castrop 是 2021 年发表的公式，表里
+    不可能有 C/H/R。因此这条路径不查 ULIB，只区分三种来源：
+      castrop_elp        调用方直接给了 ELP（IOLCon 算出的位置）
+      castrop_constants  调用方从 IOLCon 抄了 C/H/R
+      paper_default      两者都没有，公式模块用论文优化初值兜底
+    """
+    if request.castrop_elp is not None:
+        source = "castrop_elp"
+        applied = ["castrop_elp"]
+        note = (
+            "使用调用方直接给出的 ELP（mm），不再由 C/H 与 ACD/LT 推导；"
+            "R 仍按 castrop_constants 作用于目标屈光度"
+        )
+    elif request.castrop_constants is not None:
+        source = "castrop_constants"
+        applied = ["castrop_constants"]
+        note = "C/H/R 取自调用方（IOLCon 的 Castrop 列）"
+    else:
+        source = "paper_default"
+        applied = []
+        note = (
+            "ULIB 快照不含 Castrop 的 C/H/R（该表 2016-10-31 停更，Castrop "
+            "2021 年才发表），使用论文优化初值 C=0.40/H=0.00/R=0.00；"
+            "如需晶体专属常数请从 IOLCon 传入 castrop_constants"
+        )
+    model_name = (
+        str(request.iol_model).strip()
+        if request.iol_model and request.iol_model != "Personal Constant"
+        else ""
+    )
+    return {
+        "source": source,
+        "source_revision": None,
+        "barrett_model": model_name or None,
+        "ulib_name": None,
+        "match": None,
+        "matched_by": None,
+        "samples": None,
+        "preliminary": False,
+        "applied": applied,
+        "ignored_request": [],
+        "warnings": [],
+        "note": note,
+        "ulib_supported": False,
+    }
 
 
 def _calculate_offline(request, formula):
@@ -479,6 +662,23 @@ def _calculate_offline(request, formula):
             calculate_kwargs["constants"] = request.haigis_constants
         elif formula == "hoffer_q":
             calculate_kwargs["pacd"] = request.hoffer_q_pacd
+        elif formula == "holladay1":
+            calculate_kwargs["sf"] = request.holladay1_sf
+        elif formula == "castrop":
+            calculate_kwargs.update(
+                {
+                    "constants": (
+                        request.castrop_constants.to_dict()
+                        if request.castrop_constants is not None
+                        else None
+                    ),
+                    "elp": request.castrop_elp,
+                    "elp_model": request.castrop_elp_model,
+                    "cct": request.castrop_cct,
+                    "posterior_ratio": request.castrop_posterior_ratio,
+                    "al_correction": request.castrop_al_correction,
+                }
+            )
         if formula == "haigis-toric":
             calculate_kwargs.update(
                 {

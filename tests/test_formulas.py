@@ -18,7 +18,9 @@ FORMULA_MODULES = {
     "barrett": formulas.barrett,
     "srkt": formulas.srkt,
     "hoffer_q": formulas.hoffer_q,
+    "holladay1": formulas.holladay1,
     "haigis": formulas.haigis,
+    "castrop": formulas.castrop,
 }
 
 # 本文件验证球镜公式的共同契约；散光所需轴位及三常数另有专门测试。
@@ -168,6 +170,66 @@ def test_hoffer_q_frozen_reference_values():
     )
 
 
+def test_holladay1_frozen_reference_values():
+    # 输入与来源：Holladay 1988，A=118.7 -> SF=0.5663*118.7-65.60=1.6238 mm。
+    # AL=23.5 走 AG=12.5*AL/23.45=12.526 < 13.5 分支；
+    # AL=32.0 走 AG 截断到 13.5 分支。
+    assert formulas.holladay1.calculate(23.5, 44.0)["iol_power_exact"] == pytest.approx(
+        19.5288944156, abs=1e-6
+    )
+    assert formulas.holladay1.calculate(26.0, 42.0)["iol_power_exact"] == pytest.approx(
+        14.1931574682, abs=1e-6
+    )
+    assert formulas.holladay1.calculate(22.0, 44.0)["iol_power_exact"] == pytest.approx(
+        24.7706889787, abs=1e-6
+    )
+    assert formulas.holladay1.calculate(32.0, 44.0)["iol_power_exact"] == pytest.approx(
+        -3.9072598172, abs=1e-6
+    )
+    assert formulas.holladay1.calculate(24.5, 43.0)["iol_power_exact"] == pytest.approx(
+        17.6120724160, abs=1e-6
+    )
+
+
+def test_holladay1_elp_matches_published_geometry():
+    # 论文式：ELP = 0.56 + (rag - sqrt(rag^2 - AG^2/4)) + SF。
+    result = formulas.holladay1.calculate(23.5, 44.0)
+    sf = 0.5663 * 118.7 - 65.60
+    radius = 337.5 / 44.0
+    diameter = 12.5 * 23.5 / 23.45
+    height = radius - math.sqrt(radius * radius - diameter * diameter / 4.0)
+
+    assert result["elp"] == pytest.approx(0.56 + height + sf, abs=1e-9)
+    # 角膜半径不小于 7 mm：K=60 D 时 rag 截断到 7 mm。
+    high_k = formulas.holladay1.calculate(23.5, 60.0)
+    assert high_k["elp"] == pytest.approx(
+        0.56 + (7.0 - math.sqrt(49.0 - diameter * diameter / 4.0)) + sf,
+        abs=1e-9,
+    )
+
+
+def test_holladay1_explicit_sf_overrides_a_constant():
+    # 显式 SF 与 ULIB 优化值是同一条路径：ELP 平移量正好等于 SF 之差。
+    derived = formulas.holladay1.calculate(23.5, 44.0, a_constant=118.7)
+    explicit = formulas.holladay1.calculate(23.5, 44.0, sf=1.84)
+    derived_sf = 0.5663 * 118.7 - 65.60
+
+    assert explicit["elp"] - derived["elp"] == pytest.approx(
+        1.84 - derived_sf, abs=1e-9
+    )
+    assert explicit["warnings"] == []
+    assert "未提供晶体专属 SF" in derived["warnings"][0]
+
+
+def test_holladay1_target_is_applied_through_corneal_plane():
+    # 目标屈光度只进入光学部分，ELP 不变；dP/dRx 应为负、量级约 1 D/D。
+    low = formulas.holladay1.calculate(23.5, 44.0, target=-1.0)["iol_power_exact"]
+    high = formulas.holladay1.calculate(23.5, 44.0, target=1.0)["iol_power_exact"]
+    derivative = (high - low) / 2.0
+
+    assert -1.8 < derivative < -0.8
+
+
 def test_haigis_frozen_reference_value():
     # 输入与来源：Haigis 2000 三常数（a1=0.4, a2=0.1），
     # A=118.7 -> a0=1.7143，实测 ACD=3.2 mm，target=0。
@@ -212,18 +274,22 @@ def test_normalize_formula_accepts_defaults_and_case():
         "barrett",
         "srkt",
         "hoffer_q",
+        "holladay1",
         "haigis",
+        "castrop",
         "haigis-toric",
     )
 
 
 def test_normalize_formula_rejects_unknown_name():
     with pytest.raises(ValueError, match="formula 只支持"):
-        formulas.normalize_formula("holladay1")
+        formulas.normalize_formula("holladay2")
 
 
 def test_get_formula_label_returns_display_name():
     assert formulas.get_formula_label("barrett") == "Barrett Universal II"
     assert formulas.get_formula_label("srkt") == "SRK/T"
     assert formulas.get_formula_label("hoffer_q") == "Hoffer Q"
+    assert formulas.get_formula_label("holladay1") == "Holladay 1"
     assert formulas.get_formula_label("haigis") == "Haigis"
+    assert formulas.get_formula_label("castrop") == "Castrop"

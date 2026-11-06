@@ -14,13 +14,16 @@ src/formula/formula.py 负责计算模型解析、能力检查、单双眼编排
 | barrett_ii | Barrett 官网适配器 | 按官网表单转发 | Barrett 官网 |
 | srkt | SRK/T | AL、K、A 常数 | 本地，零网络 |
 | hoffer_q | Hoffer Q | AL、K、A 常数/pACD | 本地，零网络 |
+| holladay1 | Holladay 1 | AL、K、A 常数/SF | 本地，零网络 |
 | haigis | Haigis | AL、K、ACD、a0/a1/a2 | 本地，零网络 |
+| castrop | Castrop | AL、K、ACD、LT、C/H/R（或直接给 ELP） | 本地，零网络 |
 | haigis-toric | Haigis-T 公开框架近轴实现 | AL、前表面 K/轴位、实测 ACD、三常数；可选 PCA/总散光、SICA、IOL 柱镜/轴位 | 本地，零网络 |
 
 各公式使用各自的光学核心：
 
-- SRK/T 与 Hoffer Q 不使用术前实测 ACD、LT、WTW；
+- SRK/T、Hoffer Q 与 Holladay 1 不使用术前实测 ACD、LT、WTW；
 - Haigis 使用实测 ACD，不使用 LT、WTW；
+- Castrop 同时使用 ACD 与 LT，不使用 WTW 与 A 常数；
 - Haigis 光学部分使用自己的 nC=1.3315；
 - ELP 由术前生物测量决定，与目标屈光度无关；
 - 各公式独立实现，不通过 Barrett 的结果拟合或修正其他公开公式。
@@ -131,6 +134,57 @@ pACD = 0.58357 × A - 63.896
 型号已收录在内置 ULIB 快照时，请求里声明 `iol_model` 即可让服务端
 查表取优化 pACD；不声明型号时才用 `hoffer_q_pacd` 或由 A 常数推导。
 
+## 4a. Holladay 1
+
+实现位置：src/formula/holladay1.py。模型名与公式名均为 `holladay1`，
+只支持 offline。
+
+ELP 由「角膜厚度 + Fyodorov 角膜穹隆高度 + Surgeon Factor」三部分相加，
+是第一个同时用 AL 与 K 预测 ELP 的第三代公式：
+
+```text
+r    = 337.5 / K
+rag  = max(r, 7.0)
+AG   = min(12.5×AL/23.45, 13.5)
+H    = rag - sqrt(rag² - AG²/4)
+aACD = 0.56 + H
+ELP  = aACD + SF
+ALm  = AL + 0.2                      # 视网膜厚度修正
+
+Rc   = target/(1 - 0.012×target)     # 折算到角膜平面
+P    = 1336/(ALm - ELP) - 1336/(1336/(K + Rc) - ELP)
+```
+
+实现保持以下规则：
+
+- `rag` 与 `AG` 的双重截断来自原论文，目的是避免根号内出现负数：
+  角膜半径不小于 7 mm、角膜直径不大于 13.5 mm；
+- 截断只影响 ELP 推导，光学部分仍使用原始 AL 与 K；
+- ELP 在 AL≈25.32 mm 附近取极大值，K 超过 48.25 D 后 ELP 不再增长；
+- 目标屈光度只进入光学部分，不改变患者 ELP；预测屈光度按同一聚散度式反解。
+
+SF（Surgeon Factor，mm）是 Holladay 1 自己的晶体常数，量纲与物理含义都
+不同于 SRK/T 的 A 常数和 Hoffer Q 的 pACD，三者不可互换。常数来源：
+
+1. **型号**：请求声明了命中 ULIB 的 `iol_model` 时，服务端查该晶体的
+   优化 SF 并直接使用。内置快照 304 款全部带 SF 列，`GET /api/iol-models`
+   的列表与单型号查询都会返回 `sf` 字段（列表里叫 `sf`，单型号查询里叫
+   `holladay1_sf`）；
+2. **显式 SF**：未声明型号时才用请求里的 `holladay1_sf`；
+3. **A 常数换算**：两者都没有时按厂商标准关系
+   `SF = 0.5663×A - 65.60` 换算，并给出警告、降低置信度。
+
+SF 的输入范围取 −10~12 mm，而不是按 pACD 的 0~8 收窄：ULIB 实测跨度是
+−7.08 mm（`Alcon MA60MA (-diopters)`）到 10.29 mm
+（`Alcon MA60MA (+diopters)`），收窄会让型号查表拿到的值被自家校验拒掉。
+这两条超高度数晶体的 SF 会让 ELP 落到 14 mm 以上，公式发散并返回
+「无法生成 IOL 度数表」——与 Hoffer Q 用同一批常数时的表现一致，
+不是 Holladay 1 特有的缺陷。
+
+路径 1、2 一旦生效，`a_constant` 不再参与计算，会列入
+`ignored_inputs`。与 Hoffer Q 的 pACD 一样，这个 SF 是**公式常数**，
+不是术前实测的前房深度；实测 ACD、LT、WTW 一律忽略。
+
 ## 5. Haigis
 
 实现位置：src/formula/haigis.py。
@@ -158,6 +212,87 @@ K-index 恢复角膜半径，再计算 Haigis 所需的角膜屈光度。
 
 Haigis 应优先使用实测 ACD。未提供时使用明确的默认值并标记
 ACD_defaulted、LOW_CONFIDENCE；默认值不能解释为患者的真实 ACD。
+
+## 5a. Castrop
+
+实现位置：src/formula/castrop.py。模型名与公式名均为 `castrop`，
+只支持 offline。
+
+模型眼有 4 个折射面：眼镜平面、角膜前表面、角膜后表面、薄 IOL。
+折射率取 n_air=1.0、n_cornea=1.376、n_aqueous=1.336（论文 Methods
+第 1 段）。
+
+```text
+PCA     = (nC-1)/RCA
+PCP     = (n-nC)/RCP
+Pcornea = PCA + PCP - (dC/nC)·PCA·PCP        # 厚透镜，参考主平面
+ELP     = ACD + C·LT + H                     # 论文 2021 原式
+
+Rg      = predSE - R
+Lspec   = Rg/(1 - dVD·Rg)
+Lcornea = Lspec + Pcornea
+Liol    = Lcornea/(1 - (ELP/n)·Lcornea)
+PIOL    = n/(ALcor - ELP) - Liol
+
+ALcor   = 1.23854 + 0.95855·AL - 0.05467·LT   # Cooke 修正
+```
+
+角膜后表面半径与角膜厚度缺失时，按论文用固定比值推算：
+`RCP = RCA×6.4/7.77`（≈0.8237）、`dC = 0.55 mm`。两者都可以通过
+`castrop_posterior_ratio` 与 `castrop_cct` 覆盖。
+
+### 5a.1 三个常数与 ELP 推导方式
+
+C/H/R 是**晶体专属**常数，来源只有 IOLCon 的 `Castrop(C / H / R)` 列。
+ULIB 快照停在 2016-10-31，而 Castrop 2021 年才发表，表里不可能有这三列，
+因此本服务**不**用 `iol_model` 去覆盖 C/H/R（见第 7 节）。
+
+ELP 有三种推导方式，与 IOLCon 的 ELP calculation 下拉一一对应：
+
+| 本服务取值 | IOLCon 选项 | 式子 |
+| --- | --- | --- |
+| `acd_lt`（默认） | with ACD and LT | ACD + C·LT + H |
+| `regression` | with ACD, AL, R and LT | 0.045·AL + 0.761·ACD − 0.042·r + C·LT + H |
+| `regression_no_r` | with ACD, AL and LT | 0.036·AL + 0.753·ACD + C·LT + H |
+
+默认取 `acd_lt`，即论文 2021 原文的 Olsen 式，符合「按论文兜底」的口径。
+后两式出自后续章节的回归，作者目前推荐使用它们；角膜屈光术后或曲率
+不可靠时用 `regression_no_r`。
+
+R（Rauxel）是折算到屈光度的系统偏移，作用于目标屈光度：求解时以
+`target − R` 进入光学链，反解时 `predSE = 光学结果 + R`。这与论文
+公式里的 `(predSE − R)` 一致。
+
+### 5a.2 常数缺失时的兜底
+
+三种情况按优先级处理：
+
+1. **`castrop_elp` 直接给出**：IOLCon 或 AS-OCT 已经算好的 ELP（mm）。
+   给出后不再由 C/H 推导，但 R 仍作用于目标屈光度。
+2. **`castrop_constants` 给出**：使用调用方从 IOLCon 抄来的 C/H/R。
+3. **两者都没有**：用论文常数优化的初始化三元组
+   `C=0.40 / H=0.00 / R=0.00`，结果追加警告并标记 LOW_CONFIDENCE。
+   这组常数**没有晶体特异性**，只能当作占位。
+
+ACD 与 LT 是 ELP 的核心输入。缺失时分别用 3.20 mm 与 4.60 mm 兜底，
+并在 `used_inputs` 中标记 `ACD_defaulted` / `LenThickness_defaulted`。
+
+### 5a.3 输入与输出
+
+| 字段 | 作用 |
+| --- | --- |
+| `right_eye.ACD` / `left_eye.ACD` | 术前前房深度（mm），ELP 的主要输入 |
+| `right_eye.LenThickness` / `left_eye.LenThickness` | 术前晶状体厚度（mm），同时进入 ELP 与 Cooke 修正 |
+| `castrop_constants` | `{C, H, R}`，IOLCon 口径 |
+| `castrop_elp` | 直接指定 ELP（mm，2.0~12.0） |
+| `castrop_elp_model` | ELP 推导方式，见 5a.1 |
+| `castrop_cct` | 中央角膜厚度（mm），默认 0.55 |
+| `castrop_posterior_ratio` | 角膜后/前表面半径比，默认 0.8237 |
+| `castrop_al_correction` | 是否做 Cooke 眼轴修正，默认开启 |
+
+A 常数与 WTW 不参与 Castrop 计算，会列在 `ignored_inputs`。
+每眼结果额外带 `castrop_details`，记录 C/H/R、ELP 及其来源、
+Pcornea、ALcor、实际使用的角膜参数。
 
 ## 6. Haigis-T（Haigis toric）
 
@@ -443,11 +578,15 @@ Lens Factor；不在清单里的晶体走「A 常数 → 自动换算 LF」。UL
 
 ### 7.3 计算时的常数选择规则
 
+> Castrop 是例外：它的常数是 C/H/R，ULIB 快照里没有，见 5a.1。
+> 即使声明了 `iol_model`，Castrop 也不会从 ULIB 取常数。
+
 ```text
 Barrett（离线/在线/Toric）  -> 用自己的 Lens Factor，不读 ULIB
                               （ULIB 表内根本没有 LF 列）
 
-SRK/T、Hoffer Q、Haigis     -> 型号能映射到 ULIB 时用 ULIB 优化常数
+SRK/T、Hoffer Q、Holladay 1、
+Haigis                      -> 型号能映射到 ULIB 时用 ULIB 优化常数
    型号无映射 / 未选型号    -> 退回 A 常数按厂商标准关系换算（并标注来源）
 ```
 
@@ -457,10 +596,12 @@ SRK/T、Hoffer Q、Haigis     -> 型号能映射到 ULIB 时用 ULIB 优化常�
 |---|---|
 | SRK/T | ULIB 优化后的 SRK/T A |
 | Hoffer Q | ULIB 优化后的 pACD |
+| Holladay 1 | ULIB 优化后的 SF |
 | Haigis / Haigis-T | ULIB 的 a0 / a1 / a2 |
 
 **声明了型号就以型号为准**：请求里带了能命中 ULIB 的 `iol_model` 时，
-同类的 `a_constant` / `hoffer_q_pacd` / `haigis_constants` 直接被屏蔽，
+同类的 `a_constant` / `hoffer_q_pacd` / `holladay1_sf` /
+`haigis_constants` 直接被屏蔽，
 不再参与计算；没有声明型号时才按请求给的常数算。ULIB 恰好缺某一项时
 回落到请求值，并在 `warnings` 中说明来源混杂。
 
@@ -471,7 +612,7 @@ Haigis-T 因此有两种给常数的路径：直接给 `haigis_constants`，或�
 
 | 字段 | 含义 |
 |---|---|
-| `source` | `ulib`（型号映射命中）或 `a_constant_conversion`（退回换算） |
+| `source` | `ulib`（型号映射命中）、`a_constant_conversion`（退回换算），或 Castrop 的 `castrop_constants` / `castrop_elp` / `paper_default`（见 5a.2） |
 | `barrett_model` / `ulib_name` | Barrett 型号名与对应的 ULIB 条目名 |
 | `match` | `exact` / `series` |
 | `applied` | 型号提供并实际生效的字段，如 `["a_constant", "hoffer_q_pacd"]` |
@@ -498,7 +639,8 @@ Haigis-T 因此有两种给常数的路径：直接给 `haigis_constants`，或�
 | `a_constant` | 优先取 ULIB 优化后的 SRK/T A；快照缺该值时用名义 A |
 | `haigis_constants` | `[a0, a1, a2]` 优化三常数，可直接填入计算请求 |
 | `hoffer_q_pacd` | Hoffer Q 优化 pACD（mm） |
-| `holladay1_sf` | Holladay 1 SF（本项目未实现 Holladay 1，仅作记录） |
+| `holladay1_sf` | Holladay 1 优化 SF（mm），可直接填入 `holladay1_sf` |
+| `sf` | 列表接口里的同名常数；与 `holladay1_sf` 是同一个数 |
 | `srkt_a` / `srk2_a` | 两种 SRK 的优化 A |
 | `nominal_a` | 厂商名义 A |
 | `samples` / `preliminary` | 优化样本量；小于 50 时原页面标注 prelim。 |
@@ -520,9 +662,12 @@ ULIB 换算器把「优化常数关系」和「厂商标准关系」作为两套
 | 厂商标准关系 | 0.58357·A − 63.896 | 0.62467·A − 72.434 | 0.5663·A − 65.60 |
 | 优化常数关系 | 0.51255·A − 55.677 | 0.5296·A − 61.925 | 0.5114·A − 59.33 |
 
-`hoffer_q.PACD_SLOPE` / `PACD_INTERCEPT` 与 `haigis.A0_SLOPE` /
-`A0_INTERCEPT` 采用的是**厂商标准关系**，这是缺常数时的兜底起点，不是
-优化结果。同一 A 常数可以对应差异很大的优化常数（ULIB 中 A=118.0 对应
+`holladay1.SF_SLOPE` / `SF_INTERCEPT` 取的是**厂商标准关系**，与
+`hoffer_q.PACD_SLOPE`、`haigis.A0_SLOPE` 口径一致。
+
+`hoffer_q.PACD_SLOPE` / `PACD_INTERCEPT`、`haigis.A0_SLOPE` /
+`A0_INTERCEPT` 与 `holladay1.SF_SLOPE` / `SF_INTERCEPT` 采用的是
+**厂商标准关系**，这是缺常数时的兜底起点，不是优化结果。同一 A 常数可以对应差异很大的优化常数（ULIB 中 A=118.0 对应
 15 个不同的 Barrett LF），因此拿 A 常数反推 pACD/a0 只应视为近似。
 
 实测差异（AL 23.5 mm、K 44.0 D、ACD 3.2 mm、target 0）：
@@ -532,10 +677,71 @@ ULIB 换算器把「优化常数关系」和「厂商标准关系」作为两套
 | Haigis | a0=1.714 → 21.5 D | a0=−0.769 → 21.0 D |
 | Hoffer Q | pACD=5.374 → 20.0 D | pACD=5.64 → 20.5 D |
 | SRK/T | A=118.7 → 20.5 D | A=119.0 → 21.0 D |
+| Holladay 1 | SF=1.62 → 19.5 D | SF=2.02 → 20.5 D |
 
 Barrett 的 Lens Factor 同理：`barrett.a_constant_to_lens_factor` 的
 线性式来自四组厂商常数对，ULIB 表本身不提供 LF，IOLCon 才给。需要精确
 LF 时应显式传入，而不是由 A 常数推算。
+
+## 7a. Castrop 的取值口径
+
+Castrop（`castrop`，Langenbucher 2021）与本项目其它公式有一处结构性差异：
+它的三个常数 C/H/R **不在 ULIB 快照里**，因此
+
+- 服务端不提供它的型号列表：`GET /api/iol-models?formula=castrop`
+  返回空 `models`、`source="none"`、
+  `constants_available=false`，并附 warnings 说明原因；
+- Web UI 在 Castrop 下隐藏晶体型号选择器与 A 常数输入；
+- 常数只能来自调用方：
+
+| 来源 | 传法 | `constants_source.source` |
+|---|---|---|
+| IOLCon 的 C/H/R | `castrop_constants`: `{"C":..,"H":..,"R":..}` | `castrop_constants` |
+| IOLCon / AS-OCT 的 ELP | `castrop_elp`: 5.04 | `castrop_elp` |
+| 都没有 | 不传 | `paper_default`（C=0.40/H=0.00/R=0.00，LOW_CONFIDENCE） |
+
+C/H/R 三项必须齐全，缺一项返回 400 —— 半套常数比明说默认值更容易误导。
+
+ELP 推导三选一（`castrop_elp_model`），与 IOLCon 的 ELP calculation 下拉
+对应：`acd_lt`（默认，ACD + C·LT + H）、`regression`（含 AL 与角膜
+半径）、`regression_no_r`（含 AL、不含角膜半径，角膜屈光术后用）。
+
+ACD 与 LT 缺失时分别用 3.20 / 4.60 mm 兜底，并在 `used_inputs` 里标
+`ACD_defaulted` / `LenThickness_defaulted`。眼轴默认按 Cooke 回归
+换算（`castrop_al_correction`，默认 true）。
+
+## 7b. A 常数在四套公式里的不同角色
+
+同样是 `a_constant` 字段，四套公式对它的用法完全不同。区分清楚才不会
+在 `used_inputs` 里误读成"A 常数参与了计算"。
+
+| 公式 | A 常数的作用 | 有专用常数时 |
+|---|---|---|
+| SRK/T | 主参数，`ACD = 0.62467·A - 68.747 + H - 3.336` | 无专用常数可替代 |
+| Hoffer Q | 兜底：`pACD = 0.58357·A - 63.896` | 给 `hoffer_q_pacd` 后 A 不参与 |
+| Haigis | 兜底：由 A 近似 `a0 = 0.62467·A - 72.434`，a1/a2 固定 | 给 `haigis_constants` 后 A 不参与 |
+| Castrop | **不参与**，没有 A → C/H 的换算关系 | 本来就是 C/H/R 或 ELP |
+
+注意 SRK/T 与 Haigis 的斜率同为 0.62467（同一套厂商标准关系，截距不同），
+Hoffer Q 用 0.58357。这三条线性式都是"厂商标准关系"，不是优化常数关系。
+
+Castrop 的三常数连量纲都不同：C 是晶状体厚度的比例（无量纲，0.35~0.44）、
+H 是主平面相对赤道面的轴向偏移（mm，±0.5）、R 是屈光偏移（D）。
+没有任何一条公开线性式能把 A 常数映射到这三个量上，所以本服务不提供
+"由 A 常数估算 C/H/R"。IOLCon 对部分型号标注 "Castrop constants derived
+from Haigis constants"，那是该平台自己的拟合，未在论文中公开，本项目
+既不复刻也不猜测。
+
+### 7b.1 `used_inputs` 与 `ignored_inputs` 的对应
+
+| 场景 | `used_inputs.a_constant` | `ignored_inputs` |
+|---|---|---|
+| `srkt` | 数值 | 不含 `a_constant` |
+| `hoffer_q` 无 pACD | 数值（用于推导 pACD） | 不含 `a_constant` |
+| `hoffer_q` 有 pACD | `null` | 含 `a_constant` |
+| `haigis` 无三常数 | 数值（用于近似 a0） | 不含 `a_constant` |
+| `haigis` 有三常数 | `null` | 含 `a_constant` |
+| `castrop`（任意） | `null` | 含 `a_constant` |
 
 ## 8. 常数、适用域与临床限制
 

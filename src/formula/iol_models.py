@@ -172,6 +172,7 @@ def _barrett_entry(model_name, mapped=None, note=""):
         "a_constant": None,
         "haigis": None,
         "pacd": None,
+        "sf": None,
         "samples": None,
         "preliminary": False,
         "lens_factor": None,
@@ -189,6 +190,7 @@ def _barrett_entry(model_name, mapped=None, note=""):
             "a_constant": mapped.get("a_constant"),
             "haigis": list(haigis) if haigis else None,
             "pacd": mapped.get("hoffer_q_pacd"),
+            "sf": mapped.get("holladay1_sf"),
             "samples": mapped.get("samples"),
             "preliminary": mapped.get("preliminary", False),
             "ulib_name": mapped.get("ulib_name"),
@@ -211,6 +213,25 @@ def list_iol_models(formula=None):
     哪里，warnings 记录降级原因。
     """
     normalized = resolve_model_formula(formula)
+    if normalized == "castrop":
+        # ULIB 快照停在 2016-10-31，Castrop 2021 年才发表，表里没有 C/H/R，
+        # 也就没有可选的晶体条目。返回空列表 + 说明，避免前端拿一批
+        # 查不到常数的型号名去误导用户。
+        return [], {
+            "formula": "castrop",
+            "source": "none",
+            "source_url": None,
+            "source_revision": None,
+            "warnings": [
+                (
+                    "Castrop 的 C/H/R 不在内置 ULIB 快照中，服务端不提供"
+                    "型号列表；请用 castrop_constants 传入 C/H/R，"
+                    "或直接用 castrop_elp 指定 ELP"
+                )
+            ],
+            "constants_available": False,
+        }
+
     if normalized != "barrett":
         models = ulib_constants.list_models()
         return models, {
@@ -219,6 +240,7 @@ def list_iol_models(formula=None):
             "source_url": ulib_constants.ULIB_SOURCE_URL,
             "source_revision": ulib_constants.ULIB_SOURCE_REVISION,
             "warnings": [],
+            "constants_available": True,
         }
 
     # 本地映射表已经记录每个 Barrett 型号对应的 ULIB 条目和未映射原因，
@@ -249,13 +271,23 @@ def list_iol_models(formula=None):
 
 
 # 公式名与计算模型名的对照；两个入口都接受，避免调用方记两套名字。
-FORMULA_NAMES = ("barrett", "srkt", "hoffer_q", "haigis", "haigis-toric")
+FORMULA_NAMES = (
+    "barrett",
+    "srkt",
+    "hoffer_q",
+    "holladay1",
+    "haigis",
+    "castrop",
+    "haigis-toric",
+)
 CALCULATION_MODELS = {
     "barrett_ii_offline": ("barrett", "offline"),
     "barrett_ii": ("barrett", "online"),
     "srkt": ("srkt", "offline"),
     "hoffer_q": ("hoffer_q", "offline"),
+    "holladay1": ("holladay1", "offline"),
     "haigis": ("haigis", "offline"),
+    "castrop": ("castrop", "offline"),
     "haigis-toric": ("haigis-toric", "offline"),
 }
 
@@ -263,7 +295,8 @@ CALCULATION_MODELS = {
 def resolve_model_formula(formula=None):
     """把 model 名或 formula 名统一成公式名。
 
-    接受 `barrett`、`srkt`、`hoffer_q`、`haigis`、`haigis-toric`，
+    接受 `barrett`、`srkt`、`hoffer_q`、`holladay1`、`haigis`、
+    `castrop`、`haigis-toric`，
     也接受 `barrett_ii` / `barrett_ii_offline` 这类计算模型名。空值或无法
     识别的值一律按 Barrett 处理：那是唯一一套依赖官网型号清单的公式，
     退回它的列表比报 400 更有用。

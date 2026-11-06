@@ -213,6 +213,7 @@ async def test_barrett_calculate_offline_rejects_out_of_range_al():
         ("barrett", "Barrett Universal II"),
         ("srkt", "SRK/T"),
         ("hoffer_q", "Hoffer Q"),
+        ("holladay1", "Holladay 1"),
         ("haigis", "Haigis"),
     ],
 )
@@ -244,7 +245,7 @@ async def test_barrett_calculate_rejects_unknown_formula():
     result, status_code = await handler._handle_barrett_calculate(
         {
             "right_eye": {"AL": 23.5, "K1": 43.5, "K2": 44.0},
-            "formula": "holladay1",
+            "formula": "holladay2",
         }
     )
 
@@ -337,7 +338,9 @@ def test_openapi_requires_calculation_model():
         "barrett_ii",
         "srkt",
         "hoffer_q",
+        "holladay1",
         "haigis",
+        "castrop",
         "haigis-toric",
     ]
     assert schema["properties"]["formula"].get("deprecated") is True
@@ -385,6 +388,96 @@ def test_openapi_eye_optional_biometry_is_numeric():
         for field in ("LenThickness", "WTW"):
             assert props[field]["type"] == "number", (eye_name, field)
             assert "string" not in str(props[field])
+
+
+@pytest.mark.asyncio
+async def test_barrett_calculate_accepts_custom_castrop_constants():
+    """POST /api/calculate 必须接受调用方自带的 Castrop C/H/R。"""
+    handler = api.APIHandler(SimpleNamespace())
+
+    result, status_code = await handler._handle_barrett_calculate(
+        {
+            "model": "castrop",
+            "right_eye": {
+                "AL": 23.5,
+                "K1": 43.5,
+                "K2": 44.5,
+                "ACD": 3.2,
+                "LenThickness": 4.6,
+            },
+            "castrop_constants": {"C": 0.424, "H": -0.312, "R": 0.077},
+        }
+    )
+
+    assert status_code == 200
+    data = result["data"]
+    assert data["formula"] == "castrop"
+    assert data["constants_source"]["source"] == "castrop_constants"
+    eye = data["right_eye"]
+    assert eye["used_inputs"]["C"] == 0.424
+    assert eye["used_inputs"]["H"] == -0.312
+    assert eye["used_inputs"]["R"] == 0.077
+    assert eye["warnings"] == []
+
+
+@pytest.mark.parametrize(
+    "constants",
+    [
+        {"C": 0.424},
+        {"C": 0.424, "H": -0.312},
+        {"H": -0.312, "R": 0.077},
+    ],
+)
+@pytest.mark.asyncio
+async def test_barrett_calculate_requires_full_castrop_triplet(constants):
+    """C/H/R 必须三项齐全：半套常数比明说默认值更容易误导。"""
+    handler = api.APIHandler(SimpleNamespace())
+
+    result, status_code = await handler._handle_barrett_calculate(
+        {
+            "model": "castrop",
+            "right_eye": {"AL": 23.5, "K1": 43.5, "K2": 44.5, "ACD": 3.2},
+            "castrop_constants": constants,
+        }
+    )
+
+    assert status_code == 400
+    assert result["error"] == "Bad Request"
+    assert "C/H/R" in result["message"]
+
+
+@pytest.mark.asyncio
+async def test_barrett_calculate_accepts_castrop_elp_override():
+    """IOLCon 已算好 ELP 时可以直接传，不再走 C/H 推导。"""
+    handler = api.APIHandler(SimpleNamespace())
+
+    result, status_code = await handler._handle_barrett_calculate(
+        {
+            "model": "castrop",
+            "right_eye": {"AL": 23.5, "K1": 43.5, "K2": 44.5, "ACD": 3.2},
+            "castrop_elp": 5.25,
+        }
+    )
+
+    assert status_code == 200
+    data = result["data"]
+    assert data["constants_source"]["source"] == "castrop_elp"
+    assert data["right_eye"]["elp"] == pytest.approx(5.25, abs=1e-9)
+    assert data["right_eye"]["used_inputs"]["ELP_source"] == "provided"
+
+
+def test_openapi_documents_castrop_constants():
+    specification = docs.get_openapi_spec()
+    schema = specification["paths"]["/api/calculate"]["post"]["requestBody"]["content"][
+        "application/json"
+    ]["schema"]
+
+    castrop_constants = schema["properties"]["castrop_constants"]
+    assert castrop_constants["required"] == ["C", "H", "R"]
+    assert set(castrop_constants["properties"]) == {"C", "H", "R"}
+    assert castrop_constants["example"] == {"C": 0.424, "H": -0.312, "R": 0.077}
+    assert "castrop_elp" in schema["properties"]
+    assert "castrop" in schema["properties"]["model"]["enum"]
 
 
 def test_openapi_documents_toric_alias_and_conditional_requirements():
