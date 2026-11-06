@@ -1,6 +1,6 @@
 ---
 name: iol-calculator
-version: 1.2.0
+version: 1.2.1
 slug: iol-calculator
 displayName: IOL 人工晶体度数计算
 summary: 调用 IOL 计算服务计算人工晶体度数：Barrett Universal II、SRK/T、Hoffer Q、Holladay 1、Haigis、Castrop 球镜，Barrett Toric / Haigis-T 柱镜与轴位，并按 ULIB 型号查优化常数。
@@ -128,9 +128,25 @@ Langen-Bucher 团队持续维护的官方优化常数库，同一型号的常数
 更新过，更可靠。本技能刻意不内置它：IOLCon 条款只允许用户为自身
 计算目的使用数据，禁止复制、传播或转交第三方。
 
-IOLCon 的导出接口匿名可用，不用注册（约 1 MB，等几十秒）：
+IOLCon 的导出接口匿名可用，不用注册。**必须带 gzip 请求头**，否则慢
+几十倍（实测同一网络：不带压缩 103 秒传 1.09 MB，带压缩 2 秒传 34 KB，
+解压后内容逐字节相同）：
 
-    curl -s "https://iolcon.org/downloadLenses.php?action=download"
+    curl -s --compressed "https://iolcon.org/downloadLenses.php?action=download"
+
+服务端是动态压缩：不主动发 `Accept-Encoding: gzip` 时响应头里连
+`Content-Encoding` 都没有，所以不能用「响应头有没有 gzip」判断，只能
+自己带上请求头。Python 标准库的等价写法：
+
+    import gzip, urllib.request
+    req = urllib.request.Request(url, headers={"Accept-Encoding": "gzip"})
+    resp = urllib.request.urlopen(req, timeout=200)
+    raw = resp.read()                      # 34 KB
+    xml = gzip.decompress(raw) if raw[:2] == b"\x1f\x8b" else raw
+
+判断压缩与否看**首两字节是不是 `\x1f\x8b`**，不要只看响应头。
+注意 `urllib.request.urlopen` 默认不发 `Accept-Encoding`，所以拿到的是
+未压缩体；`requests` 库默认会发，行为不同。
 
 返回 XML，646 款晶体，含 SRK/T A（`<SRKt>`）、Hoffer Q pACD
 （`<HofferQ>`）、Holladay 1 SF（`<Holladay1>`）、Haigis a0/a1/a2
