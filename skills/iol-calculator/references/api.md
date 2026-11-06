@@ -101,6 +101,9 @@ true` 表示多数决未达成，应当让用户核对而不是直接拿去计�
 | `barrett`（默认） | Barrett 官网清单 | 18 |
 | `srkt` / `hoffer_q` / `haigis` / `haigis-toric` | ULIB 快照 | 304 |
 
+ULIB 快照停在 2016-10-31；现行优化常数以 IOLCon（iolcon.org）为准，
+用户可自行获取后以自定义参数传入（见 SKILL.md「常数要新：优先 IOLCON」）。
+
 也接受 `barrett_ii`、`barrett_ii_offline`。响应：
 
     {"success": true,

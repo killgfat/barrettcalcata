@@ -15,7 +15,7 @@ metadata:
       - name: IOL_API_BASE
         required: false
         description: 可选的自部署实例地址；未设置时使用默认公共实例
-description: 调用 IOL 计算服务（HTTP API）来产出人工晶体度数的具体数值——Barrett Universal II、SRK/T、Hoffer Q、Haigis 的球镜计算，Barrett Toric 的柱镜与轴位，以及按晶体型号查优化常数。在下列情形使用：用户给出具体生物测量值（眼轴 AL、角膜曲率 K1/K2、前房深度 ACD、散光轴位、白到白 WTW）并问晶体该放多少度、柱镜选哪档、轴位定在哪；指定了晶体型号要查它的 A 常数 / Haigis a0a1a2 / Hoffer Q pACD；要把计算结果在几个公式之间对比或解释为什么差一档；提到自己部署了一份实例（自定义域名、IOL_API_BASE）想拿它算度数；拿着报告上的某个读数问它该怎么填进计算、会不会影响结果。反过来不需要本技能的场景：纯粹问公式原理、为什么 K 值要用 1.3375 折射率、Haigis 与 Haigis-L 的文献差异、PubMed 上有哪些研究，只是想打开 ULIB 网站看看，或者想让本技能从报告图片里 OCR 出数值——本服务不做图片识别，只接受用户已经读出的数值。
+description: 调用 IOL 计算服务（HTTP API）来产出人工晶体度数的具体数值——Barrett Universal II、SRK/T、Hoffer Q、Haigis 的球镜计算，Barrett Toric 的柱镜与轴位，以及按晶体型号查优化常数。在下列情形使用：用户给出具体生物测量值（眼轴 AL、角膜曲率 K1/K2、前房深度 ACD、散光轴位、白到白 WTW）并问晶体该放多少度、柱镜选哪档、轴位定在哪；指定了晶体型号要查它的 A 常数 / Haigis a0a1a2 / Hoffer Q pACD；要把计算结果在几个公式之间对比或解释为什么差一档；提到自己部署了一份实例（自定义域名、IOL_API_BASE）想拿它算度数；拿着报告上的某个读数问它该怎么填进计算、会不会影响结果。反过来不需要本技能的场景：纯粹问公式原理、为什么 K 值要用 1.3375 折射率、Haigis 与 Haigis-L 的文献差异、PubMed 上有哪些研究，只是想打开 ULIB / IOLCon 网站看看，或者想让本技能从报告图片里 OCR 出数值——本服务不做图片识别，只接受用户已经读出的数值。
 ---
 
 # IOL Calculator
@@ -56,7 +56,8 @@ description: 调用 IOL 计算服务（HTTP API）来产出人工晶体度数的
 加 `--raw` 输出原始 JSON。
 
 查晶体型号与常数不必调接口：`references/iol-models.md` 是内置的 304 款
-ULIB 型号表，直接查表就能填 `iol_model`。要拿服务端的结果（含 Barrett
+ULIB 型号表，直接查表就能填 `iol_model`。这张表是 2016 年的静态快照，
+要最新常数见下文「常数要新：优先 IOLCON」。要拿服务端的结果（含 Barrett
 官网型号）也可以：
 
     curl -s "$IOL_API_BASE/api/iol-models?formula=srkt"
@@ -104,6 +105,31 @@ Barrett 系列（`barrett_ii_offline` / `barrett_ii`）不读 ULIB，只用 `a_c
 
 `haigis-toric` 的常数有两条路：请求级 `haigis_constants`，或命中 ULIB 的
 `iol_model`。都没有会返回 400。
+
+## 常数要新：优先 IOLCON
+
+内置 ULIB 表是 2016-10-31 停更的快照。IOLCon（https://iolcon.org）是
+Langen-Bucher 团队持续维护的官方优化常数库，同一型号的常数往往已经
+更新过，更可靠。本技能刻意不内置它：IOLCon 条款禁止把数据复制、传播
+或转交第三方，但用户自己查来用于计算是允许的。
+
+用 `srkt` / `hoffer_q` / `haigis` / `haigis-toric`（Barrett 系列需要
+`a_constant`）且报了晶体型号时，主动建议用户：
+
+1. 自己到 iolcon.org 免费注册登录，搜索该型号；
+2. 读出常数：SRK/T A、Hoffer Q pACD、Haigis a0/a1/a2、Barrett 的
+   Lens Factor；
+3. 用自定义参数传请求（`a_constant` / `hoffer_q_pacd` /
+   `haigis_constants`），**不要同时声明 `iol_model`**——会被内置表
+   静默屏蔽（见上一节）；
+4. 回复里注明常数来自 IOLCon、哪个型号、什么时候取的。
+
+用户拿不到 IOLCon 数据时再走内置表（声明 `iol_model`），但要如实
+说明这是 2016 年快照，与现行优化值可能差半档以上。用户手上有厂商
+手册等其他来源的常数，同样走自定义参数。
+
+合规红线：不要把 IOLCon 的表格批量复制进代码、文档或对话；一次
+计算只需要一个型号的三四个数字。
 
 ## 读懂返回
 
