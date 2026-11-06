@@ -170,6 +170,8 @@ def print_calculation(body: dict) -> None:
             print("    注意: 该条目样本量偏小（preliminary）")
     elif source.get("source") == "a_constant_conversion":
         print(f"  常数来源: {source.get('note')}")
+    elif source.get("source") == "explicit_sf":
+        print(f"  常数来源: {source.get('note')}")
     elif source.get("source") == "castrop_constants":
         print("  常数来源: 调用方传入的 Castrop C/H/R（IOLCon）")
     elif source.get("source") == "castrop_elp":

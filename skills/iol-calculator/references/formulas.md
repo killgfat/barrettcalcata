@@ -41,8 +41,9 @@ P   = 1336/(ALm-ELP) - 1336/(1336/K' - ELP)
 - 声明命中 ULIB 的 `iol_model` 时用该晶体的优化 SF（快照 304 款全有），
   请求里的 `a_constant` / `holladay1_sf` 被屏蔽；
 - `/api/iol-models` 的列表项带 `sf`，单型号查询带 `holladay1_sf`，
-  前端可直接显示；`references/iol-models.md` 的静态表暂无 SF 列，
-  需要精确值时用接口；
+  `references/iol-models.md` 的静态表也有 SF 列，可直接查；
+- IOLCon 导出 XML 的 `<Holladay1>` 就是优化后的 SF（mm），
+  优先取 optimized，为空才回落 nominal；
 - 不读实测 ACD、LT、WTW；
 - rag/AG 的双重截断会让 ELP 在 AL≈25.32 mm 处达到极大值，
   这是原论文为避免根号内为负而做的限制，不是误差。

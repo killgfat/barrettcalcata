@@ -98,5 +98,15 @@
     "id": 20,
     "query": "Haigis 和 Haigis-L 这两个公式在文献里的区别是什么，各自适用什么人群",
     "should_trigger": false
+  },
+  {
+    "id": 21,
+    "query": "Holladay 1 这个公式里 SF 该填多少，IOLCon 上 ZCB00 的 optimized SF 是多少",
+    "should_trigger": true
+  },
+  {
+    "id": 22,
+    "query": "Holladay 1 和 Hoffer Q 的常数都是毫米，能通用吗",
+    "should_trigger": false
   }
 ]
