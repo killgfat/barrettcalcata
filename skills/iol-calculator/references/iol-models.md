@@ -39,7 +39,10 @@ SKILL.md「Castrop 的常数怎么取」处理，从 IOLCon 现取后用
   Holladay 1 用 SF；Haigis / Haigis-Toric 用 a0/a1/a2。
 - **SF** 列是 Holladay 1 的 Surgeon Factor（mm），可直接作为
   `holladay1_sf` 传进请求，或声明 `iol_model` 让服务端自己取。
-  它与接口里的 `sf` / `holladay1_sf` 是同一个数。注意 SF 与 pACD 量纲
+  它与接口里的 `sf` / `holladay1_sf` 是同一个数。
+  **本表的 SF 与 IOLCon 的 optimized SF 不是同一来源**，数值会差：
+  ZCB00 在本表是 2.02，IOLCon 的 nominal 是 1.96、optimized 是
+  2.0582。本表是 2016 年 ULIB 快照，能拿到 IOLCon 时优先用 optimized。注意 SF 与 pACD 量纲
   相同但含义不同，不能互换：SF 是虹膜平面到 IOL 主平面的距离，
   pACD 是角膜顶点到虹膜平面的距离。
 

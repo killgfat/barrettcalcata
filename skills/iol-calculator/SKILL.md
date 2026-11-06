@@ -137,8 +137,8 @@ IOLCon 的导出接口匿名可用，不用注册（约 1 MB，等几十秒）�
 和 Barrett 的 Lens Factor（`<Barrett><LF>`）。每款有
 nominal（厂商名义值）和 optimized（实测优化值）两组常数。**优先取
 optimized，为空才回落 nominal**：每个 optimized 块都存在，判据是
-它的 `results` 属性大于 0 且对应字段非空；646 款里只有约 150 款
-有优化数据，其余全空。IOLCon 比内置表有价值主要就在这批优化值上，
+它的 `results` 属性大于 0 且对应字段非空；646 款里只有 152 款
+有 Holladay 1 的优化数据（其它公式的条数略有出入），其余全空。IOLCon 比内置表有价值主要就在这批优化值上，
 拿 nominal 前先确认没有 optimized 可用。接口没有按型号名过滤的参数
 ——现场下载整个文件、用 `grep` 定位目标型号、只取它的三四个数字，
 用完即弃。
@@ -172,10 +172,21 @@ SF 是虹膜平面到 IOL 主平面的距离，pACD 是角膜顶点到虹膜平�
 
 1. **IOLCon 的 optimized SF**（最可靠）→ 传 `holladay1_sf`。
    导出 XML 里的字段就叫 `<Holladay1>`，值直接是 SF 毫米数，不需要
-   再做换算。646 款里 nominal 有 526 款、optimized 有 152 款，
-   另有 92 款带独立的 `type="ULIB"` 块；口径同上，**optimized 优先，
-   为空才回落 nominal**。例：`AMO Tecnis 1 ZCB00` 的 nominal 是 1.96、
-   optimized 是 2.0582，差 0.1 mm 就够换半档，别拿 nominal 顶替；
+   再做换算。取值顺序 **optimized → nominal → ULIB**：
+
+   | 块 | 含义 | 有值的款数 |
+   |---|---|---:|
+   | `type="optimized"` | IOLCon 实测优化值，最准 | 152 |
+   | `type="nominal"` | 厂商名义值 | 526 |
+   | `type="ULIB"` | IOLCon 转载的 ULIB 快照 | 92 |
+
+   三者可重叠，所以加起来超过 646。`type="ULIB"` 块的值与我们内置表
+   是同一批数据（实测 MA50BM 2.12、MA60AC 1.9 两边完全一致），
+   所以它只是「IOLCon 帮你也备了一份 ULIB」，优先级最低——有
+   optimized 就别用它。
+
+   例：`AMO Tecnis 1 ZCB00` 的 nominal 是 1.96、optimized 是 2.0582，
+   差 0.1 mm 就够换半档，别拿 nominal 顶替；
 2. **内置 ULIB 快照**（拿不到 IOLCon 时）→ 声明 `iol_model`，304 款全部
    带 SF。静态表 `references/iol-models.md` 的 SF 列可以直接查来填
    `holladay1_sf`，也可以只声明型号让服务端取；但这是 2016 年快照，
