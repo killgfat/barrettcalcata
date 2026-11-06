@@ -119,9 +119,18 @@ IOLCon 的导出接口匿名可用，不用注册（约 1 MB，等几十秒）�
 
 返回 XML，646 款晶体，含 SRK/T A（`<SRKt>`）、Hoffer Q pACD、
 Haigis a0/a1/a2 和 Barrett 的 Lens Factor（`<Barrett><LF>`）。每款有
-nominal（厂商名义值）和 optimized（实测优化值）两组常数，优化的只有
-部分型号有数。接口没有按型号名过滤的参数——现场下载整个文件、用
-`grep` 定位目标型号、只取它的三四个数字，用完即弃。
+nominal（厂商名义值）和 optimized（实测优化值）两组常数。**优先取
+optimized，为空才回落 nominal**：每个 optimized 块都存在，判据是
+它的 `results` 属性大于 0 且对应字段非空；646 款里只有约 150 款
+有优化数据，其余全空。IOLCon 比内置表有价值主要就在这批优化值上，
+拿 nominal 前先确认没有 optimized 可用。接口没有按型号名过滤的参数
+——现场下载整个文件、用 `grep` 定位目标型号、只取它的三四个数字，
+用完即弃。
+
+grep 型号名常命中多条：近似型号在文件里各占一条 `<Lens>`（如
+`ZCB00` 与 `ZCB00V` 是相邻两条）。取数前先核对 `<Manufacturer>`
+和 `<Name>` 与目标一致；不要用 `grep -A` 数行跨过 `</Lens>` 边界，
+会把下一个型号的常数混进来。
 
 用 `srkt` / `hoffer_q` / `haigis` / `haigis-toric`（Barrett 系列需要
 `a_constant`）且报了晶体型号时，主动建议：
