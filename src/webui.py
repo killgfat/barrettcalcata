@@ -12,16 +12,22 @@ INDEX_PAGE = """
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: Arial, sans-serif; background: #f5f5f5; padding: 20px; }
+        /* 页头/切换带的左右内缩 = 卡片内容的左边缘，也就是下面各输入框的
+           左边缘（main-content padding + form-section padding + 边框）。
+           用一个变量统一控制，改卡片留白时这里要跟着改。 */
+        :root { --page-inset: 50px; }
         .container { max-width: 1000px; margin: 0 auto; background: white; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        .header { background: #007bff; color: white; padding: 20px; border-radius: 10px 10px 0 0; display: flex; justify-content: space-between; align-items: center; position: relative; }
-        .header-title { text-align: center; flex: 1; }
+        .header { background: #007bff; color: white; padding: 20px var(--page-inset); border-radius: 10px 10px 0 0; display: flex; justify-content: space-between; align-items: center; gap: 16px; position: relative; }
+        .header-title { text-align: left; flex: 1; min-width: 0; }
         .header-title h1 { margin: 0; font-size: 1.8em; }
         .header-title p { margin: 5px 0 0; opacity: 0.9; }
         .github-link { display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; color: white; text-decoration: none; border-radius: 6px; transition: background 0.2s; }
         .github-link:hover { background: rgba(255,255,255,0.15); }
         .github-icon { width: 28px; height: 28px; fill: white; }
-        .main-content { padding: 30px; }
-        .mode-switch-band { padding: 16px 30px 0; background: white; }
+        /* 左右留白由 .mode-switch-band 统一提供（它包住了整个主体），
+           main-content 只管上下，卡片边框才能和页头标题在同一条左基线上。 */
+        .main-content { padding: 0 0 30px; }
+        .mode-switch-band { padding: 16px var(--page-inset) 0; background: white; }
         .mode-switch { display: flex; gap: 4px; max-width: 420px; margin: 0 auto; padding: 4px; border: 1px solid #cbd5e1; border-radius: 8px; background: #f1f5f9; }
         .formula-switch { display: flex; flex-wrap: wrap; gap: 4px; max-width: 820px; margin: 12px auto 0; padding: 4px; border: 1px solid #cbd5e1; border-radius: 8px; background: #f1f5f9; }
         .formula-button { flex: 1 1 160px; min-height: 40px; border: 0; border-radius: 6px; background: transparent; color: #475569; font-size: 14px; font-weight: bold; cursor: pointer; transition: background 0.2s, color 0.2s, box-shadow 0.2s; }
@@ -43,6 +49,65 @@ INDEX_PAGE = """
         .haigis-constants input { width: 88px; padding: 6px 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; }
         .haigis-constant-field { display: flex; align-items: center; gap: 4px; color: #475569; font-size: 14px; }
         .haigis-constants-note { color: #64748b; font-size: 12px; }
+        /* 三个公式的常数都紧跟在 A 常数下方，风格与 A 常数统一：
+           同样的 10px 内边距、16px 字号、整行高度；同一行的多个常数
+           等分整行宽度（每个都比原来的 96px 大得多），单字段则铺满整行。 */
+        /* 与其它 .form-group 用同一套间距：上方 15px、下方 15px，
+           不要用负 margin 压缩，否则和上下的方框不在同一节奏上。 */
+        .formula-constants { margin-top: 0; margin-bottom: 15px; }
+        /* 同一行的多个常数并排（相对位置不变），但每个都是
+           "标签在上、输入框在下"，与 A 常数、pACD 的写法一致。 */
+        .formula-constants .inline-constants {
+            display: flex; align-items: flex-start; gap: 10px; flex-wrap: nowrap;
+        }
+        .formula-constants .inline-constants + .inline-constants { margin-top: 15px; }
+        .formula-constants .inline-constant {
+            display: flex; flex-direction: column; align-items: stretch; gap: 5px;
+            flex: 1 1 0; min-width: 0; margin-bottom: 0; font-weight: normal;
+        }
+        /* 与普通 form-group 的 label 完全同规格：16px/700、24px 行高、5px 下间距。 */
+        .formula-constants .inline-constant > span {
+            color: #555; font-size: 16px; font-weight: bold;
+            line-height: 1.5; min-height: 24px; white-space: nowrap;
+        }
+        .formula-constants .inline-constant input,
+        .formula-constants .inline-constant select {
+            width: 100%; min-width: 0;
+            padding: 10px; border: 1px solid #ddd; border-radius: 5px;
+            font-size: 16px; background: #fff;
+        }
+        .formula-constants .inline-constant input:focus,
+        .formula-constants .inline-constant select:focus {
+            outline: none; border-color: #007bff; box-shadow: 0 0 5px rgba(0,123,255,0.3);
+        }
+        .formula-constants .inline-constant input:disabled {
+            background: #f1f5f9; color: #94a3b8; cursor: not-allowed;
+        }
+        /* 这些常数都是精确小数（a0、C、pACD…），上下箭头没有意义，
+           而且 <input type="number"> 的 spin button 会白占约 14px 宽度，
+           窄屏下正好把 "-1.714" 挤出可视区。这里统一去掉。 */
+        .formula-constants input[type="number"]::-webkit-outer-spin-button,
+        .formula-constants input[type="number"]::-webkit-inner-spin-button {
+            -webkit-appearance: none; margin: 0; height: auto;
+        }
+        .formula-constants input[type="number"] {
+            -moz-appearance: textfield; appearance: textfield;
+        }
+        .formula-constants .formula-constant-hint { margin-top: 5px; }
+        /* 由所选晶体决定时，A 常数与三常数一样锁定并灰显。 */
+        #aConstant[disabled] { background: #f1f5f9; color: #94a3b8; cursor: not-allowed; }
+        @media (max-width: 768px) {
+            .formula-constants .inline-constants { gap: 8px; }
+            .formula-constants .inline-constant { gap: 4px; }
+            .formula-constants .inline-constant > span { font-size: 15px; }
+        }
+        @media (max-width: 380px) {
+            .formula-constants .inline-constants { gap: 5px; }
+            .formula-constants .inline-constant { gap: 3px; }
+            .formula-constants .inline-constant > span { font-size: 13px; }
+            .formula-constants .inline-constant input,
+            .formula-constants .inline-constant select { padding: 9px 5px; font-size: 15px; }
+        }
         .mode-button { flex: 1; min-height: 44px; border: 0; border-radius: 6px; background: transparent; color: #475569; font-size: 15px; font-weight: bold; cursor: pointer; transition: background 0.2s, color 0.2s, box-shadow 0.2s; }
         .mode-button:hover { color: #0f172a; }
         .mode-button.active { background: white; color: #0f766e; box-shadow: 0 1px 4px rgba(15, 23, 42, 0.14); }
@@ -150,11 +215,43 @@ INDEX_PAGE = """
         }
         .form-group { position: relative; }
         @media (max-width: 768px) {
+            :root { --page-inset: 14px; }
             .container { margin: 10px; }
-            .main-content { padding: 20px; }
+            /* 收窄留白，把宽度让给输入框（三常数一行才能放大）。 */
+            #iolForm .form-section, .toric-section { padding: 16px; }
             .eye-params.show { grid-template-columns: 1fr; }
             .form-group input { width: 100%; max-width: 100%; }
             .suggestion-box { font-size: 0.8em; }
+        }
+        /* 必须放在整个 <style> 的最后：顺序在后的媒体查询会覆盖前面的留白，
+           否则 768px 的 padding 会盖掉这里的收窄，320px 时三常数被挤爆。 */
+        @media (max-width: 1100px) {
+            /* 三常数一行时每个框也要 ≥64px（容得下 "-1.714"），
+               窄屏优先压缩留白而不是压扁输入框。 */
+            .formula-constants .inline-constants { gap: 8px; }
+            .formula-constants .inline-constant { gap: 4px; }
+            .formula-constants .inline-constant > span { font-size: 14px; }
+        }
+        @media (max-width: 900px) {
+            body { padding: 10px; }
+            .container { margin: 6px; }
+        }
+        @media (max-width: 480px) {
+            :root { --page-inset: 8px; }
+            body { padding: 8px; }
+            .container { margin: 4px; }
+            #iolForm .form-section { padding: 10px; }
+            .formula-constants .inline-constants { gap: 5px; }
+            .formula-constants .inline-constant { gap: 2px; }
+            .formula-constants .inline-constant > span { font-size: 12px; }
+            .formula-constants .inline-constant input,
+            .formula-constants .inline-constant select { padding: 9px 4px; font-size: 14px; }
+        }
+        /* Haigis 三常数的小数位多（-1.714），需要比 C/H/R 更紧的标签，
+           否则 320px 下每个框挤不到能显示完整数值的宽度。 */
+        @media (max-width: 360px) {
+            #haigisConstants .inline-constant > span { font-size: 11px; }
+            #haigisConstants .inline-constant input { padding: 9px 3px; font-size: 13px; }
         }
     </style>
 </head>
@@ -182,6 +279,7 @@ INDEX_PAGE = """
                 <button type="button" class="formula-button" data-formula="hoffer_q" aria-pressed="false">Hoffer Q</button>
                 <button type="button" class="formula-button" data-formula="srkt" aria-pressed="false">SRK/T</button>
                 <button type="button" class="formula-button" data-formula="haigis" aria-pressed="false">Haigis</button>
+                <button type="button" class="formula-button" data-formula="castrop" aria-pressed="false">Castrop</button>
             </div>
             <div class="formula-switch" id="toricFormulaSwitch" role="group" aria-label="散光计算公式" hidden>
                 <button type="button" class="formula-button active" data-toric-formula="barrett" aria-pressed="true">Barrett Toric · 在线</button>
@@ -197,19 +295,7 @@ INDEX_PAGE = """
             </div>
             <div id="executionModeHint" class="param-hint mode-switch-hint"></div>
             <div id="formulaInputHint" class="param-hint formula-input-hint"></div>
-            <div class="haigis-constants" id="haigisConstants" hidden>
-                <span class="haigis-constants-label">Haigis 常数</span>
-                <label class="haigis-constant-field" for="haigisA0">a0 <input type="number" id="haigisA0" aria-label="Haigis a0" min="-10" max="10" step="0.001" placeholder="a0"></label>
-                <label class="haigis-constant-field" for="haigisA1">a1 <input type="number" id="haigisA1" aria-label="Haigis a1" min="-2" max="2" step="0.001" placeholder="a1"></label>
-                <label class="haigis-constant-field" for="haigisA2">a2 <input type="number" id="haigisA2" aria-label="Haigis a2" min="-1" max="1" step="0.001" placeholder="a2"></label>
-                <span class="haigis-constants-note" id="haigisConstantsNote">照抄 IOL Master 的 a0/a1/a2；不填则用 A 常数近似</span>
-            </div>
-            <div class="haigis-constants" id="hofferQPacdControls" hidden>
-                <label class="haigis-constants-label" for="hofferQPacd">Hoffer Q pACD</label>
-                <input type="number" id="hofferQPacd" step="0.01" min="0" max="8" placeholder="留空由 A 常数推导">
-                <span class="haigis-constants-note">单位 mm；这是公式常数，不是术前 ACD</span>
-            </div>
-        </div>
+
 
         <div class="main-content">
             <form id="iolForm">
@@ -219,7 +305,7 @@ INDEX_PAGE = """
                         <label for="patientName">患者姓名（可选）</label>
                         <input type="text" id="patientName" name="patientName" placeholder="请输入患者姓名">
                     </div>
-                    <div class="form-group">
+                    <div class="form-group" id="iolModelField">
                         <label for="iolModelSearch">晶体型号（可选）</label>
                         <div class="ulib-combobox" id="iolModelGroup">
                             <input type="text" id="iolModelSearch" name="iolModel" placeholder="输入关键词搜索；留空表示用下方 A 常数" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="iolModelList" aria-autocomplete="list">
@@ -231,6 +317,37 @@ INDEX_PAGE = """
                         <label for="aConstant">A常数</label>
                         <input type="number" id="aConstant" name="aConstant" value="119.30" step="0.01" required>
                         <div class="param-hint" id="aConstantHint">默认值：119.30（可根据晶体类型调整）</div>
+                    </div>
+                    <div class="form-group formula-constants" id="haigisConstants" hidden>
+                        <div class="inline-constants">
+                            <label class="inline-constant" for="haigisA0"><span>a0</span><input type="number" id="haigisA0" aria-label="Haigis a0" min="-10" max="10" step="0.001" placeholder="a0"></label>
+                            <label class="inline-constant" for="haigisA1"><span>a1</span><input type="number" id="haigisA1" aria-label="Haigis a1" min="-2" max="2" step="0.001" placeholder="a1"></label>
+                            <label class="inline-constant" for="haigisA2"><span>a2</span><input type="number" id="haigisA2" aria-label="Haigis a2" min="-1" max="1" step="0.001" placeholder="a2"></label>
+                        </div>
+                        <div class="param-hint formula-constant-hint" id="haigisConstantsNote">Haigis 三常数照抄 IOL Master；不填则由 A 常数近似 a0</div>
+                    </div>
+                    <div class="form-group" id="hofferQPacdGroup" hidden>
+                        <label for="hofferQPacd">Hoffer Q pACD</label>
+                        <input type="number" id="hofferQPacd" step="0.01" min="0" max="8" placeholder="留空由 A 常数推导">
+                        <div class="param-hint" id="hofferQPacdNote">单位 mm；这是公式常数，不是术前 ACD</div>
+                    </div>
+                    <div class="form-group formula-constants" id="castropConstants" hidden>
+                        <div class="inline-constants">
+                            <label class="inline-constant" for="castropC"><span>C</span><input type="number" id="castropC" aria-label="Castrop C" min="0.2" max="0.6" step="0.0001" placeholder="0.4"></label>
+                            <label class="inline-constant" for="castropH"><span>H</span><input type="number" id="castropH" aria-label="Castrop H" min="-1" max="1" step="0.0001" placeholder="0"></label>
+                            <label class="inline-constant" for="castropR"><span>R</span><input type="number" id="castropR" aria-label="Castrop R" min="-1" max="1" step="0.0001" placeholder="0"></label>
+                        </div>
+                        <div class="inline-constants">
+                            <label class="inline-constant" for="castropElp"><span>ELP</span><input type="number" id="castropElp" aria-label="直接指定 ELP（mm，可选）" min="2" max="12" step="0.01" placeholder="可选"></label>
+                            <label class="inline-constant" for="castropElpModel"><span>推导</span>
+                                <select id="castropElpModel" aria-label="Castrop ELP 推导方式">
+                                    <option value="acd_lt" selected>ACD + C·LT + H</option>
+                                    <option value="regression">ACD, AL, R, LT 回归</option>
+                                    <option value="regression_no_r">ACD, AL, LT 回归</option>
+                                </select>
+                            </label>
+                        </div>
+                        <div class="param-hint formula-constant-hint" id="castropConstantsNote">C/H/R 照抄 IOLCon 的 Castrop 列；留空则用论文初值 C=0.40/H=0.00/R=0.00</div>
                     </div>
                     <div class="form-group">
                         <label for="kIndex">K-index</label>
@@ -283,6 +400,10 @@ INDEX_PAGE = """
                                 <label for="rightACD">ACD mm（可选）</label>
                                 <input type="number" id="rightACD" name="rightACD" step="0.01" min="0.5" max="8" placeholder="留空由公式决定">
                             </div>
+                            <div class="form-group" data-formula-only="castrop" hidden>
+                                <label for="rightLT">晶状体厚度 LT mm（Castrop）</label>
+                                <input type="number" id="rightLT" name="rightLT" step="0.01" min="0" max="15" placeholder="术前 LT，留空用 4.60">
+                            </div>
                             <div class="form-group">
                                 <label for="rightRefraction">目标屈光度 D（可选）</label>
                                 <input type="number" id="rightRefraction" name="rightRefraction" step="0.01" min="-5" max="5" placeholder="默认0.0">
@@ -311,6 +432,10 @@ INDEX_PAGE = """
                             <div class="form-group">
                                 <label for="leftACD">ACD mm（可选）</label>
                                 <input type="number" id="leftACD" name="leftACD" step="0.01" min="0.5" max="8" placeholder="留空由公式决定">
+                            </div>
+                            <div class="form-group" data-formula-only="castrop" hidden>
+                                <label for="leftLT">晶状体厚度 LT mm（Castrop）</label>
+                                <input type="number" id="leftLT" name="leftLT" step="0.01" min="0" max="15" placeholder="术前 LT，留空用 4.60">
                             </div>
                             <div class="form-group">
                                 <label for="leftRefraction">目标屈光度 D（可选）</label>
@@ -544,34 +669,39 @@ INDEX_PAGE = """
 
         const aConstantInput = document.getElementById('aConstant');
 
-        const FORMULA_CONSTANT_FIELDS = {
-            haigisA0: 'a0',
-            haigisA1: 'a1',
-            haigisA2: 'a2',
-            hofferQPacd: '留空由 A 常数推导'
-        };
+        // 所有"由公式/型号提供"的常数输入框：A 常数与各公式的专用常数同等对待。
+        // 每个输入框用 data-default-placeholder 记住自己的原占位符。
+        const FORMULA_CONSTANT_FIELDS = [
+            'aConstant',
+            'haigisA0', 'haigisA1', 'haigisA2',
+            'hofferQPacd',
+            'castropC', 'castropH', 'castropR', 'castropElp',
+        ];
+        const LOCKED_PLACEHOLDER = '由所选晶体决定';
+
+        function setFormulaConstantsLocked(locked) {
+            FORMULA_CONSTANT_FIELDS.forEach((id) => {
+                const input = document.getElementById(id);
+                if (!input) return;
+                if (!('defaultPlaceholder' in input.dataset)) {
+                    input.dataset.defaultPlaceholder = input.placeholder || '';
+                }
+                input.disabled = locked;
+                input.placeholder = locked
+                    ? LOCKED_PLACEHOLDER
+                    : input.dataset.defaultPlaceholder;
+            });
+        }
 
         function clearUlibConstants() {
             // 只解除锁定，保留用户已经填过的值（切换到自定义常数时用）。
-            Object.entries(FORMULA_CONSTANT_FIELDS).forEach(([id, placeholder]) => {
-                const input = document.getElementById(id);
-                if (!input) return;
-                input.disabled = false;
-                input.placeholder = placeholder;
-            });
-            aConstantInput.readOnly = false;
+            setFormulaConstantsLocked(false);
         }
 
         function lockUlibConstants() {
-            // 型号已声明时常数由后端查表：输入框锁定但保留原值，
-            // 用户能看到自己填过什么，提交时这些字段不会被发送。
-            Object.entries(FORMULA_CONSTANT_FIELDS).forEach(([id]) => {
-                const input = document.getElementById(id);
-                if (!input) return;
-                input.disabled = true;
-                input.placeholder = '由所选型号决定';
-            });
-            aConstantInput.readOnly = true;
+            // 型号已声明时常数由后端查表：A 常数与各公式三常数一起锁定，
+            // 与"A 常数也被型号决定"的语义保持一致。
+            setFormulaConstantsLocked(true);
         }
 
         // 型号列表在初始化末尾随公式选择一起加载：这里调用会读到尚未
@@ -1026,8 +1156,9 @@ INDEX_PAGE = """
                     k_index: parseFloat(document.getElementById('kIndex').value)
                 };
                 // 声明了晶体型号时交给后端查表，不再上报本地常数输入。
+                // Castrop 的常数是 C/H/R，A 常数与它无关，也不上报。
                 const usesModelConstants = Boolean(activeModelName());
-                if (!usesModelConstants) {
+                if (!usesModelConstants && selectedFormula !== 'castrop') {
                     formData.a_constant = roundToTwoDecimals(
                         document.getElementById('aConstant').value
                     );
@@ -1043,6 +1174,7 @@ INDEX_PAGE = """
                         K1: parseFloat(document.getElementById('rightK1').value),
                         K2: parseFloat(document.getElementById('rightK2').value),
                         ACD: rightACDValue === null ? undefined : rightACDValue,
+                        LenThickness: readCastropLt('rightLT'),
                         Refraction: document.getElementById('rightRefraction').value ? parseFloat(document.getElementById('rightRefraction').value) : undefined
                     };
                 }
@@ -1057,6 +1189,7 @@ INDEX_PAGE = """
                         K1: parseFloat(document.getElementById('leftK1').value),
                         K2: parseFloat(document.getElementById('leftK2').value),
                         ACD: leftACDValue === null ? undefined : leftACDValue,
+                        LenThickness: readCastropLt('leftLT'),
                         Refraction: document.getElementById('leftRefraction').value ? parseFloat(document.getElementById('leftRefraction').value) : undefined
                     };
                 }
@@ -1076,6 +1209,19 @@ INDEX_PAGE = """
                 }
                 if (Number.isFinite(hofferQPacdValue)) {
                     payload.hoffer_q_pacd = hofferQPacdValue;
+                }
+                if (calculationModel === 'castrop') {
+                    // C/H/R 三项全空时交给后端用论文初值，避免传 null 覆盖。
+                    const castropValues = readCastropConstants();
+                    if (castropValues) {
+                        payload.castrop_constants = castropValues;
+                    }
+                    const elpValue = parseFloat(castropElp.value);
+                    if (Number.isFinite(elpValue)) {
+                        payload.castrop_elp = elpValue;
+                    } else if (castropElpModel.value !== 'acd_lt') {
+                        payload.castrop_elp_model = castropElpModel.value;
+                    }
                 }
 
                 const response = await fetch('/api/calculate', {
@@ -1120,8 +1266,17 @@ INDEX_PAGE = """
         const haigisA0 = document.getElementById('haigisA0');
         const haigisA1 = document.getElementById('haigisA1');
         const haigisA2 = document.getElementById('haigisA2');
-        const hofferQPacdControls = document.getElementById('hofferQPacdControls');
+        const hofferQPacdGroup = document.getElementById('hofferQPacdGroup');
+        const hofferQPacdNote = document.getElementById('hofferQPacdNote');
+        const haigisConstantsNote = document.getElementById('haigisConstantsNote');
         const hofferQPacd = document.getElementById('hofferQPacd');
+        const castropConstants = document.getElementById('castropConstants');
+        const castropConstantsNote = document.getElementById('castropConstantsNote');
+        const castropC = document.getElementById('castropC');
+        const castropH = document.getElementById('castropH');
+        const castropR = document.getElementById('castropR');
+        const castropElp = document.getElementById('castropElp');
+        const castropElpModel = document.getElementById('castropElpModel');
         const executionModeHint = document.getElementById('executionModeHint');
         const formulaInputHint = document.getElementById('formulaInputHint');
 
@@ -1135,7 +1290,8 @@ INDEX_PAGE = """
             barrett: 'Barrett 本地/在线均使用 ACD（可选）；本地还使用 LT/WTW（可选），缺失时会警告并降置信度。',
             srkt: 'SRK/T 由 A 常数和 K 自行推导 ACD；填写的 ACD、LT、WTW 会被忽略。',
             hoffer_q: 'Hoffer Q 可使用报告中的 pACD；留空则由 A 常数推导。填写的 ACD、LT、WTW 会被忽略。',
-            haigis: 'Haigis 使用实测 ACD；a0/a1/a2 请照抄 IOL Master（不填则用 A 常数近似，可能差 1–3 D）；LT/WTW 会被忽略。'
+            haigis: 'Haigis 使用实测 ACD；a0/a1/a2 请照抄 IOL Master（不填则用 A 常数近似，可能差 1–3 D）；LT/WTW 会被忽略。',
+            castrop: 'Castrop 需要术前 ACD 和晶状体厚度 LT；C/H/R 照抄 IOLCon（留空用论文初值 0.40/0/0）；也可直接填 ELP。A 常数与 WTW 会被忽略。'
         };
 
         // 型号选择器的 DOM 引用必须在使用前就绪：syncFormulaControls() 会在
@@ -1184,6 +1340,7 @@ INDEX_PAGE = """
         // 自绘下拉：输入关键词即时缩小候选，候选项只显示型号名。
         // 不用原生 datalist，因为它会再过滤一遍且各浏览器行为不一致。
         // Barrett 与其他公式共用同一个控件，只是数据来源不同。
+        const iolModelField = document.getElementById('iolModelField');
         const iolModelGroup = document.getElementById('iolModelGroup');
         const iolModelSearch = document.getElementById('iolModelSearch');
         const iolModelList = document.getElementById('iolModelList');
@@ -1205,6 +1362,9 @@ INDEX_PAGE = """
         }
 
         async function loadModelOptions() {
+            // Castrop 的常数是 C/H/R，ULIB 快照里没有这三列，型号列表
+            // 对它没有意义 —— 不发请求，界面也不显示选择器。
+            if (activeFormula() === 'castrop') return;
             // Barrett 与其他公式的列表来自不同数据集，切换时按来源重新拉。
             const source = activeFormulaSource();
             if (modelsLoaded && loadedFormulaSource === source) return;
@@ -1229,6 +1389,11 @@ INDEX_PAGE = """
                     } else if (source === 'barrett') {
                         iolModelHint.textContent =
                             'Barrett 官网型号 ' + modelOptions.length + ' 个；留空则用 A 常数';
+                    } else if (activeFormula() === 'castrop') {
+                        // Castrop 的 C/H/R 不在 ULIB 里，型号只用于记录。
+                        iolModelHint.textContent = '源自 ULIB Constants（' +
+                            (info.source_revision || '2016-10-31') + '）· '
+                            + modelOptions.length + ' 款；该表无 C/H/R，常数请手动填写';
                     } else {
                         iolModelHint.textContent = '源自 ULIB Constants（' +
                             (info.source_revision || '2016-10-31') + '）· '
@@ -1320,14 +1485,19 @@ INDEX_PAGE = """
 
         function resetAConstantToDefault() {
             // 只在空着时补默认值，不覆盖用户已经填过的常数。
+            aConstantInput.disabled = false;
             aConstantInput.readOnly = false;
             if (!aConstantInput.value) aConstantInput.value = '119.30';
             document.getElementById('aConstantHint').textContent =
-                '默认值：119.30（可根据晶体类型调整）';
+                '默认 119.30（可调整）';
         }
 
         function resetModelHint() {
             const hint = document.getElementById('iolModelHint');
+            if (activeFormula() === 'castrop') {
+                hint.textContent = 'Castrop 不使用晶体型号常数';
+                return;
+            }
             if (!modelsLoaded) {
                 hint.textContent = '留空则使用下方的 A 常数';
                 return;
@@ -1452,24 +1622,21 @@ INDEX_PAGE = """
             if (model.preliminary) text += '（样本量偏小，仅供参考）';
             hint.textContent = text;
             document.getElementById('aConstantHint').textContent =
-                '由所选型号决定，输入框值不参与计算';
+                '由所选晶体决定，A 常数不参与计算';
         }
 
         function activeModelName() {
             // 「后端按型号查表并屏蔽请求常数」只对非 Barrett 公式成立。
             // Barrett 型号只用来填 A 常数，a_constant 仍然要提交。
-            return activeFormula() === 'barrett' ? '' : (selectedModelName || '');
+            // Castrop 的常数是 C/H/R，与服务端型号表无关，不上报 iol_model。
+            const formula = activeFormula();
+            if (formula === 'barrett' || formula === 'castrop') return '';
+            return selectedModelName || '';
         }
 
         function setConstantInputsLocked(locked) {
             // 只切可编辑状态，不动输入值：用户自己填的常数切回来还在。
-            Object.entries(FORMULA_CONSTANT_FIELDS).forEach(([id, placeholder]) => {
-                const input = document.getElementById(id);
-                if (!input) return;
-                input.disabled = locked;
-                input.placeholder = locked ? '由所选型号决定' : placeholder;
-            });
-            aConstantInput.readOnly = locked;
+            setFormulaConstantsLocked(locked);
         }
 
         function refreshConstantLock() {
@@ -1488,10 +1655,29 @@ INDEX_PAGE = """
             // 解锁后输入框仍是用户原值；只有空值时补默认，免得 Barrett
             // 分支带着空值提交。
             if (!aConstantInput.value) resetAConstantToDefault();
+            if (!aConstantInput.disabled) {
+                // 解锁后按当前值给提示，别让"默认 119.30"和填着的值打架。
+                document.getElementById('aConstantHint').textContent =
+                    aConstantInput.value && aConstantInput.value !== '119.30'
+                        ? '当前 A 常数 ' + aConstantInput.value + '（可调整）'
+                        : '默认 119.30（可调整）';
+            }
             resetModelHint();
         }
 
         function syncModelSelectors() {
+            // Castrop 不用型号常数：隐藏选择器、清掉已选型号，但保留已
+            // 加载的列表，切回其它公式时不必重新请求。
+            if (activeFormula() === 'castrop') {
+                selectedModelName = '';
+                iolModelSearch.value = '';
+                closeModelList();
+                // 上一个型号改过的 A 常数提示要复原，否则切回 Barrett
+                // 时会看到"该型号没有可用 A 常数"这种过期信息。
+                resetAConstantToDefault();
+                refreshConstantLock();
+                return;
+            }
             // 晶体列表跟着当前生效的公式走：Barrett 与其余公式的列表来源
             // 不同，切换时按来源重新拉取，并清掉上一个来源的选择。
             const source = activeFormulaSource();
@@ -1512,9 +1698,52 @@ INDEX_PAGE = """
                 ? EXECUTION_MODE_HINTS[resolveExecutionMode()]
                 : LOCAL_FORMULA_HINT;
             formulaInputHint.textContent = FORMULA_INPUT_HINTS[selectedFormula] || '';
-            haigisConstants.hidden = selectedFormula !== 'haigis';
-            hofferQPacdControls.hidden = selectedFormula !== 'hoffer_q';
+            // 三常数/单常数跟在 A 常数下方同一个 form-group 里，一起显隐。
+            const isHaigis = selectedFormula === 'haigis';
+            const isHofferQ = selectedFormula === 'hoffer_q';
+            haigisConstants.hidden = !isHaigis;
+            haigisConstantsNote.hidden = !isHaigis;
+            hofferQPacdGroup.hidden = !isHofferQ;
+            hofferQPacdNote.hidden = !isHofferQ;
+            castropConstants.hidden = selectedFormula !== 'castrop';
+            // Castrop 不用 A 常数，隐藏并解除 required，否则表单无法提交。
+            const isCastrop = selectedFormula === 'castrop';
+            document.getElementById('aConstantGroup').hidden = isCastrop;
+            aConstantInput.required = !isCastrop;
+            // ULIB 快照里没有 Castrop 的 C/H/R，型号选择器对它无意义。
+            iolModelField.hidden = isCastrop;
+            resetModelHint();
+            // Castrop 需要术前晶状体厚度，其它公式忽略 LT，输入框跟着隐藏。
+            document.querySelectorAll('[data-formula-only]').forEach(group => {
+                group.hidden = group.dataset.formulaOnly !== selectedFormula;
+            });
             syncModelSelectors();
+        }
+
+        function readCastropLt(inputId) {
+            // LT 只在 Castrop 下参与计算；其它公式提交它会被标成 ignored，
+            // 所以这里按当前公式决定是否上报。
+            if (selectedFormula !== 'castrop') return undefined;
+            const raw = document.getElementById(inputId).value;
+            if (raw === '') return undefined;
+            const value = parseFloat(raw);
+            return Number.isFinite(value) ? value : undefined;
+        }
+
+        function readCastropConstants() {
+            // C/H/R 三项要么全填要么全空：后端只接受完整三元组。
+            const c = castropC.value.trim();
+            const h = castropH.value.trim();
+            const r = castropR.value.trim();
+            if (!c && !h && !r) return null;
+            if (!c || !h || !r) {
+                throw new Error('Castrop 的 C/H/R 必须同时填写（或全部留空用论文初值）');
+            }
+            return {
+                C: parseFloat(c),
+                H: parseFloat(h),
+                R: parseFloat(r)
+            };
         }
 
         function hasAnyEyeData() {
@@ -1577,7 +1806,10 @@ INDEX_PAGE = """
             executionModeHint.hidden = isToric;
             formulaInputHint.hidden = isToric;
             haigisConstants.hidden = isToric;
-            hofferQPacdControls.hidden = isToric;
+            haigisConstantsNote.hidden = isToric;
+            hofferQPacdGroup.hidden = isToric;
+            hofferQPacdNote.hidden = isToric;
+            castropConstants.hidden = isToric;
             syncModelSelectors();
             if (isToric) {
                 executionModeControls.hidden = true;
@@ -1586,9 +1818,8 @@ INDEX_PAGE = """
             if (isToric) {
                 syncToricFormulaControls();
             } else {
-                document.getElementById('aConstantGroup').hidden = false;
-                aConstantInput.required = true;
-                document.getElementById('haigisConstantsNote').textContent = '照抄 IOL Master 的 a0/a1/a2；不填则用 A 常数近似';
+                // A 常数的可见性/必填状态由 syncFormulaControls 按公式决定。
+                castropConstantsNote.textContent = 'C/H/R 照抄 IOLCon 的 Castrop 列；留空则用论文初值 C=0.40/H=0.00/R=0.00';
                 syncFormulaControls();
                 validateForm();
             }
@@ -1628,9 +1859,10 @@ INDEX_PAGE = """
                 ? '必填：晶体型号（或完整 a0/a1/a2）、AL、前表面 K1/K2 及正交轴位、术前实测 ACD。标有 * 的参数必填；LT、WTW、A 常数不参与计算。切口 SIA 表示沿切口方向的扁平化量。'
                 : '使用上方患者、晶体型号、A 常数和 K-index 设置；请至少启用一眼。标有 * 的参数必填。';
             haigisConstants.hidden = !isHaigis;
-            document.getElementById('haigisConstantsNote').textContent = isHaigis
+            haigisConstantsNote.hidden = !isHaigis;
+            haigisConstantsNote.textContent = isHaigis
                 ? '选择晶体型号后由该型号常数计算；未选型号时须完整填写 a0/a1/a2。'
-                : '照抄 IOL Master 的 a0/a1/a2；不填则用 A 常数近似';
+                : 'Haigis 三常数照抄 IOL Master；不填则由 A 常数近似 a0';
             document.getElementById('aConstantGroup').hidden = isHaigis;
             aConstantInput.required = !isHaigis;
             ['right', 'left'].forEach(syncToricPosteriorControls);
@@ -1960,12 +2192,19 @@ INDEX_PAGE = """
                 if (used[key] === null || used[key] === undefined) return;
                 let value = used[key];
                 if (key === 'ACD' && used.ACD_defaulted) value += '(默认)';
+                if (key === 'LenThickness' && used.LenThickness_defaulted) value += '(默认)';
                 parts.push(label + '=' + value);
             });
             if (used.a_constant !== null && used.a_constant !== undefined) parts.push('A=' + used.a_constant);
             if (used.a0 !== null && used.a0 !== undefined) parts.push('a0=' + used.a0);
             if (used.a1 !== null && used.a1 !== undefined) parts.push('a1=' + used.a1);
             if (used.a2 !== null && used.a2 !== undefined) parts.push('a2=' + used.a2);
+            // Castrop 的常数与 ELP 来源单独列出，方便与 IOLCon 对照。
+            if (used.C !== null && used.C !== undefined) {
+                parts.push('C=' + used.C + ', H=' + used.H + ', R=' + used.R);
+            }
+            if (used.Pcornea !== null && used.Pcornea !== undefined) parts.push('Pcornea=' + used.Pcornea);
+            if (used.AL_corrected !== null && used.AL_corrected !== undefined) parts.push('ALcor=' + used.AL_corrected);
             return parts.join(', ');
         }
 
@@ -1979,6 +2218,14 @@ INDEX_PAGE = """
                     + (source.ignored_request && source.ignored_request.length
                         ? '（已忽略请求中的 ' + source.ignored_request.join('、') + '）'
                         : ''));
+            } else if (source && source.source === 'castrop_constants') {
+                lines.push('常数来源：调用方传入的 Castrop C/H/R（IOLCon）');
+            } else if (source && source.source === 'castrop_elp') {
+                lines.push('ELP 来源：调用方直接指定（IOLCon 或 AS-OCT），C/H 不参与推导');
+            } else if (source && source.source === 'paper_default') {
+                lines.push('常数来源：论文优化初值 C=0.40/H=0.00/R=0.00（无晶体特异性）');
+            } else if (source && source.source === 'a_constant_conversion') {
+                lines.push('常数来源：A 常数换算（非晶体优化常数）');
             }
             [['右眼', 'right_eye'], ['左眼', 'left_eye']].forEach((item) => {
                 const label = item[0];

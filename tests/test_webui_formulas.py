@@ -71,11 +71,75 @@ def test_execution_mode_hint_wording_is_accurate():
 def test_haigis_constants_inputs_exist_and_are_optional():
     page = get_page()
 
-    assert 'class="haigis-constants" id="haigisConstants" hidden' in page
+    # 三常数紧跟在 A 常数下方，用一行短输入框。
+    assert 'class="form-group formula-constants" id="haigisConstants" hidden' in page
     for field in ("a0", "a1", "a2"):
         assert 'id="haigisA' + field[-1] + '"' in page
     assert "readHaigisConstants" in page
     assert "payload.haigis_constants" in page
+
+
+def test_formula_constants_follow_a_constant_and_precede_k_index():
+    """三套公式常数都排在 A 常数之后、K-index 之前。"""
+    page = get_page()
+
+    between = page[page.index('id="aConstantHint"') :]
+    between = between[: between.index('id="kIndex"')]
+    for group_id in ("haigisConstants", "hofferQPacdGroup", "castropConstants"):
+        assert f'id="{group_id}"' in between
+
+
+def test_haigis_and_castrop_constants_share_a_row_with_stacked_labels():
+    """Haigis a0/a1/a2 与 Castrop C/H/R 同一行等分宽度，但标签各自在框上方。"""
+    page = get_page()
+
+    assert ".formula-constants .inline-constants {" in page
+    assert "flex-wrap: nowrap;" in page
+    # 每个 inline-constant 内部是纵向布局：标签在上、输入框在下。
+    assert "flex-direction: column; align-items: stretch; gap: 5px;" in page
+    # 标签与 .form-group label 同规格。
+    assert "line-height: 1.5; min-height: 24px; white-space: nowrap;" in page
+    # 输入框仍铺满所在列，与 A 常数同为 10px 内边距 / 16px 字号。
+    assert ".formula-constants .inline-constant input," in page
+    assert "width: 100%; min-width: 0;" in page
+    assert "padding: 10px; border: 1px solid #ddd; border-radius: 5px;" in page
+    assert "font-size: 16px; background: #fff;" in page
+
+
+def test_hoffer_q_pacd_is_a_regular_form_group():
+    """pACD 只有单个值，应当和 A 常数一样：标签在上、整行输入框在下。"""
+    page = get_page()
+
+    group = page[page.index('id="hofferQPacdGroup"') :]
+    group = group[: group.index("</div>\n                    </div>")]
+    # 不再套 inline-constant / inline-constants（那是"标签在左"的横排布局）。
+    assert 'class="inline-constant"' not in group
+    assert 'class="inline-constants"' not in group
+    # 普通 form-group 结构：label → input → hint。
+    assert '<label for="hofferQPacd">Hoffer Q pACD</label>' in group
+    assert 'id="hofferQPacd"' in group
+    assert 'class="param-hint"' in group
+
+
+def test_native_spin_buttons_are_removed_from_constant_inputs():
+    """数字框去掉上下箭头，否则窄屏会把数值挤出可视区。"""
+    page = get_page()
+
+    assert "::-webkit-inner-spin-button" in page
+    assert "-moz-appearance: textfield; appearance: textfield;" in page
+
+
+def test_locking_uses_shared_helper_for_a_constant_and_formula_constants():
+    """选晶体后 "由所选晶体决定" 要同时落到 A 常数与各公式常数。"""
+    page = get_page()
+
+    assert "const FORMULA_CONSTANT_FIELDS = [" in page
+    assert "'aConstant'," in page
+    assert "'haigisA0', 'haigisA1', 'haigisA2'," in page
+    assert "'hofferQPacd'," in page
+    assert "'castropC', 'castropH', 'castropR', 'castropElp'," in page
+    assert "const LOCKED_PLACEHOLDER = '由所选晶体决定';" in page
+    assert "function setFormulaConstantsLocked(locked)" in page
 
 
 def test_iol_model_selector_is_a_single_combobox():
@@ -196,7 +260,7 @@ def test_ai_formula_constants_are_filled_and_submitted():
     """Haigis 三常数与 Hoffer Q pACD 识别后可自动回填并用于计算。"""
     page = get_page()
 
-    assert 'id="hofferQPacdControls"' in page
+    assert 'id="hofferQPacdGroup"' in page
     assert 'id="hofferQPacd"' in page
     assert "const constants = data.haigis_constants" in page
     assert "haigisA0.value = Number(constants.a0).toFixed(3)" in page
