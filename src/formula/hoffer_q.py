@@ -119,12 +119,18 @@ def refraction_for_power(
     iol_power,
     a_constant=DEFAULT_A_CONSTANT,
     k_index=1.3375,
+    pacd=None,
 ):
-    """给定 IOL 度数，返回 Hoffer Q 预测屈光度（D，眼镜平面）。"""
+    """给定 IOL 度数，返回 Hoffer Q 预测屈光度（D，眼镜平面）。
+
+    pacd 是晶体常数，正算与反解应传入相同值；省略时由 A 常数推导，
+    与 calculate 的常数处理保持一致。
+    """
     al_value, k_value = validate_eye(al, k)
     k_ref = normalize_k_to_reference(k_value, k_index)
     a_value = as_float(a_constant, "a_constant")
-    elp = _acd(al_value, k_ref, a_value) + ELP_OFFSET
+    pacd_value = _pacd(a_value) if pacd is None else as_float(pacd, "pACD")
+    elp = _acd(al_value, k_ref, a_value, pacd_value) + ELP_OFFSET
     return _invert_vergence_target(
         al_value, elp, k_ref, as_float(iol_power, "iol_power")
     )

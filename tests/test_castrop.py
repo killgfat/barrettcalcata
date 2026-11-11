@@ -40,6 +40,31 @@ def reference_body(**eye_overrides):
     return {"right_eye": eye, "model": "castrop", "a_constant": 118.7}
 
 
+def matrix_retinal_height(
+    power, refraction, *, al, k, elp, cct, posterior_ratio, r_offset
+):
+    """独立用 (光线高度, n×倾角) 矩阵求视网膜交点，长度用米。"""
+    radius = 0.3375 / k
+    front_power = 0.376 / radius
+    back_power = (1.336 - 1.376) / (radius * posterior_ratio)
+    matrices = (
+        ((1, 0.012), (0, 1)),
+        ((1, 0), (-front_power, 1)),
+        ((1, cct / 1000 / 1.376), (0, 1)),
+        ((1, 0), (-back_power, 1)),
+        ((1, (elp - cct) / 1000 / 1.336), (0, 1)),
+        ((1, 0), (-power, 1)),
+        ((1, (al - elp) / 1000 / 1.336), (0, 1)),
+    )
+    height, angle = 1.0, -(refraction - r_offset)
+    for matrix in matrices:
+        height, angle = (
+            matrix[0][0] * height + matrix[0][1] * angle,
+            matrix[1][0] * height + matrix[1][1] * angle,
+        )
+    return height
+
+
 # --- 几何与光学核心 ---------------------------------------------------------
 
 
@@ -54,8 +79,9 @@ def test_corneal_power_uses_thick_lens_model():
     assert cornea["p_front"] == pytest.approx(49.019, abs=1e-2)
     # PCP = (1.336-1.376)/0.0063181 = -6.331 D
     assert cornea["p_back"] == pytest.approx(-6.331, abs=1e-2)
-    # 厚透镜：49.019 - 6.331 - (0.55e-3/1.376)*49.019*(-6.331)
-    assert cornea["p_cornea"] == pytest.approx(42.812, abs=1e-2)
+    # 厚透镜：49.019 - 6.331 - (0.50e-3/1.376)*49.019*(-6.331)
+    assert cornea["p_cornea"] == pytest.approx(42.800919, abs=1e-6)
+    assert cornea["cct"] == 0.50
 
 
 def test_corneal_power_respects_keratometer_index():
@@ -164,8 +190,98 @@ def test_reference_power_is_stable():
     result = castrop.calculate(
         REFERENCE_AL, REFERENCE_K, acd=REFERENCE_ACD, lt=REFERENCE_LT
     )
-    assert result["iol_power_exact"] == pytest.approx(21.2633, abs=1e-4)
+    assert result["iol_power_exact"] == pytest.approx(
+        21.1699331832, abs=1e-9
+    )
     assert result["elp"] == pytest.approx(5.04, abs=1e-9)
+
+
+@pytest.mark.parametrize("target", [-2.0, 0.0, 1.0])
+@pytest.mark.parametrize("k_index", [1.3375, 1.332])
+@pytest.mark.parametrize(
+    ("al", "k", "lt", "elp", "cct", "ratio", "al_correction"),
+    [
+        (21.5, 46.5, 5.0, 4.5, 0.30, 0.60, True),
+        (23.5, 44.0, 4.6, 5.04, 0.50, 6.4 / 7.77, True),
+        (26.0, 42.5, 4.5, 6.0, 0.55, 0.85, False),
+        (30.0, 40.0, 3.5, 7.0, 0.90, 0.95, True),
+    ],
+)
+def test_surface_propagation_matches_independent_ray_matrices(
+    target, k_index, al, k, lt, elp, cct, ratio, al_correction
+):
+    """正算、独立反解与候选表均须满足四折射面矩阵成像条件。"""
+    input_k = k * (k_index - 1) / 0.3375
+    kwargs = {
+        "k_index": k_index,
+        "acd": 3.2,
+        "lt": lt,
+        "elp": elp,
+        "cct": cct,
+        "posterior_ratio": ratio,
+        "al_correction": al_correction,
+        "constants": {"C": 0.424, "H": -0.312, "R": 0.077},
+    }
+    result = castrop.calculate(al, input_k, target=target, **kwargs)
+    al_cor = (
+        1.23854 + 0.95855 * al - 0.05467 * lt if al_correction else al
+    )
+    geometry = {
+        "al": al_cor,
+        "k": k,
+        "elp": elp,
+        "cct": cct,
+        "posterior_ratio": ratio,
+        "r_offset": 0.077,
+    }
+    # 视网膜交点对 IOL 度数线性，直接求令交点为零的度数。
+    height_0 = matrix_retinal_height(0.0, target, **geometry)
+    height_1 = matrix_retinal_height(1.0, target, **geometry)
+    expected_power = -height_0 / (height_1 - height_0)
+    assert result["iol_power_exact"] == pytest.approx(
+        expected_power, abs=1e-9
+    )
+
+    power = result["iol_power"]
+    # 视网膜交点对眼镜平面屈光度也线性，独立反求屈光度。
+    height_0 = matrix_retinal_height(power, 0.0, **geometry)
+    height_1 = matrix_retinal_height(power, 1.0, **geometry)
+    expected_refraction = -height_0 / (height_1 - height_0)
+    assert result["predicted_refraction"] == pytest.approx(
+        expected_refraction, abs=1e-9
+    )
+    assert castrop.refraction_for_power(
+        al, input_k, power, **kwargs
+    ) == pytest.approx(expected_refraction, abs=1e-9)
+    for row in result["iol_options"]:
+        height_0 = matrix_retinal_height(
+            float(row["iol_power"]), 0.0, **geometry
+        )
+        height_1 = matrix_retinal_height(
+            float(row["iol_power"]), 1.0, **geometry
+        )
+        assert float(row["refraction"]) == pytest.approx(
+            -height_0 / (height_1 - height_0), abs=0.00501
+        )
+
+
+def test_explicit_cct_preserves_measurement_and_corrects_recommendation():
+    result = castrop.calculate(
+        REFERENCE_AL,
+        REFERENCE_K,
+        acd=REFERENCE_ACD,
+        lt=REFERENCE_LT,
+        cct=0.55,
+    )
+
+    assert result["castrop"]["cct"] == 0.55
+    assert result["iol_power_exact"] == pytest.approx(
+        21.1431652452, abs=1e-9
+    )
+    assert result["iol_power"] == 21.0
+    assert result["predicted_refraction"] == pytest.approx(
+        0.1000177578, abs=1e-9
+    )
 
 
 @pytest.mark.parametrize("target", [-2.0, -0.5, 0.0, 1.0, 2.0])
@@ -370,6 +486,29 @@ def test_model_castrop_dispatches_offline():
     assert eye["used_inputs"]["a_constant"] is None
     assert "a_constant" in eye["ignored_inputs"]
     assert eye["castrop_details"]["elp_source"] == "acd_lt"
+
+
+@pytest.mark.parametrize(
+    ("cct", "expected_power"),
+    [(None, 21.1699331832), (0.55, 21.1431652452)],
+)
+def test_cct_default_and_override_through_dispatch(cct, expected_power):
+    body = reference_body()
+    if cct is not None:
+        body["castrop_cct"] = cct
+    eye = run_calculation(body)["right_eye"]
+
+    assert eye["castrop_details"]["cct"] == (0.50 if cct is None else cct)
+    assert eye["recommended_power"] == "21"
+    expected_refraction = castrop.refraction_for_power(
+        REFERENCE_AL,
+        REFERENCE_K,
+        expected_power,
+        acd=REFERENCE_ACD,
+        lt=REFERENCE_LT,
+        cct=cct,
+    )
+    assert expected_refraction == pytest.approx(0.0, abs=1e-9)
 
 
 def test_iolcon_constants_are_used_and_accepted():

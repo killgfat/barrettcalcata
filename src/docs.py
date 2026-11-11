@@ -359,7 +359,8 @@ def get_openapi_spec():
                                             "type": "number",
                                             "minimum": 0.3,
                                             "maximum": 0.9,
-                                            "description": "仅 model=castrop 可用。中央角膜厚度（mm），默认 0.55。",
+                                            "default": 0.5,
+                                            "description": "仅 model=castrop 可用。中央角膜厚度（mm），按论文默认 0.50。",
                                         },
                                         "castrop_posterior_ratio": {
                                             "type": "number",

@@ -12,7 +12,7 @@ ACD 是术前晶状体眼前房深度，LT 是晶状体厚度，C 是 Olsen 式�
 轴向偏移。论文另给出把 AL 与角膜半径纳入的回归式，见 ELP_MODELS；
 R 是把验光系统误差折算到屈光度的偏移，加在预测等效球镜上。
 
-角膜按厚透镜处理（参考主平面）::
+角膜前后表面分别折射，中间按角膜折射率传播；等效屈光力仅供诊断::
 
     PCA     = (nC - 1)/RCA
     PCP     = (n - nC)/RCP
@@ -20,7 +20,7 @@ R 是把验光系统误差折算到屈光度的偏移，加在预测等效球镜
 
 缺少术后角膜数据时按论文用固定比值推算：:
 
-    RCP = RCA*6.4/7.77,  dC = 0.55 mm
+    RCP = RCA*6.4/7.77,  dC = 0.50 mm
 
 眼轴先用 Cooke 回归折算成等效分段测量（论文第 4 点）::
 
@@ -30,10 +30,12 @@ R 是把验光系统误差折算到屈光度的偏移，加在预测等效球镜
 
     Rg      = predSE - R
     Lspec   = Rg/(1 - dVD*Rg)
-    Lcornea = Lspec + Pcornea
-    Liol    = Lcornea/(1 - (ELP/n)*Lcornea)
+    Lfront  = Lspec + PCA
+    Lback   = Lfront/(1 - (dC/nC)*Lfront) + PCP
+    Liol    = Lback/(1 - ((ELP-dC)/n)*Lback)
     PIOL    = n/(ALcor - ELP) - Liol
 
+上述传播式的长度用米；函数接口和诊断输出的长度仍用 mm。
 反解 predSE 时按同一链条逆推，因此 target 往返自洽。
 
 ULIB 快照（2016-10-31 停更）不包含 Castrop 的 C/H/R。常数只能来自
@@ -85,7 +87,7 @@ N_AQUEOUS = 1.336
 KERATOMETRY_MM = 337.5
 
 # 论文给定的缺省值：角膜厚度 500 μm、后/前表面半径比 6.4/7.77。
-DEFAULT_CCT_MM = 0.55
+DEFAULT_CCT_MM = 0.50
 DEFAULT_POSTERIOR_RATIO = 6.4 / 7.77
 
 # 论文常数优化的初始化三元组 C/H/R = 0.4/0/0。
@@ -298,37 +300,46 @@ def _validate_elp(elp, al):
     return elp_value
 
 
-def _power(al_cor, elp, p_cornea, target, r_offset):
+def _propagate(vergence, distance_mm, refractive_index):
+    """沿给定介质传播聚散度；负距离用于反向传播。"""
+    denominator = 1.0 - distance_mm / 1000.0 / refractive_index * vergence
+    if abs(denominator) <= 1e-9:
+        raise ValueError("角膜屈光度与传播距离组合导致 Castrop 公式发散")
+    return vergence / denominator
+
+
+def _power(al_cor, elp, cornea, target, r_offset):
     """由目标屈光度解 IOL 度数（D）。"""
     rg = target - r_offset
     denominator = 1.0 - SPECTACLE_VERTEX_M * rg
     if abs(denominator) <= 1e-9:
         raise ValueError("目标屈光度过大，无法折算到角膜前顶点")
     l_spec = rg / denominator
-    l_cornea = l_spec + p_cornea
-    reduced = elp / 1000.0 / N_AQUEOUS
-    propagation = 1.0 - reduced * l_cornea
-    if abs(propagation) <= 1e-9:
-        raise ValueError("角膜屈光度与 ELP 组合导致 Castrop 公式发散")
-    l_iol = l_cornea / propagation
+    l_front = l_spec + cornea["p_front"]
+    l_back = (
+        _propagate(l_front, cornea["cct"], N_CORNEA) + cornea["p_back"]
+    )
+    l_iol = _propagate(l_back, elp - cornea["cct"], N_AQUEOUS)
     axial = (al_cor - elp) / 1000.0
     if axial <= 1e-6:
         raise ValueError("ELP 与眼轴过于接近，Castrop 公式发散")
     return N_AQUEOUS / axial - l_iol
 
 
-def _refraction(al_cor, elp, p_cornea, iol_power, r_offset):
+def _refraction(al_cor, elp, cornea, iol_power, r_offset):
     """由 IOL 度数反解预测等效球镜（D，眼镜平面）。"""
     axial = (al_cor - elp) / 1000.0
     if axial <= 1e-6:
         return float("nan")
     l_iol = N_AQUEOUS / axial - as_float(iol_power, "iol_power")
-    reduced = elp / 1000.0 / N_AQUEOUS
-    denominator = 1.0 + reduced * l_iol
-    if abs(denominator) <= 1e-9:
+    try:
+        l_back = _propagate(l_iol, cornea["cct"] - elp, N_AQUEOUS)
+        l_front = _propagate(
+            l_back - cornea["p_back"], -cornea["cct"], N_CORNEA
+        )
+    except ValueError:
         return float("nan")
-    l_cornea = l_iol / denominator
-    l_spec = l_cornea - p_cornea
+    l_spec = l_front - cornea["p_front"]
     denominator = 1.0 + SPECTACLE_VERTEX_M * l_spec
     if abs(denominator) <= 1e-9:
         return float("nan")
@@ -421,11 +432,11 @@ def calculate(
             "请核对晶状体厚度"
         )
 
-    exact_power = _power(al_cor, elp_value, p_cornea, target_value, r_value)
+    exact_power = _power(al_cor, elp_value, cornea, target_value, r_value)
 
     def refraction_at(power):
         """返回该 IOL 度数对应的预测等效球镜。"""
-        return _refraction(al_cor, elp_value, p_cornea, power, r_value)
+        return _refraction(al_cor, elp_value, cornea, power, r_value)
 
     result = build_formula_result(
         al=al_value,
@@ -503,7 +514,7 @@ def refraction_for_power(
     return _refraction(
         detail["al_corrected"],
         detail["elp"],
-        detail["p_cornea"],
+        detail,
         iol_power,
         detail["R"],
     )

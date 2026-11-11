@@ -13,6 +13,7 @@ if str(SRC_DIR) not in sys.path:
 
 formulas = importlib.import_module("formula")
 barrett_offline = importlib.import_module("formula.barrett")
+ulib_constants = importlib.import_module("formula.constants")
 
 FORMULA_MODULES = {
     "barrett": formulas.barrett,
@@ -168,6 +169,87 @@ def test_hoffer_q_frozen_reference_values():
     assert formulas.hoffer_q.calculate(24.5, 43.0)["iol_power_exact"] == pytest.approx(
         18.2360205273, abs=1e-6
     )
+
+
+@pytest.mark.parametrize("target", [-2.0, 0.0, 1.0])
+@pytest.mark.parametrize("k_index", [1.3375, 1.332])
+def test_hoffer_q_explicit_pacd_target_round_trip(target, k_index):
+    result = formulas.hoffer_q.calculate(
+        REFERENCE_AL, REFERENCE_K, target=target, k_index=k_index, pacd=6.0
+    )
+    refraction = formulas.hoffer_q.refraction_for_power(
+        REFERENCE_AL,
+        REFERENCE_K,
+        result["iol_power_exact"],
+        k_index=k_index,
+        pacd=6.0,
+    )
+
+    assert refraction == pytest.approx(target, abs=1e-6)
+
+
+@pytest.mark.parametrize("target", [-2.0, 0.0, 1.0])
+def test_hoffer_q_ulib_pacd_target_round_trip(target):
+    entry = ulib_constants.lookup("Alcon SN60WF")
+    assert entry is not None
+    assert entry.pacd is not None
+    result = formulas.hoffer_q.calculate(
+        REFERENCE_AL, REFERENCE_K, target=target, pacd=entry.pacd
+    )
+    refraction = formulas.hoffer_q.refraction_for_power(
+        REFERENCE_AL,
+        REFERENCE_K,
+        result["iol_power_exact"],
+        pacd=entry.pacd,
+    )
+
+    assert refraction == pytest.approx(target, abs=1e-6)
+
+
+@pytest.mark.parametrize("a_constant", [112.0, 118.7, 125.0])
+def test_hoffer_q_explicit_pacd_ignores_a_constant(a_constant):
+    reference = formulas.hoffer_q.calculate(
+        REFERENCE_AL, REFERENCE_K, pacd=6.0
+    )
+    result = formulas.hoffer_q.calculate(
+        REFERENCE_AL, REFERENCE_K, a_constant=a_constant, pacd=6.0
+    )
+    reference_refraction = formulas.hoffer_q.refraction_for_power(
+        REFERENCE_AL, REFERENCE_K, 21.5, pacd=6.0
+    )
+    refraction = formulas.hoffer_q.refraction_for_power(
+        REFERENCE_AL,
+        REFERENCE_K,
+        21.5,
+        a_constant=a_constant,
+        pacd=6.0,
+    )
+
+    assert result["iol_power_exact"] == pytest.approx(
+        reference["iol_power_exact"], abs=1e-9
+    )
+    assert refraction == pytest.approx(reference_refraction, abs=1e-9)
+
+
+def test_hoffer_q_refraction_default_pacd_preserves_legacy_call():
+    # 旧位置参数与冻结正视度数保持兼容；None 仍表示由 A 常数推导。
+    args = (REFERENCE_AL, REFERENCE_K, 20.2261181952, REFERENCE_A, 1.3375)
+    refraction = formulas.hoffer_q.refraction_for_power(*args)
+
+    assert refraction == pytest.approx(0.0, abs=1e-6)
+    assert formulas.hoffer_q.refraction_for_power(
+        *args, pacd=None
+    ) == pytest.approx(refraction, abs=1e-9)
+
+
+@pytest.mark.parametrize(
+    "pacd", [float("nan"), float("inf"), float("-inf"), "invalid", True]
+)
+def test_hoffer_q_refraction_rejects_invalid_pacd(pacd):
+    with pytest.raises(ValueError, match="pACD"):
+        formulas.hoffer_q.refraction_for_power(
+            REFERENCE_AL, REFERENCE_K, 21.5, pacd=pacd
+        )
 
 
 def test_holladay1_frozen_reference_values():

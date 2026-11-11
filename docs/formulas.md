@@ -225,21 +225,32 @@ ACD_defaulted、LOW_CONFIDENCE；默认值不能解释为患者的真实 ACD。
 ```text
 PCA     = (nC-1)/RCA
 PCP     = (n-nC)/RCP
-Pcornea = PCA + PCP - (dC/nC)·PCA·PCP        # 厚透镜，参考主平面
+Pcornea = PCA + PCP - (dC/nC)·PCA·PCP        # 等效屈光力，仅供诊断
 ELP     = ACD + C·LT + H                     # 论文 2021 原式
 
 Rg      = predSE - R
 Lspec   = Rg/(1 - dVD·Rg)
-Lcornea = Lspec + Pcornea
-Liol    = Lcornea/(1 - (ELP/n)·Lcornea)
+Lfront  = Lspec + PCA
+Lback   = Lfront/(1 - (dC/nC)·Lfront) + PCP
+Liol    = Lback/(1 - ((ELP-dC)/n)·Lback)
 PIOL    = n/(ALcor - ELP) - Liol
 
 ALcor   = 1.23854 + 0.95855·AL - 0.05467·LT   # Cooke 修正
 ```
 
-角膜后表面半径与角膜厚度缺失时，按论文用固定比值推算：
-`RCP = RCA×6.4/7.77`（≈0.8237）、`dC = 0.55 mm`。两者都可以通过
+上述光学传播式的长度用米；API 输入和诊断输出的长度仍用 mm。
+前后角膜表面分别折射，先在角膜内传播 dC，再在房水中传播 ELP−dC；
+不把主平面上的等效 Pcornea 直接加在角膜前顶点使用。预测屈光度沿同一
+表面顺序反向传播，并在眼镜平面加回 R。
+
+角膜后表面半径与角膜厚度缺失时，按论文取：
+`RCP = RCA×6.4/7.77`（≈0.8237）、`dC = 0.50 mm`。两者都可以通过
 `castrop_posterior_ratio` 与 `castrop_cct` 覆盖。
+
+分表面传播修正会改变原实现的计算结果。参考眼 AL=23.5、K=44、
+ACD=3.2、LT=4.6、C/H/R=0.4/0/0、target=0，开启 Cooke 修正时：
+显式 CCT=0.55 mm 的精确 IOL 度数由 21.263326 D 修正为 21.143165 D；
+采用论文默认 CCT=0.50 mm 时为 21.169933 D。
 
 ### 5a.1 三个常数与 ELP 推导方式
 
@@ -286,7 +297,7 @@ ACD 与 LT 是 ELP 的核心输入。缺失时分别用 3.20 mm 与 4.60 mm 兜�
 | `castrop_constants` | `{C, H, R}`，IOLCon 口径 |
 | `castrop_elp` | 直接指定 ELP（mm，2.0~12.0） |
 | `castrop_elp_model` | ELP 推导方式，见 5a.1 |
-| `castrop_cct` | 中央角膜厚度（mm），默认 0.55 |
+| `castrop_cct` | 中央角膜厚度（mm），默认 0.50 |
 | `castrop_posterior_ratio` | 角膜后/前表面半径比，默认 0.8237 |
 | `castrop_al_correction` | 是否做 Cooke 眼轴修正，默认开启 |
 
